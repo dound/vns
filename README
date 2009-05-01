@@ -1,1 +1,19 @@
-Simple VNS: a temporary solution for testing PWOSPF with a VNS-protocol compatible system.
+Simple VNS
+
+Purpose: Provide a temporary testing platform which is compatible with the VNS
+         protocol for the PWOSPF project.
+
+How to Use:
+  1) Start the local VNS server: python VNS.py
+
+  2) Connect instances of your router - the default topology has four routers:
+      sr -s 127.0.0.1 -v rtr1
+      ...
+      sr -s 127.0.0.1 -v rtr4
+
+  3) You can't inject traffic from outside the network, but you should see your
+     PWOSPF traffic going around.  You can also generate traffic with your
+     router (e.g., by pinging through your CLI).
+
+Note: This is very new and beta.  I don't doubt there are bugs - let me know if
+      you find something wrong ... but it works for me :).  Feedback welcome.
