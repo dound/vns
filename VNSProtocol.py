@@ -126,6 +126,33 @@ class VNSInterface:
         fmt = '%s: mac=%s ip=%s mask=%s'
         return fmt % (self.name, self.mac, ip_to_str(self.ip), ip_to_str(self.mask))
 
+class VNSBanner(LTMessage):
+    @staticmethod
+    def get_type():
+        return 8
+
+    def __init__(self, msg):
+        LTMessage.__init__(self)
+        self.msg = str(msg)
+
+    def length(self):
+        return VNSBanner.SIZE
+
+    FORMAT = '> 256s'
+    SIZE = struct.calcsize(FORMAT)
+
+    def pack(self):
+        return struct.pack(VNSBanner.FORMAT, self.msg)
+
+    @staticmethod
+    def unpack(body):
+        t = struct.unpack(VNSBanner.FORMAT, body)
+        return VNSBanner(t[0])
+
+    def __str__(self):
+        return 'BANNER: %s' % self.msg
+VNS_MESSAGES.append(VNSBanner)
+
 class VNSHardwareInfo(LTMessage):
     @staticmethod
     def get_type():
