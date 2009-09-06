@@ -48,6 +48,19 @@ class VirtualNode(Node):
         if self.conn is not None:
             self.conn.send(VNSPacket(intf.name, packet))
 
+class BlackHole(Node):
+    """A node which discards all receives packets and sends no packets."""
+    def __init__(self, name, interfaces):
+        Node.__init__(self, name, interfaces)
+
+    def connect(self, _):
+        print 'Rejecting connection to %s - may not control a Black Hole node' % self.name
+        return False
+
+    def handle_packet(self, incoming_intf, packet):
+        """Discard all received packets."""
+        pass
+
 class Host(Node):
     """A host in the network which replies to echo requests"""
     def __init__(self, name, interfaces):
