@@ -79,11 +79,6 @@ class Port(Model):
     """A port on a node in a topology template."""
     node = ForeignKey(Node)
     name = CharField(max_length=5)
-    ipSet = CharField('IP Set Identifier', max_length=30,
-                      help_text='An identifier for a set of IPs with a common ' +
-                                'prefix.  This name only distinguishes different' +
-                                'sets - it has no meaning in and of itself.')
-    mask = IntegerField('# of Bits in the Subnet Mask')
 
     def __unicode__(self):
         return u'%s: %s: %s' % (self.node.template.name, self.node.name, self.name)
