@@ -16,14 +16,8 @@ if tmaj<8 or (tmaj==8 and tmin<2) or (tmaj==8 and tmin==2 and (v[4]=='' or int(v
     print >> sys.stderr, 'Fatal Error: twisted version 8.2.0+r27292 or higher is required!'
     sys.exit(-1)
 
-PORT = 80
-
-# tell python about the VNS Django project
-vns_root_dir = path.join(path.dirname(__file__), '').replace('\\','/')
-sys.path.append(vns_root_dir)
-
-# tell Django about the settings file
-environ['DJANGO_SETTINGS_MODULE'] = 'web.settings'
+sys.path.append(path.join(path.dirname(__file__), '').replace('\\','/'))
+from django_settings import VNS_WEB_SERVER_PORT as PORT
 
 def wsgi_resource():
     pool = threadpool.ThreadPool()
