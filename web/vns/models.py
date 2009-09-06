@@ -124,6 +124,9 @@ class IPAssignment(Model):
     topology = ForeignKey(Topology)
     port = ForeignKey(Port)
     ip = IPAddressField()
+    mask = IntegerField(choices=tuple([(i, u'/%d'%i) for i in range(1,33)]),
+                        help_text='Number of bits which are dedicated to a' +
+                                  'common routing prefix.')
 
     def __unicode__(self):
         return u'%s: %s <== %s' % (self.topology.__unicode__(),

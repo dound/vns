@@ -69,7 +69,7 @@ class TopologyUserAdmin(admin.ModelAdmin):
     search_fields = ('ip', 'topology__template__name', 'topology__name')
 
 class IPAssignmentAdmin(admin.ModelAdmin):
-    list_display = ('topology', 'port', 'ip')
+    list_display = ('topology', 'port', 'ip', 'mask')
     ordering = ('ip',)
     search_fields = ('ip', 'topology__template__name', 'topology__name', 'port__node__name')
 
