@@ -1,4 +1,5 @@
 from os import environ, path
+import re
 import sys
 
 from django.core.handlers.wsgi import WSGIHandler
@@ -6,6 +7,14 @@ from twisted.application import internet, service
 from twisted.web import server, resource, wsgi, static
 from twisted.python import threadpool
 from twisted.internet import reactor
+import twisted
+
+# twisted version check
+v = re.findall(r'^(\d+)\.(\d+)\.(\d+)([+]r(\d+))?', twisted.__version__)[0]
+tmaj, tmin = int(v[0]), int(v[1])
+if tmaj<8 or (tmaj==8 and tmin<2) or (tmaj==8 and tmin==2 and (v[4]=='' or int(v[4])<27292)):
+    print >> sys.stderr, 'Fatal Error: twisted version 8.2.0+r27292 or higher is required!'
+    sys.exit(-1)
 
 PORT = 80
 
