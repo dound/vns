@@ -69,9 +69,9 @@ class TopologyUserAdmin(admin.ModelAdmin):
     search_fields = ('ip', 'topology__template__name', 'topology__name')
 
 class IPAssignmentAdmin(admin.ModelAdmin):
-    list_display = ('topology', 'node', 'ip')
+    list_display = ('topology', 'port', 'ip')
     ordering = ('ip',)
-    search_fields = ('ip', 'topology__template__name', 'topology__name', 'node__name')
+    search_fields = ('ip', 'topology__template__name', 'topology__name', 'port__node__name')
 
 class IPBlockAdmin(admin.ModelAdmin):
     list_display = ('simulator', 'parentIPBlock', 'org', 'subnet', 'mask')

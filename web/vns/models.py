@@ -118,15 +118,16 @@ class TopologyUser(Model):
         return u'%s may interact with %s' % (self.ip, self.topology.__unicode__())
 
 class IPAssignment(Model):
-    """Maps an IP address to a node in a particular topology.  IPs may be
-    assigned to more than one node based on constraints enforced at a higher
-    level."""
+    """Maps an IP address to a port on a particular node in a particular
+    topology.  IPs may be assigned to more than one node based on constraints
+    enforced at a higher level."""
     topology = ForeignKey(Topology)
-    node = ForeignKey(Node)
+    port = ForeignKey(Port)
     ip = IPAddressField()
 
     def __unicode__(self):
-        return u'%s: %s <== %s' % (self.topology.__unicode__(), self.node.name, self.ip)
+        return u'%s: %s <== %s' % (self.topology.__unicode__(),
+                                      self.port.__unicode__(), self.ip)
 
 class IPBlock(Model):
     """A block of IP addresses which can be allocated to topologies in a
