@@ -22,18 +22,18 @@ class Organization(Model):
     def __unicode__(self):
         return u'%s' % self.name
 
-class Position(Model):
-    """A user's role (in the VNS web system)."""
-    name = CharField(max_length=30, unique=True)
-
-    def __unicode__(self):
-        return u'%s' % self.name
-
 class UserProfile(Model):
     """Defines extra information to associate with a User."""
+    POSITION_CHOICES = (
+        (0, u'VNS Admin'),
+        (1, u'Student'),
+        (3, u'Instructor'),
+        (4, u'TA'),
+    )
+
     user = ForeignKey(User, unique=True)
     org  = ForeignKey(Organization)
-    pos  = ForeignKey(Position)
+    pos  = IntegerField(choices=POSITION_CHOICES)
 
     def __unicode__(self):
         return u'%s' % self.user.__unicode__()
@@ -59,18 +59,24 @@ class TopologyTemplate(Model):
     def __unicode__(self):
         return u'%s' % self.name
 
-class NodeType(Model):
-    """Describes a type of Node which can be simulated in a topology."""
-    name = CharField(max_length=30, unique=True)
-
-    def __unicode__(self):
-        return u'%s' % self.name
-
 class Node(Model):
     """A node in a topology template."""
+    VIRTUAL_NODE_ID = 0
+    BLACK_HOLE_ID = 1
+    HUB_ID = 2
+    WEB_SERVER_ID = 3
+    SYSTEM_ROUTER_ID = 4
+    NODE_CHOICES = (
+        (VIRTUAL_NODE_ID, u'Virtual Node'),
+        (BLACK_HOLE_ID, u'Black Hole'),
+        (HUB_ID, u'Hub'),
+        (WEB_SERVER_ID, u'Web Server'),
+        (SYSTEM_ROUTER_ID, u'System Router'),
+    )
+
     template = ForeignKey(TopologyTemplate)
     name = CharField(max_length=30)
-    type = ForeignKey(NodeType)
+    type = IntegerField(choices=NODE_CHOICES)
 
     def __unicode__(self):
         return u'%s: %s' % (self.template.name, self.name)

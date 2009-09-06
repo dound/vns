@@ -1,6 +1,6 @@
 from django.contrib import admin
-from web.vns.models import Simulator, Organization, Position, UserProfile, \
-                           TopologyTemplate, NodeType, Node, Port, Link,   \
+from web.vns.models import Simulator, Organization, UserProfile, \
+                           TopologyTemplate, Node, Port, Link,   \
                            Topology, TopologyUser, IPAssignment, IPBlock
 
 def make_user_search_fields(prefix):
@@ -10,11 +10,6 @@ class SimulatorAdmin(admin.ModelAdmin):
     list_display = ('name', 'ip')
     ordering = ('name',)
     search_fields = ('name', 'ip')
-
-class PositionAdmin(admin.ModelAdmin):
-    list_display = ('name',)
-    ordering = ('name',)
-    search_fields = ('name',)
 
 class OrganizationAdmin(admin.ModelAdmin):
     list_display = ('name', 'parentOrg', 'boss')
@@ -31,11 +26,6 @@ class TopologyTemplateAdmin(admin.ModelAdmin):
     list_display = ('name', 'org', 'owner', 'visibility', 'date_updated')
     ordering = ('name',)
     search_fields = make_user_search_fields('owner') + ('name', 'org__name', 'date_updated')
-
-class NodeTypeAdmin(admin.ModelAdmin):
-    list_display = ('name',)
-    ordering = ('name',)
-    search_fields = ('name',)
 
 class NodeAdmin(admin.ModelAdmin):
     list_display = ('template', 'name', 'type')
@@ -80,10 +70,8 @@ class IPBlockAdmin(admin.ModelAdmin):
 
 admin.site.register(Simulator, SimulatorAdmin)
 admin.site.register(Organization, OrganizationAdmin)
-admin.site.register(Position, PositionAdmin)
 admin.site.register(UserProfile, UserProfileAdmin)
 admin.site.register(TopologyTemplate, TopologyTemplateAdmin)
-admin.site.register(NodeType, NodeTypeAdmin)
 admin.site.register(Node, NodeAdmin)
 admin.site.register(Port, PortAdmin)
 admin.site.register(Link, LinkAdmin)
