@@ -85,8 +85,8 @@ class Port(Model):
 
 class Link(Model):
     """A link connecting two nodes in a topology template."""
-    port1 = ForeignKey(Node, related_name='port1_id')
-    port2 = ForeignKey(Node, related_name='port2_id')
+    port1 = ForeignKey(Port, related_name='port1_id')
+    port2 = ForeignKey(Port, related_name='port2_id')
     lossiness = FloatField(default=0.0,
                            help_text='% of packets lost by this link: [0.0, 1.0]')
 
