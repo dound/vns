@@ -1,11 +1,14 @@
 """Defines a simple VNS-like simulation."""
 
+import logging.config
 import struct
 
 from twisted.internet import reactor
 
 from VNSProtocol import VNS_DEFAULT_PORT, create_vns_server
 from VNSProtocol import VNSOpen, VNSClose, VNSPacket, VNSInterface, VNSHardwareInfo
+
+logging.config.fileConfig('logging.conf')
 
 class Node:
     """A node in a topology"""
