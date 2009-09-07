@@ -1,3 +1,7 @@
+import hashlib
+from socket import inet_aton
+import struct
+
 from django.db.models import AutoField, CharField, DateField, FloatField, ForeignKey, \
                              IntegerField, IPAddressField, ManyToManyField, Model
 from django.contrib.auth.models import User
@@ -134,9 +138,21 @@ class IPAssignment(Model):
                         help_text='Number of bits which are dedicated to a' +
                                   'common routing prefix.')
 
+    def get_ip(self):
+        """Returns the 4-byte integer representation of the IP."""
+        return inet_aton(self.ip)
+
+    def get_mask(self):
+        """Returns the 4-byte integer representation of the subnet mask."""
+        return struct.pack('>I', 0xffffffff ^ (1 << 32 - self.mask) - 1)
+
+    def get_mac(self):
+        """Maps the string representation of the IP address into a 6B MAC address"""
+        return '\x00' + hashlib.md5(self.ip).digest()[0:5]
+
     def __unicode__(self):
-        return u'%s: %s <== %s' % (self.topology.__unicode__(),
-                                      self.port.__unicode__(), self.ip)
+        return u'%s: %s <== %s/%d' % (self.topology.__unicode__(),
+                                      self.port.__unicode__(), self.ip, self.mask)
 
 class IPBlock(Model):
     """A block of IP addresses which can be allocated to topologies in a
