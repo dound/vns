@@ -11,6 +11,7 @@ class Simulator(Model):
     name = CharField(max_length=30, unique=True)
     ip = IPAddressField(unique=True,
                         help_text='IP address where the server is located.')
+    gatewayIP = IPAddressField(help_text='First hop IP address outside of the simulator.')
 
     def __unicode__(self):
         return u'%s' % self.name
@@ -69,13 +70,14 @@ class Node(Model):
     BLACK_HOLE_ID = 1
     HUB_ID = 2
     WEB_SERVER_ID = 3
-    SYSTEM_ROUTER_ID = 4
+    GATEWAY_ID = 4
     NODE_CHOICES = (
         (VIRTUAL_NODE_ID, u'Virtual Node'),
         (BLACK_HOLE_ID, u'Black Hole'),
         (HUB_ID, u'Hub'),
         (WEB_SERVER_ID, u'Web Server'),
-        (SYSTEM_ROUTER_ID, u'System Router'),
+        (GATEWAY_ID, u'Gateway Router'), # b/w simulator and the real world, OR
+                                         # perhaps even between two simulators
     )
 
     template = ForeignKey(TopologyTemplate)
