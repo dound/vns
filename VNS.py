@@ -240,9 +240,9 @@ class BasicNode(Node):
 
         eth_type = struct.unpack('> H', packet[12:14])[0]
         if eth_type == 0x0800:
-            self.handle_arp_packet(intf, packet[:14], packet[14:])
-        elif eth_type == 0x0806:
             self.handle_ip_packet(intf, packet[:14], packet[14:])
+        elif eth_type == 0x0806:
+            self.handle_arp_packet(intf, packet[:14], packet[14:])
 
     def handle_arp_packet(self, intf, eth, arp):
         """Respond to arp if it is a request for the mac address of intf's IP."""
