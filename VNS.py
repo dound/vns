@@ -85,6 +85,22 @@ class Topology():
         n = self.clients.pop(client_conn)
         n.disconnect(client_conn)
 
+    def get_gateway_addrs(self):
+        """Returns a list of Ethernet and IP addresses (as byte-strings) which
+        belong to gateways (if any) connecting this topology to the outside."""
+        addrs = []
+        sz = len(self.gateway.interfaces)
+        if sz > 1:
+            logging.error('gateway in topology %d has more than 1 interface' % self.topo_id)
+
+        if sz > 0:
+            intf = self.gateway.interfaces[0]
+            if intf.link:
+                other = intf.link.get_other()
+                addrs.append(other.mac)
+                addrs.append(struct.pack('>I', other.ip))
+        return addrs
+
     def get_id(self):
         """Returns this topology's unique ID number."""
         return self.id
@@ -450,6 +466,7 @@ class VNSSimulator:
     topologies."""
     def __init__(self):
         self.topologies = {} # maps active topology ID to its Topology object
+        self.border_addrs = {} # maps MAC/IP addrs of gateways to their Topology
         self.clients = {}    # maps active conn to the topology ID it is conn to
         self.server = create_vns_server(VNS_DEFAULT_PORT,
                                         self.handle_recv_msg,
@@ -512,7 +529,9 @@ class VNSSimulator:
             topo = self.topologies[tid]
             topo.client_disconnected(conn)
             if not topo.is_active():
-                del self.topologies[topo.id]
+                for addr in topo.get_gateway_addrs():
+                    del self.border_addrs[addr]
+                del self.topologies[tid]
 
     def handle_open_msg(self, conn, open_msg):
         # get the topology the client is trying to connect to
@@ -523,6 +542,8 @@ class VNSSimulator:
             try:
                 topo = Topology(tid)
                 self.topologies[tid] = topo
+                for addr in topo.get_gateway_addrs():
+                    self.border_addrs[addr] = topo
             except db.Topology.DoesNotExist:
                 self.terminate_connection(conn,
                                           'requested topology (%d) does not exist' % tid)
