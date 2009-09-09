@@ -5,6 +5,7 @@ import random
 from socket import inet_ntoa
 import struct
 
+from pcapy import open_live
 from twisted.internet import reactor
 
 import settings
@@ -450,6 +451,31 @@ class VNSSimulator:
                                         self.handle_recv_msg,
                                         None,
                                         self.handle_client_disconnected)
+        if settings.BORDER_DEV_NAME:
+            self.__run_pcap(settings.BORDER_DEV_NAME)
+
+    def __run_pcap(self, dev):
+        """Start listening for packets coming in from the outside world."""
+        MAX_LEN      = 1514    # max size of packet to capture
+        PROMISCUOUS  = 1       # promiscuous mode?
+        READ_TIMEOUT = 100     # in milliseconds
+        PCAP_FILTER  = ''      # empty => get everything (or we could use a BPF filter)
+        MAX_PKTS     = -1      # number of packets to capture; -1 => no limit
+
+        # the method which will be called when a packet is captured
+        def ph(hdr, data):
+            # thread safety: call from the main twisted event loop
+            reactor.callFromThread(self.handle_packet_from_outside, data)
+
+        # start the packet capture
+        p = open_live(dev, MAX_LEN, PROMISCUOUS, READ_TIMEOUT)
+        p.setfilter(PCAP_FILTER)
+        logging.info("Listening on %s: net=%s, mask=%s" % (dev, p.getnet(), p.getmask()))
+        p.loop(MAX_PKTS, ph)
+
+    def handle_packet_from_outside(self, packet):
+        """Forwards packet to the appropriate simulation, if any."""
+        logging.debug('TODO: implement external packet handling')
 
     def handle_recv_msg(self, conn, vns_msg):
         if vns_msg is not None:
