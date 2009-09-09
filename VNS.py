@@ -491,7 +491,7 @@ class VNSSimulator:
         MAX_PKTS     = -1      # number of packets to capture; -1 => no limit
 
         # the method which will be called when a packet is captured
-        def ph(hdr, data):
+        def ph(_, data):
             # thread safety: call from the main twisted event loop
             reactor.callFromThread(self.handle_packet_from_outside, data)
 
