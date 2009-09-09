@@ -36,7 +36,8 @@ class Topology():
 
         # read in this topology's nodes
         db_nodes = db.Node.objects.filter(template=t.template)
-        self.nodes = [Topology.__make_node(dn) for dn in db_nodes]
+        self.gateway = None
+        self.nodes = [self.__make_node(dn) for dn in db_nodes]
 
         # remember the DB to simulator object mapping
         nodes_db_to_sim = {}
@@ -108,8 +109,7 @@ class Topology():
         """Returns true if any clients are connected."""
         return len(self.clients) > 0
 
-    @staticmethod
-    def __make_node(dn):
+    def __make_node(self, dn):
         """Converts the given database node into a simulator node object."""
         # TODO: need to distinguish between nodes THIS simulator simulates,
         #       versus nodes which ANOTHER simulator is responsible for.  Do
@@ -124,11 +124,15 @@ class Topology():
         elif dn.type == db.Node.WEB_SERVER_ID:
             return WebServer(dn.name)
         elif dn.type == db.Node.GATEWAY_ID:
-            return Gateway(dn.name)
+            if self.gateway is not None:
+                err = 'only one gateway per topology is allowed'
+            else:
+                self.gateway = Gateway(dn.name)
+                return self.gateway
         else:
             err = 'unknown node type: %d' % dn.type
-            logging.critical(err)
-            raise db.Topology.DoesNotExist(err)
+        logging.critical(err)
+        raise db.Topology.DoesNotExist(err)
 
 class Link:
     """Information about a connection between two ports.  Tells intf1 and intf2
