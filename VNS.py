@@ -91,7 +91,7 @@ class Topology():
         addrs = []
         sz = len(self.gateway.interfaces)
         if sz > 1:
-            logging.error('gateway in topology %d has more than 1 interface' % self.topo_id)
+            logging.error('gateway in topology %d has more than 1 interface' % self.id)
 
         if sz > 0:
             intf = self.gateway.interfaces[0]
