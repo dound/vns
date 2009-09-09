@@ -481,6 +481,9 @@ class VNSSimulator:
                                         self.handle_client_disconnected)
         if settings.BORDER_DEV_NAME:
             self.__run_pcap(settings.BORDER_DEV_NAME)
+            self.__start_raw_socket(settings.BORDER_DEV_NAME)
+        else:
+            self.raw_socket = None
 
     def __run_pcap(self, dev):
         """Start listening for packets coming in from the outside world."""
@@ -500,6 +503,12 @@ class VNSSimulator:
         p.setfilter(PCAP_FILTER)
         logging.info("Listening on %s: net=%s, mask=%s" % (dev, p.getnet(), p.getmask()))
         p.loop(MAX_PKTS, ph)
+
+    def __start_raw_socket(self, dev):
+        """Starts a socket for sending raw Ethernet frames."""
+        import socket
+        self.raw_socket = socket.socket(socket.PF_PACKET, socket.SOCK_RAW)
+        self.raw_socket.bind((dev, 0x9999))
 
     @staticmethod
     def __get_dst_addr(packet):
