@@ -89,7 +89,7 @@ class Topology():
         """Returns this topology's unique ID number."""
         return self.id
 
-    def handle_packet(self, conn, pkt_msg):
+    def handle_packet_from_client(self, conn, pkt_msg):
         """Sends the specified message out the specified port on the node
         controlled by conn.  If conn does not control a node, then a KeyError is
         raised.  If conn's node does not have an interface with the specified
@@ -564,7 +564,7 @@ class VNSSimulator:
             return
 
         try:
-            ret = topo.handle_packet(conn, pkt_msg)
+            ret = topo.handle_packet_from_client(conn, pkt_msg)
         except KeyError:
             msg = 'client %s sent VNSPacket message but its topology (%d) does not think it is connected to any node' % (conn, tid)
             self.terminate_connection(conn, msg, lvl=logging.WARN)
