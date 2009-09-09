@@ -121,6 +121,13 @@ class Topology():
         fmt = 'bad packet request: invalid interface: %s'
         return fmt % (n.name, departure_intf_name)
 
+    def handle_packet_to_gateway(self, packet):
+        """Forwards packet to the node connected to the gateway."""
+        if len(self.gateway.interfaces) > 0:
+            intf = self.gateway.interfaces[0]
+            if intf.link:
+                intf.link.send_to_other(intf, packet)
+
     def is_active(self):
         """Returns true if any clients are connected."""
         return len(self.clients) > 0
@@ -494,9 +501,35 @@ class VNSSimulator:
         logging.info("Listening on %s: net=%s, mask=%s" % (dev, p.getnet(), p.getmask()))
         p.loop(MAX_PKTS, ph)
 
+    @staticmethod
+    def __get_dst_addr(packet):
+        """Returns the address the packet is destined to.  This will be the
+        Ethernet frame's destination MAC address except for ARP requests, in
+        which case the destination IP from the ARP packet is used (since the
+        destination MAC would be the broadcast MAC and we don't want to flood
+        every simulation with every ARP request)."""
+        if len(packet) < 14:
+            return None # too small to even have an Ethernet header
+
+        ether_type = packet[12:14]
+        if ether_type == '\x08\x06': # ARP
+            arp = packet[14:]
+            if len(arp) < 28:
+                return None # too small, ignore it
+
+            arp_type = arp[6:8]
+            if arp_type == '\x00\x01': # request
+                return arp[24:28] # dst IP
+
+        return packet[0:6] # dst MAC
+
     def handle_packet_from_outside(self, packet):
         """Forwards packet to the appropriate simulation, if any."""
-        logging.debug('TODO: implement external packet handling')
+        addr = VNSSimulator.__get_dst_addr(packet)
+        if addr:
+            topo = self.border_addrs.get(addr)
+            if topo:
+                topo.handle_packet_to_gateway(packet)
 
     def handle_recv_msg(self, conn, vns_msg):
         if vns_msg is not None:
