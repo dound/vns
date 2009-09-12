@@ -33,7 +33,7 @@ class ConnectionReturn():
 
 class Topology():
     """A topology to simulate."""
-    def __init__(self, tid):
+    def __init__(self, tid, raw_socket):
         """Reads topology with the specified id from the database.  A
         DoesNotExist exception (Topology or IPAssignment) is raised if this fails."""
         # maps clients connected to this topology to the node they are connected to
@@ -45,7 +45,7 @@ class Topology():
         # read in this topology's nodes
         db_nodes = db.Node.objects.filter(template=t.template)
         self.gateway = None
-        self.nodes = [self.__make_node(dn) for dn in db_nodes]
+        self.nodes = [self.__make_node(dn, raw_socket) for dn in db_nodes]
 
         # remember the DB to simulator object mapping
         nodes_db_to_sim = {}
@@ -140,7 +140,7 @@ class Topology():
         """Returns true if any clients are connected."""
         return len(self.clients) > 0
 
-    def __make_node(self, dn):
+    def __make_node(self, dn, raw_socket):
         """Converts the given database node into a simulator node object."""
         # TODO: need to distinguish between nodes THIS simulator simulates,
         #       versus nodes which ANOTHER simulator is responsible for.  Do
@@ -158,7 +158,7 @@ class Topology():
             if self.gateway is not None:
                 err = 'only one gateway per topology is allowed'
             else:
-                self.gateway = Gateway(dn.name)
+                self.gateway = Gateway(dn.name, raw_socket)
                 return self.gateway
         else:
             err = 'unknown node type: %d' % dn.type
@@ -399,8 +399,9 @@ class BlackHole(Node):
 class Gateway(Node):
     """Shuffles packets between a simulated topology and the gateway router
     on the edge of the real network."""
-    def __init__(self, name):
+    def __init__(self, name, raw_socket):
         Node.__init__(self, name)
+        self.raw_socket = raw_socket
 
     @staticmethod
     def get_type_str():
@@ -427,7 +428,14 @@ class Gateway(Node):
                 logging.debug('ignoring IP packet to private address space: %s' % inet_ntoa(dst_ip))
                 return
 
-        logging.debug('TODO: forward packet out to the real network')
+        # forward packet out to the real network
+        if self.raw_socket:
+            try:
+                self.raw_socket.send(packet)
+            except socket.error:
+                # this is recoverable - the network may come back up
+                log_exception(logging.WARN,
+                              'unable to forward packet to the real network')
 
     def handle_packet_from_outside(self, packet):
         """Forwards the specified packet to the first hop in the topology."""
@@ -602,7 +610,7 @@ class VNSSimulator:
             topo = self.topologies[tid]
         except KeyError:
             try:
-                topo = Topology(tid)
+                topo = Topology(tid, self.raw_socket)
                 self.topologies[tid] = topo
                 for addr in topo.get_gateway_addrs():
                     self.border_addrs[addr] = topo
