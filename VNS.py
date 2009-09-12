@@ -1,11 +1,14 @@
 """The VNS simulator."""
 
+import errno
 import logging.config
 import random
+import socket
 from socket import inet_ntoa
 import struct
+import sys
 
-from pcapy import open_live
+from pcapy import open_live, PcapError
 from twisted.internet import reactor
 
 import settings
@@ -480,8 +483,8 @@ class VNSSimulator:
                                         None,
                                         self.handle_client_disconnected)
         if settings.BORDER_DEV_NAME:
-            self.__run_pcap(settings.BORDER_DEV_NAME)
             self.__start_raw_socket(settings.BORDER_DEV_NAME)
+            self.__run_pcap(settings.BORDER_DEV_NAME)
         else:
             self.raw_socket = None
 
@@ -499,16 +502,28 @@ class VNSSimulator:
             reactor.callFromThread(self.handle_packet_from_outside, data)
 
         # start the packet capture
-        p = open_live(dev, MAX_LEN, PROMISCUOUS, READ_TIMEOUT)
+        try:
+            p = open_live(dev, MAX_LEN, PROMISCUOUS, READ_TIMEOUT)
+        except PcapError:
+            logging.exception('failed to start pcap')
+            sys.exit(-1)
+
         p.setfilter(PCAP_FILTER)
         logging.info("Listening on %s: net=%s, mask=%s" % (dev, p.getnet(), p.getmask()))
         p.loop(MAX_PKTS, ph)
 
     def __start_raw_socket(self, dev):
         """Starts a socket for sending raw Ethernet frames."""
-        import socket
-        self.raw_socket = socket.socket(socket.PF_PACKET, socket.SOCK_RAW)
-        self.raw_socket.bind((dev, 0x9999))
+        try:
+            self.raw_socket = socket.socket(socket.PF_PACKET, socket.SOCK_RAW)
+            self.raw_socket.bind((dev, 0x9999))
+        except socket.error as e:
+            if e.errno == errno.EPERM:
+                extra = ' (did you forget to run me with root?)'
+            else:
+                extra = ''
+            logging.exception('failed to open raw socket' + extra)
+            sys.exit(-1)
 
     @staticmethod
     def __get_dst_addr(packet):
