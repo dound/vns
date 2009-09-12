@@ -7,6 +7,7 @@ import socket
 from socket import inet_ntoa
 import struct
 import sys
+import traceback
 
 from pcapy import open_live, PcapError
 from twisted.internet import reactor
@@ -17,6 +18,10 @@ from VNSProtocol import VNS_DEFAULT_PORT, create_vns_server
 from VNSProtocol import VNSOpen, VNSClose, VNSPacket, VNSInterface, VNSHardwareInfo
 
 logging.config.fileConfig('logging.conf')
+
+def log_exception(lvl, msg):
+    """Like logging.exception(msg) except you may choose what level to log to."""
+    logging.log(lvl, msg + '\n' + traceback.format_exc()[:-1])
 
 class ConnectionReturn():
     def __init__(self, fail_reason=None, prev_client=None):
@@ -505,7 +510,7 @@ class VNSSimulator:
         try:
             p = open_live(dev, MAX_LEN, PROMISCUOUS, READ_TIMEOUT)
         except PcapError:
-            logging.exception('failed to start pcap')
+            log_exception(logging.CRITICAL, 'failed to start pcap')
             sys.exit(-1)
 
         p.setfilter(PCAP_FILTER)
@@ -522,7 +527,7 @@ class VNSSimulator:
                 extra = ' (did you forget to run me with root?)'
             else:
                 extra = ''
-            logging.exception('failed to open raw socket' + extra)
+            log_exception(logging.CRITICAL, 'failed to open raw socket' + extra)
             sys.exit(-1)
 
     @staticmethod
