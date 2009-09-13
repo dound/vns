@@ -153,7 +153,7 @@ class Topology():
         elif dn.type == db.Node.HUB_ID:
             return Hub(dn.name)
         elif dn.type == db.Node.WEB_SERVER_ID:
-            return WebServer(dn.name)
+            return WebServer(dn.name, dn.webserver.web_server_addr.hostname)
         elif dn.type == db.Node.GATEWAY_ID:
             if self.gateway is not None:
                 err = 'only one gateway per topology is allowed'
@@ -468,10 +468,12 @@ class Hub(Node):
                 self.send_packet(intf, packet)
 
 class WebServer(BasicNode):
-    """A host in the network which is serving a website on TCP port 80.  Like
+    """A host in the network which is serving a website (specified by the
+    web_server_to_proxy_hostname parameter) on TCP port 80.  Like
     Host, it also replies to echo and ARP requests."""
-    def __init__(self, name):
+    def __init__(self, name, web_server_to_proxy_hostname):
         BasicNode.__init__(self, name)
+        self.web_server_to_proxy_hostname = web_server_to_proxy_hostname
 
     @staticmethod
     def get_type_str():
