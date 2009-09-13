@@ -44,11 +44,6 @@ class LinkAdmin(admin.ModelAdmin):
                      'port2__node__name', 'lossiness')
 
 class TopologyAdmin(admin.ModelAdmin):
-    list_display = ('node1', 'node2', 'lossiness')
-    ordering = ('node1',)
-    search_fields = ('node1__template__name', 'node1__name', 'node2__name', 'lossiness')
-
-class TopologyAdmin(admin.ModelAdmin):
     list_display = ('owner', 'id', 'template')
     ordering = ('owner', 'id')
     search_fields = ('id', 'owner__name', 'template__name')
