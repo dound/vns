@@ -87,6 +87,20 @@ class Node(Model):
     def __unicode__(self):
         return u'%s: %s' % (self.template.name, self.name)
 
+class WebServerHostname(Model):
+    """A web server hostname which can be proxied by a simulated web server."""
+    hostname = CharField(max_length=256)
+
+    def __unicode__(self):
+        return u'%s' % self.hostname
+
+class WebServer(Node):
+    """A web server node.  It specifies which web server it will proxy (i.e.,
+    if you connect to it, what website will it appear to serve).  This is
+    limited to choices in the WebServerHostname table to prevent users from
+    using the system to retrieve content from questionable sources."""
+    web_server_addr = ForeignKey(WebServerHostname)
+
 class Port(Model):
     """A port on a node in a topology template."""
     node = ForeignKey(Node)

@@ -1,6 +1,6 @@
 from django.contrib import admin
 from web.vns.models import Simulator, Organization, UserProfile, \
-                           TopologyTemplate, Node, Port, Link,   \
+                           TopologyTemplate, Node, WebServer, WebServerHostname, Port, Link, \
                            Topology, TopologyUser, IPAssignment, IPBlock
 
 def make_user_search_fields(prefix):
@@ -31,6 +31,16 @@ class NodeAdmin(admin.ModelAdmin):
     list_display = ('template', 'name', 'type')
     ordering = ('template', 'name')
     search_fields = ('template__name', 'name', 'type__name')
+
+class WebServerAdmin(admin.ModelAdmin):
+    list_display = ('template', 'name', 'type', 'web_server_addr')
+    ordering = ('template', 'name')
+    search_fields = ('template__name', 'name', 'type__name', 'web_server_addr')
+
+class WebServerHostnameAdmin(admin.ModelAdmin):
+    list_display = ('hostname',)
+    ordering = ('hostname',)
+    search_fields = ('hostname',)
 
 class PortAdmin(admin.ModelAdmin):
     list_display = ('node', 'name')
@@ -68,6 +78,8 @@ admin.site.register(Organization, OrganizationAdmin)
 admin.site.register(UserProfile, UserProfileAdmin)
 admin.site.register(TopologyTemplate, TopologyTemplateAdmin)
 admin.site.register(Node, NodeAdmin)
+admin.site.register(WebServer, WebServerAdmin)
+admin.site.register(WebServerHostname, WebServerHostnameAdmin)
 admin.site.register(Port, PortAdmin)
 admin.site.register(Link, LinkAdmin)
 admin.site.register(Topology, TopologyAdmin)
