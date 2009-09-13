@@ -14,6 +14,7 @@ from twisted.internet import reactor
 
 import settings
 import web.vns.models as db
+from ProtocolHelper import Packet
 from VNSProtocol import VNS_DEFAULT_PORT, create_vns_server
 from VNSProtocol import VNSOpen, VNSClose, VNSPacket, VNSInterface, VNSHardwareInfo
 
@@ -269,88 +270,59 @@ class BasicNode(Node):
             logging.debug('ignoring packet which is too small: %dB' % len(packet))
             return
 
-        eth_type = struct.unpack('> H', packet[12:14])[0]
-        if eth_type == 0x0800:
-            self.handle_ip_packet(intf, packet[:14], packet[14:])
-        elif eth_type == 0x0806:
-            self.handle_arp_packet(intf, packet[:14], packet[14:])
+        pkt = Packet(packet)
+        if pkt.is_valid_ipv4():
+            self.handle_ipv4_packet(intf, pkt)
+        elif pkt.is_valid_arp():
+            self.handle_arp_packet(intf, pkt)
 
-    def handle_arp_packet(self, intf, eth, arp):
+    def handle_arp_packet(self, intf, pkt):
         """Respond to arp if it is a request for the mac address of intf's IP."""
-        if len(arp) < 28:            # must be the expected size
-            logging.debug('ignoring ARP packet which is too small: %dB (%dB incl the Ethernet frame)' % (len(arp), len(eth)+len(arp)))
+        if pkt.arp_type != '\x00\x01': # only handle ARP REQUESTs
             return
-        elif arp[6:8] != '\x00\x01': # must be ARP REQUEST
-            return
-        elif arp[0:2] != '\x00\x01': # must be Ethernet HW type
-            return
-        elif arp[2:4] != '\x08\x00': # must be IP protocol type
-            return
-        elif arp[4]   != '\x06':     # must be 6B Ethernet address
-            return
-        elif arp[5]   != '\x04':     # must be 4B IP address
-            return
-
-        # get the source and destination hw and protocol addrs
-        sha = arp[8:14]
-        spa = arp[14:18]
-        dha = arp[18:24]
-        dpa = arp[24:28]
 
         # is the ARP request asking about THIS interface on broadcast dha?
         intf_ip_packed = struct.pack('> I', intf.ip)
-        if intf_ip_packed == dpa and dha=='\xFF\xFF\xFF\xFF\xFF\xFF':
+        if pkt.dpa==intf_ip_packed and pkt.dha=='\xFF\xFF\xFF\xFF\xFF\xFF':
             # send it back to the requester (reverse src/dst, copy in our mac addr)
-            reply_eth = eth[6:12] + eth[0:6] + eth[12:14]   # reverse MAC SA, DA
-            reply_arp = arp[0:8] + intf.mac + intf_ip_packed + sha + spa # rev for reply
+            reply_eth = pkt.get_reversed_eth()
+            reply_arp = pkt.arp[0:8] + intf.mac + intf_ip_packed + pkt.sha + pkt.spa
             self.send_packet(intf, reply_eth + reply_arp)
 
-    def handle_ip_packet(self, intf, eth, ip):
-        """Vets an IP packet's size and version, and replying if it is an ICMP
-        echo request.  Other handling is delegated to subclasses.  If the size
-        is too small or the version is wrong, it will be discarded."""
-        if len(ip) < 20:            # must be the expected size
-            logging.debug('ignoring IP packet which is too small: %dB (%dB incl the Ethernet frame)' % (len(ip), len(eth)+len(ip)))
-            return
-
-        ver = (struct.unpack('> B', ip[0]) & 0xF0) >> 4
-        if ver != 4:
-            logging.debug('ignoring non-IPv4 packet: v=%d' % ver)
-            return
-
-        dst_ip = struct.unpack('> I', ip[16:20])
-        if self.has_ip(dst_ip):
-            self.handle_ip_packet_to_self(intf, eth, ip)
+    def handle_ipv4_packet(self, intf, pkt):
+        """Replies to an ICMP echo request to this node.  Other handling is
+        delegated to subclasses."""
+        if self.has_ip(pkt.ip_dst):
+            self.handle_ipv4_packet_to_self(intf, pkt)
         else:
-            self.handle_ip_packet_to_other(intf, eth, ip)
+            self.handle_ipv4_packet_to_other(intf, pkt)
 
-    def handle_ip_packet_to_self(self, intf, eth, ip):
+    def handle_ipv4_packet_to_self(self, intf, pkt):
         """Called when a IP packet for on of our interfaces is received on intf.
         eth holds the Ethernet frame bytes and ip holds the IP packet bytes.
         This implementation replies with an echo reply or protocol unreachable
         as appropriate."""
-        proto = ip[9]
-        if proto == '\x01':
-            icmp = ip[20:]
-            if icmp[0] == '\x08':
-                new_eth = eth[6:12] + eth[0:6] + eth[12:14] # reverse MAC SA, DA
-                new_ip = ip[0:12] + ip[16:20] + ip[12:16]   # reverse IP SA, DA
+        if pkt.ip_proto == '\x01':
+            icmp = pkt.ip_payload
+            if icmp[0] == '\x08': # echo request
+                new_eth = pkt.get_reversed_eth()
+                new_ip = pkt.get_reversed_ip(new_ttl=64)
                 new_icmp = '\x00' + icmp[1:] # change to echo reply type
                 echo_reply = new_eth + new_ip + new_icmp
                 self.send_packet(intf, echo_reply)
         else:
-            self.handle_non_icmp_ip_packet_to_self(intf, eth, ip, proto)
+            self.handle_non_icmp_ip_packet_to_self(intf, pkt)
 
-    def handle_non_icmp_ip_packet_to_self(self, intf, eth, ip, proto):
+    def handle_non_icmp_ip_packet_to_self(self, intf, pkt):
         """Handles IP packets which are not ICMP packets by replying with a
         protocol unreachable ICMP message."""
-        new_eth = eth[6:12] + eth[0:6] + eth[12:14] # reverse MAC SA, DA
-        new_ip = ip[0:12] + ip[16:20] + ip[12:16]   # reverse IP SA, DA
+        new_eth = pkt.get_reversed_eth()
+        new_ip = pkt.get_reversed_ip(new_ttl=64)
         new_icmp = '\x03\x02\xfd\xfc' # dest unreach: proto unreach w/cksum
         proto_unreach = new_eth + new_ip + new_icmp
         self.send_packet(intf, proto_unreach)
 
-    def handle_ip_packet_to_other(self, intf, eth, ip):
+    def handle_ipv4_packet_to_other(self, intf, pkt):
         """Called when a IP packet for someone else is received on intf.  eth
         holds the Ethernet frame bytes and ip holds the IP packet bytes.  This
         implementation simply drops the packet."""
@@ -479,11 +451,13 @@ class WebServer(BasicNode):
     def get_type_str():
         return 'Web Server'
 
-    def handle_non_icmp_ip_packet_to_self(self, intf, eth, ip, proto):
-        if proto == '\x06':
-            self.handle_http_to_self(self, intf, eth, ip)
+    def handle_non_icmp_ip_packet_to_self(self, intf, pkt):
+        if pkt.is_http():
+            self.handle_http_to_self(self, intf, pkt)
+        else:
+            BasicNode.handle_non_icmp_ip_packet_to_self(self, intf, pkt)
 
-    def handle_http_to_self(self, intf, eth, ip):
+    def handle_http_to_self(self, intf, pkt):
         logging.debug('TODO: implement HTTP handling (proxy it to a real server)')
 
 class VNSSimulator:
