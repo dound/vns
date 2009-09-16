@@ -96,12 +96,28 @@ class VNSPacket(LTMessage):
         return 'PACKET: %uB on %s' % (len(self.ethernet_frame), self.intf_name)
 VNS_MESSAGES.append(VNSPacket)
 
+class VNSProtocolException(Exception):
+    def __init__(self, msg):
+        self.msg = msg
+
+    def __str__(self):
+        return self.msg
+
 class VNSInterface:
     def __init__(self, name, mac, ip, mask):
         self.name = str(name)
         self.mac = str(mac)
-        self.ip = int(ip)
-        self.mask = int(mask)
+        self.ip = str(ip)
+        self.mask = str(mask)
+
+        if len(mac) != 6:
+            raise VNSProtocolException('MAC address must be 6B')
+
+        if len(ip) != 4:
+            raise VNSProtocolException('IP address must be 4B')
+
+        if len(mask) != 4:
+            raise VNSProtocolException('IP address mask must be 4B')
 
     HWINTERFACE = 1  # string
     HWSPEED = 2      # uint32
@@ -110,7 +126,7 @@ class VNSInterface:
     HWETHIP = 64     # uint32
     HWMASK = 128     # uint32
 
-    FORMAT = '> I32s II28s I32s II28s II28s II28s'
+    FORMAT = '> I32s II28s I32s I4s28s II28s I4s28s'
     SIZE = struct.calcsize(FORMAT)
 
     def pack(self):

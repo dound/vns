@@ -244,7 +244,7 @@ class Node:
 
     def has_ip(self, ip):
         """Returns whether ip is assigned to any of this node's interfaces.  ip
-        should be a network byte-order integer."""
+        should be a network byte-order byte-string."""
         for intf in self.interfaces:
             if intf.ip == ip:
                 return True
