@@ -1,4 +1,5 @@
 """The VNS simulator."""
+import ProtocolHelper
 
 import errno
 import logging.config
@@ -447,7 +448,26 @@ class WebServer(BasicNode):
     def __init__(self, name, web_server_to_proxy_hostname):
         BasicNode.__init__(self, name)
         self.web_server_to_proxy_hostname = web_server_to_proxy_hostname
-        self.__resolve_web_server_ip()
+        self.__init_web_server_ip()
+
+        # Each request is from a unique socket (TCP port and IP pair).  It is
+        # then forwarded from a different local TCP port to the web server this
+        # node is proxying.  The request to local port mapping as well as the
+        # reverse mapping is stored in conns.  Keys and values are all raw
+        # byte-strings in network byte order.
+        self.conns = {}  # (requester IP, TCP port) <=> local TCP port
+        self.fins = {} # keys = conns key which has sent a FIN
+        self.next_tcp_port = 10000  # next TCP port to forward from
+
+    def __init_web_server_ip(self):
+        """Resolves the target web server hostname to an IP address."""
+        try:
+            str_ip = socket.gethostbyname(self.web_server_to_proxy_hostname)
+            self.web_server_to_proxy_ip = socket.inet_aton(str_ip)
+        except socket.gaierror:
+            self.web_server_to_proxy_ip = None
+            log_exception(logging.WARN,
+                          'unable to resolve web server hostname: ' + self.web_server_to_proxy_hostname)
 
     @staticmethod
     def get_type_str():
@@ -457,23 +477,77 @@ class WebServer(BasicNode):
         """Returns True if the hostname was successfully resolved to an IP."""
         return self.web_server_to_proxy_ip is None
 
-    def __resolve_web_server_ip(self):
-        """Resolves the target web server hostname to an IP address."""
-        try:
-            str_ip = socket.gethostbyname(self.web_server_to_proxy_hostname)
-            self.web_server_to_proxy_ip = socket.inet_aton(str_ip)
-        except socket.gaierror:
-            self.web_server_to_proxy_ip = None
-            log_exception(logging.WARN,
-                          'unable to resolve web server hostname: ' + self.web_server_to_proxy_hostname)
     def handle_non_icmp_ip_packet_to_self(self, intf, pkt):
-        if pkt.is_http():
-            self.handle_http_to_self(self, intf, pkt)
-        else:
-            BasicNode.handle_non_icmp_ip_packet_to_self(self, intf, pkt)
+        """If pkt is part of an HTTP exchange on HTTP_PORT, then the packet is
+        forwarded as appropriate (this node acts as a proxy server)  Otherwise,
+        the default superclass implementation is called."""
+        if pkt.is_valid_tcp() and self.__has_web_server_ip():
+            if pkt.tcp_dst_port == ProtocolHelper.HTTP_PORT:
+                self.handle_http_request(self, intf, pkt)
+                return
+            elif pkt.tcp_dst_port == ProtocolHelper.HTTP_PORT:
+                self.handle_http_reply(self, intf, pkt)
+                return
 
-    def handle_http_to_self(self, intf, pkt):
-        logging.debug('TODO: implement HTTP handling (proxy it to a real server)')
+        BasicNode.handle_non_icmp_ip_packet_to_self(self, intf, pkt)
+
+    def handle_http_request(self, intf, pkt):
+        """Forward the received packet from an HTTP client to the web server."""
+        # see if we are already working with this connection
+        client_info = (pkt.ip_src, pkt.tcp_src_port)
+        my_port = self.conns.get(client_info)
+        if my_port is None:
+            # new connection: allocate a port for it
+            my_port = struct.pack('> H', self.next_tcp_port)
+            self.next_tcp_port += 1
+            if self.next_tcp_port > 65535:
+                self.next_tcp_port = 10000
+            self.conns[client_info] = my_port
+            self.conns[my_port] = client_info
+
+        # rewrite and forward the request to the web server we're proxying
+        new_dst = self.web_server_to_proxy_ip
+        new_packet = pkt.modify_tcp_packet(new_dst, pkt.tcp_dst_port,
+                                           my_port, reverse_eth=True)
+        intf.link.send_to_other(new_packet)
+
+        self.__check_for_teardown(pkt, client_info, my_port)
+
+    def handle_http_reply(self, intf, pkt):
+        """Forward the received packet from the web server to the HTTP client."""
+        if pkt.ip_dst != self.web_server_to_proxy_ip:
+            return # ignore HTTP replies unless they're from our web server
+
+        client_info = self.conns.get(pkt.tcp_dst_port)
+        if client_info is None:
+            return # ignore unexpected replies
+
+        # rewrite and forward the reply back to the client its associated with
+        (client_ip, client_tcp_port) = client_info
+        new_packet = pkt.modify_tcp_packet(client_ip, client_tcp_port,
+                                           pkt.tcp_src_port, reverse_eth=True)
+        intf.link.send_to_other(new_packet)
+
+        self.__check_for_teardown(pkt, pkt.tcp_dst_port, client_info)
+
+    def __check_for_teardown(self, pkt, side_from, other_side):
+        """Checks to see if a TCP RST or the final FIN has been received from
+        side_from and handles them appropriately if so."""
+        if pkt.is_tcp_rst() or self.__is_full_close(pkt, side_from, other_side):
+            del self.conns[side_from]
+            del self.conns[other_side]
+            self.fins.pop(other_side, None)
+
+    def __is_full_close(self, pkt, side_from, other_side):
+        """Checks to see if pkt from side_from is a FIN.  Returns True if
+        other_side has already sent a FIN.  Otherwise returns False."""
+        if not pkt.is_tcp_fin():
+            return False
+        elif self.fins.has_key(other_side):
+            return True
+        else:
+            self.fins[side_from] = True # cleaned up by __check_for_teardown
+            return False
 
 class VNSSimulator:
     """The VNS simulator.  It gives clients control of nodes in simulated
