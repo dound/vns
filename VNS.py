@@ -652,7 +652,7 @@ class VNSSimulator:
         if conn.connected:
             if notify_client:
                 conn.send(VNSClose(why))
-            conn.loseConnection()
+            conn.transport.loseConnection()
 
         if log_it:
             logging.log(lvl, 'terminating client (%s): %s' % (conn, why))
