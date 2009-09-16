@@ -85,6 +85,9 @@ class Packet:
         tcp_hlen = 4 * ((struct.unpack('> B', tcp[12])[0] & 0xF0) >> 4)
         if tcp_hlen >= 20:
             self.tcp = tcp[:tcp_hlen]
+            self.tcp_src_port = tcp[0:2]
+            self.tcp_dst_port = tcp[2:4]
+            self.tcp_control_bits = struct.unpack('>B', tcp[13])[0] & 0x3F
             self.tcp_data = tcp[tcp_hlen:]
 
     def get_reversed_eth(self):
@@ -129,10 +132,17 @@ class Packet:
         """Returns True if this packet has a TCP header."""
         return len(self.tcp) >= 20
 
-    def is_http(self):
-        """Returns True if this packet contains a TCP header with a destination
-        port of HTTP_PORT."""
-        return self.is_valid_tcp() and self.tcp[2:4] == HTTP_PORT
+    def is_tcp_fin(self):
+        """Returns True if the FIN flag is set."""
+        return (self.tcp_control_bits & 0x01) == 0x01
+
+    def is_tcp_syn(self):
+        """Returns True if the SYN flag is set."""
+        return (self.tcp_control_bits & 0x02) == 0x02
+
+    def is_tcp_rst(self):
+        """Returns True if the RST flag is set."""
+        return (self.tcp_control_bits & 0x04) == 0x04
 
     @staticmethod
     def cksum_ip_hdr(ip_hdr):
@@ -147,15 +157,18 @@ class Packet:
         csum = tcp_checksum(ip_hdr, tcp_hdr, tcp_data)
         return tcp_hdr[0:16] + struct.pack('> H', csum) + tcp_hdr[18:]
 
-    def get_tcp_packet_with_new_dst(self, new_dst_ip, new_dst_port):
+    def modify_tcp_packet(self, new_dst_ip, new_dst_port, new_src_port,
+                          reverse_eth=True):
         """Returns this Ethernet frame (which must contain a TCP header) altered
-        so that it is now addressed to the specified address and port (IP and
-        TCP checksums are updated appropriately)."""
+        so that it is now addressed to the specified IP address and port (IP and
+        TCP checksums are updated appropriately); the Ethernet src/dst MACs are
+        also swapped if reverse_eth is True."""
+        new_eth_hdr = self.get_reversed_eth() if reverse_eth else self.eth
         new_ip_hdr = Packet.cksum_ip_hdr(self.ip[0:16] + new_dst_ip + self.ip[20:])
 
-        new_tcp_hdr_wo_csum = self.tcp[0:2] + new_dst_port + self.tcp[4:]
+        new_tcp_hdr_wo_csum = new_src_port + new_dst_port + self.tcp[4:]
         new_tcp_hdr = Packet.cksum_tcp_hdr(new_ip_hdr,
                                            new_tcp_hdr_wo_csum,
                                            self.tcp_data)
 
-        return self.eth + new_ip_hdr + new_tcp_hdr + self.tcp_data
+        return new_eth_hdr + new_ip_hdr + new_tcp_hdr + self.tcp_data
