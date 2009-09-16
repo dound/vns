@@ -562,7 +562,8 @@ class VNSSimulator:
                                         self.handle_client_disconnected)
         if settings.BORDER_DEV_NAME:
             self.__start_raw_socket(settings.BORDER_DEV_NAME)
-            self.__run_pcap(settings.BORDER_DEV_NAME)
+            # run pcap in another thread (it will run forever)
+            reactor.callInThread(self.__run_pcap, settings.BORDER_DEV_NAME)
         else:
             self.raw_socket = None
 
