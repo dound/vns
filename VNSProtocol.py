@@ -174,16 +174,18 @@ VNS_MESSAGES.append(VNSHardwareInfo)
 
 VNS_PROTOCOL = LTProtocol(VNS_MESSAGES, 'I', 'I')
 
-def create_vns_server(port, recv_callback):
+def create_vns_server(port, recv_callback, lost_conn_callback, verbose=True):
     """Starts a server which listens for VNS clients on the specified port.
 
     @param port  the port to listen on
     @param recv_callback  the function to call with received message content
                          (takes two arguments: transport, msg)
+    @param lost_conn_callback  called with one argument (a LTProtocol) when a connection is lost
+    @param verbose        whether to print messages when they are sent
 
     @return returns the new LTTwistedServer
     """
     from ltprotocol.ltprotocol import LTTwistedServer
-    server = LTTwistedServer(VNS_PROTOCOL, recv_callback)
+    server = LTTwistedServer(VNS_PROTOCOL, recv_callback, None, lost_conn_callback, verbose)
     server.listen(port)
     return server
