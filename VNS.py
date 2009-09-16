@@ -442,15 +442,30 @@ class Hub(Node):
 class WebServer(BasicNode):
     """A host in the network which is serving a website (specified by the
     web_server_to_proxy_hostname parameter) on TCP port 80.  Like
-    Host, it also replies to echo and ARP requests."""
+    Host, it also replies to echo and ARP requests.  It serves the specified
+    website by acting as a proxy for that website."""
     def __init__(self, name, web_server_to_proxy_hostname):
         BasicNode.__init__(self, name)
         self.web_server_to_proxy_hostname = web_server_to_proxy_hostname
+        self.__resolve_web_server_ip()
 
     @staticmethod
     def get_type_str():
         return 'Web Server'
 
+    def __has_web_server_ip(self):
+        """Returns True if the hostname was successfully resolved to an IP."""
+        return self.web_server_to_proxy_ip is None
+
+    def __resolve_web_server_ip(self):
+        """Resolves the target web server hostname to an IP address."""
+        try:
+            str_ip = socket.gethostbyname(self.web_server_to_proxy_hostname)
+            self.web_server_to_proxy_ip = socket.inet_aton(str_ip)
+        except socket.gaierror:
+            self.web_server_to_proxy_ip = None
+            log_exception(logging.WARN,
+                          'unable to resolve web server hostname: ' + self.web_server_to_proxy_hostname)
     def handle_non_icmp_ip_packet_to_self(self, intf, pkt):
         if pkt.is_http():
             self.handle_http_to_self(self, intf, pkt)
