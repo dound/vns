@@ -66,7 +66,7 @@ class Topology():
             interfaces_db_to_sim[dp] = intf
 
         # read in this topology's links
-        links = Link.objects.filter(port1__node__template=t.template)
+        links = db.Link.objects.filter(port1__node__template=t.template)
         for db_link in links:
             intf1 = interfaces_db_to_sim[db_link.port1]
             intf2 = interfaces_db_to_sim[db_link.port2]
