@@ -730,6 +730,7 @@ class VNSSimulator:
             self.terminate_connection(conn, ret)
 
 def main():
+    logging.info('VNS Simulator starting up')
     VNSSimulator()
     reactor.run()
 
