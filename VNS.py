@@ -108,7 +108,7 @@ class Topology():
             if intf.link:
                 other = intf.link.get_other(intf)
                 addrs.append(other.mac)
-                addrs.append(struct.pack('>I', other.ip))
+                addrs.append(other.ip)
         return addrs
 
     def get_id(self):
