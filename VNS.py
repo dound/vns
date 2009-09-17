@@ -5,7 +5,7 @@ import errno
 import logging.config
 import random
 import socket
-from socket import inet_ntoa
+from socket import inet_aton, inet_ntoa
 import struct
 import sys
 import traceback
@@ -24,6 +24,11 @@ logging.config.fileConfig('logging.conf')
 def log_exception(lvl, msg):
     """Like logging.exception(msg) except you may choose what level to log to."""
     logging.log(lvl, msg + '\n' + traceback.format_exc()[:-1])
+
+def hexstr(bs):
+    """Returns a hexidecimal dump of the specified byte-string."""
+    bytes = struct.unpack('> %uB' % len(bs), bs)
+    return ''.join(['%0.2X' % byte for byte in bytes])
 
 class ConnectionReturn():
     def __init__(self, fail_reason=None, prev_client=None):
@@ -86,8 +91,8 @@ class Topology():
                 ret = n.connect(client_conn)
                 if ret.is_success():
                     client_conn.send(VNSHardwareInfo(n.interfaces))
-                    fmt = 'client (%s) has connected to topology %d node %s'
-                    logging.info(fmt % (client_conn, self.id, n))
+                    fmt = 'client (%s) has connected to node %s on topology %d'
+                    logging.info(fmt % (client_conn, n, self.id))
                 return ret
         return ConnectionReturn('there is no node named %s' % requested_name)
 
@@ -254,6 +259,9 @@ class Node:
         """Sends the packet out departing_intf."""
         if departing_intf.link:
             departing_intf.link.send_to_other(departing_intf, packet)
+
+    def __str__(self):
+        return '%s (%s)' % (self.name, self.get_type_str())
 
 class BasicNode(Node):
     """A basic node which replies to ARP and ICMP Echo requests.  Further
@@ -463,7 +471,7 @@ class WebServer(BasicNode):
         """Resolves the target web server hostname to an IP address."""
         try:
             str_ip = socket.gethostbyname(self.web_server_to_proxy_hostname)
-            self.web_server_to_proxy_ip = socket.inet_aton(str_ip)
+            self.web_server_to_proxy_ip = inet_aton(str_ip)
         except socket.gaierror:
             self.web_server_to_proxy_ip = None
             log_exception(logging.WARN,
@@ -672,6 +680,7 @@ class VNSSimulator:
     def handle_open_msg(self, conn, open_msg):
         # get the topology the client is trying to connect to
         tid = open_msg.topo_id
+        logging.info('new client %s connected to topology %d' % (conn, tid))
         try:
             topo = self.topologies[tid]
         except KeyError:
@@ -679,6 +688,8 @@ class VNSSimulator:
                 topo = Topology(tid, self.raw_socket)
                 self.topologies[tid] = topo
                 for addr in topo.get_gateway_addrs():
+                    str_addr = hexstr(addr) if len(addr)!=4 else inet_ntoa(addr)
+                    logging.debug('gateway addr: %s' % str_addr)
                     self.border_addrs[addr] = topo
             except db.Topology.DoesNotExist:
                 self.terminate_connection(conn,
