@@ -106,7 +106,7 @@ class Topology():
         if sz > 0:
             intf = self.gateway.interfaces[0]
             if intf.link:
-                other = intf.link.get_other()
+                other = intf.link.get_other(intf)
                 addrs.append(other.mac)
                 addrs.append(struct.pack('>I', other.ip))
         return addrs
