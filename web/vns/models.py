@@ -143,6 +143,14 @@ class TopologyUser(Model):
                         help_text='Number of bits which are dedicated to a' +
                                   'common routing prefix.')
 
+    def subnet_str(self):
+        """Returns the string IP/mask."""
+        return '%s/%d' % (self.ip, self.mask)
+
+    def md5(self):
+        """Returns the MD5 sum of the string IP/mask."""
+        return hashlib.md5(self.subnet_str()).digest()
+
     def __unicode__(self):
         return u'%s/%d may interact with %s' % (self.ip, self.mask, self.topology.__unicode__())
 
@@ -165,9 +173,10 @@ class IPAssignment(Model):
         """Returns the 4-byte integer representation of the subnet mask."""
         return struct.pack('>I', 0xffffffff ^ (1 << 32 - self.mask) - 1)
 
-    def get_mac(self):
-        """Maps the string representation of the IP address into a 6B MAC address"""
-        return '\x00' + hashlib.md5(self.ip).digest()[0:5]
+    def get_mac(self, salt=''):
+        """Maps the string representation of the IP address (as well as any
+        salt, if given) into a 6B MAC address whose first byte is 0."""
+        return '\x00' + hashlib.md5(self.ip + salt).digest()[0:5]
 
     def __unicode__(self):
         return u'%s: %s <== %s/%d' % (self.topology.__unicode__(),

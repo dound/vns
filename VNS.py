@@ -2,6 +2,7 @@
 import ProtocolHelper
 
 import errno
+import hashlib
 import logging.config
 import random
 import socket
@@ -63,6 +64,15 @@ class Topology():
         t = db.Topology.objects.get(pk=tid)
         self.id = tid
 
+        # determine who may use this topology
+        tus = db.TopologyUser.objects.filter(topology=t)
+        self.permitted_source_prefixes = [tu.subnet_str() for tu in tus]
+
+        # Salt for MAC address generation: ensures a topology which reuses
+        # shared IPs still gets unique MAC addresses so that ARP requests really
+        # intended for other topologies don't end up on every copy of the topo.
+        self.mac_salt = ''.join([hashlib.md5(psp).digest() for psp in self.permitted_source_prefixes])
+
         # read in this topology's nodes
         db_nodes = db.Node.objects.filter(template=t.template)
         self.gateway = None
@@ -81,7 +91,7 @@ class Topology():
         for dp in db_ports:
             sn = nodes_db_to_sim[dp.node]
             ipa = db.IPAssignment.objects.get(topology=t, port=dp)
-            intf = sn.add_interface(dp.name, ipa.get_mac(), ipa.get_ip(), ipa.get_mask())
+            intf = sn.add_interface(dp.name, ipa.get_mac(self.mac_salt), ipa.get_ip(), ipa.get_mask())
             interfaces_db_to_sim[dp] = intf
 
         # read in this topology's links
@@ -90,10 +100,6 @@ class Topology():
             intf1 = interfaces_db_to_sim[db_link.port1]
             intf2 = interfaces_db_to_sim[db_link.port2]
             Link(intf1, intf2, db_link.lossiness)
-
-        # determine who may use this topology
-        tus = db.TopologyUser.objects.filter(topology=t)
-        self.permitted_user_ips = [tu.ip for tu in tus]
 
     def log(self, level, msg):
         """Logs (at the specified level) msg prefixed with topology info."""
