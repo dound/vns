@@ -153,19 +153,20 @@ class Topology():
         #       versus nodes which ANOTHER simulator is responsible for.  Do
         #       this with a RemotelySimulatedNode class which handles received
         #       packets by forwarding them to the appropriate simulator.
+        topo = self
         if dn.type == db.Node.VIRTUAL_NODE_ID:
-            return VirtualNode(dn.name)
+            return VirtualNode(topo, dn.name)
         elif dn.type == db.Node.BLACK_HOLE_ID:
-            return BlackHole(dn.name)
+            return BlackHole(topo, dn.name)
         elif dn.type == db.Node.HUB_ID:
-            return Hub(dn.name)
+            return Hub(topo, dn.name)
         elif dn.type == db.Node.WEB_SERVER_ID:
-            return WebServer(dn.name, dn.webserver.web_server_addr.hostname)
+            return WebServer(topo, dn.name, dn.webserver.web_server_addr.hostname)
         elif dn.type == db.Node.GATEWAY_ID:
             if self.gateway is not None:
                 err = 'only one gateway per topology is allowed'
             else:
-                self.gateway = Gateway(dn.name, raw_socket)
+                self.gateway = Gateway(topo, dn.name, raw_socket)
                 return self.gateway
         else:
             err = 'unknown node type: %d' % dn.type
@@ -215,7 +216,8 @@ class Link:
 
 class Node:
     """A node in a topology"""
-    def __init__(self, name):
+    def __init__(self, topo, name):
+        self.topo = topo
         self.name = name
         self.interfaces = []
 
@@ -266,8 +268,8 @@ class Node:
 class BasicNode(Node):
     """A basic node which replies to ARP and ICMP Echo requests.  Further
     handling of IP packets is delegated to subclasses."""
-    def __init__(self, name):
-        Node.__init__(self, name)
+    def __init__(self, topo, name):
+        Node.__init__(self, topo, name)
 
     @staticmethod
     def get_type_str():
@@ -339,8 +341,8 @@ class BasicNode(Node):
 
 class VirtualNode(Node):
     """A node which a user can take control of (i.e., handle packets for)"""
-    def __init__(self, name):
-        Node.__init__(self, name)
+    def __init__(self, topo, name):
+        Node.__init__(self, topo, name)
         self.conn = None  # connection to the virtual host, if any
 
     def connect(self, conn):
@@ -366,8 +368,8 @@ class VirtualNode(Node):
 
 class BlackHole(Node):
     """A node which discards all receives packets and sends no packets."""
-    def __init__(self, name):
-        Node.__init__(self, name)
+    def __init__(self, topo, name):
+        Node.__init__(self, topo, name)
 
     @staticmethod
     def get_type_str():
@@ -380,8 +382,8 @@ class BlackHole(Node):
 class Gateway(Node):
     """Shuffles packets between a simulated topology and the gateway router
     on the edge of the real network."""
-    def __init__(self, name, raw_socket):
-        Node.__init__(self, name)
+    def __init__(self, topo, name, raw_socket):
+        Node.__init__(self, topo, name)
         self.raw_socket = raw_socket
 
     @staticmethod
@@ -426,8 +428,8 @@ class Gateway(Node):
 
 class Host(BasicNode):
     """A host in the network which replies to echo and ARP requests."""
-    def __init__(self, name):
-        BasicNode.__init__(self, name)
+    def __init__(self, topo, name):
+        BasicNode.__init__(self, topo, name)
 
     @staticmethod
     def get_type_str():
@@ -435,8 +437,8 @@ class Host(BasicNode):
 
 class Hub(Node):
     """A hub"""
-    def __init__(self, name):
-        Node.__init__(self, name)
+    def __init__(self, topo, name):
+        Node.__init__(self, topo, name)
 
     @staticmethod
     def get_type_str():
@@ -453,8 +455,8 @@ class WebServer(BasicNode):
     web_server_to_proxy_hostname parameter) on TCP port 80.  Like
     Host, it also replies to echo and ARP requests.  It serves the specified
     website by acting as a proxy for that website."""
-    def __init__(self, name, web_server_to_proxy_hostname):
-        BasicNode.__init__(self, name)
+    def __init__(self, topo, name, web_server_to_proxy_hostname):
+        BasicNode.__init__(self, topo, name)
         self.web_server_to_proxy_hostname = web_server_to_proxy_hostname
         self.__init_web_server_ip()
 
