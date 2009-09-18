@@ -90,8 +90,13 @@ class Topology():
         db_ports = db.Port.objects.filter(node__template=t.template)
         for dp in db_ports:
             sn = nodes_db_to_sim[dp.node]
+            # TODO: we're hitting the DB a lot here; could optimize a bit
             ipa = db.IPAssignment.objects.get(topology=t, port=dp)
-            intf = sn.add_interface(dp.name, ipa.get_mac(self.mac_salt), ipa.get_ip(), ipa.get_mask())
+            try:
+                mac = db.MACAssignment.objects.get(topology=t, port=dp).get_mac()
+            except db.MACAssignment.DoesNotExist:
+                mac = ipa.get_mac(self.mac_salt)
+            intf = sn.add_interface(dp.name, mac, ipa.get_ip(), ipa.get_mask())
             interfaces_db_to_sim[dp] = intf
 
         # read in this topology's links
