@@ -41,7 +41,8 @@ def hexstr(bs):
 __decoder = EthDecoder()
 def pktstr(pkt):
     """Returns a human-readable dump of the specified packet."""
-    return __decoder.decode(pkt)
+    ret = '\n' + str(__decoder.decode(pkt))
+    return ret.replace('\n', '\n    ')
 
 class ConnectionReturn():
     def __init__(self, fail_reason=None, prev_client=None):
@@ -151,6 +152,8 @@ class Topology():
         n = self.clients[conn]
         for intf in n.interfaces:
             if intf.name == departure_intf_name:
+                self.dlog('client sending packet from %s out %s: %s' %
+                          n.name, intf.name, pktstr(pkt_msg.ethernet_frame))
                 n.send_packet(intf, pkt_msg.ethernet_frame)
                 return True
 
@@ -304,9 +307,10 @@ class BasicNode(Node):
     def handle_packet(self, intf, packet):
         """Responses to ARP requests (as appropriate) and forwards IP packets."""
         if len(packet) < 14:
-            logging.debug('ignoring packet which is too small: %dB' % len(packet))
+            self.dlog('ignoring packet which is too small: %dB' % len(packet))
             return
 
+        self.dlog('%s handling packet: %s' % (self.name, pktstr(packet)))
         pkt = Packet(packet)
         if pkt.is_valid_ipv4():
             self.handle_ipv4_packet(intf, pkt)
@@ -316,6 +320,7 @@ class BasicNode(Node):
     def handle_arp_packet(self, intf, pkt):
         """Respond to arp if it is a request for the mac address of intf's IP."""
         if pkt.arp_type != '\x00\x01': # only handle ARP REQUESTs
+            self.dlog('%s ignoring ARP which is not a request' % self.name)
             return
 
         # is the ARP request asking about THIS interface on broadcast dha?
@@ -324,7 +329,9 @@ class BasicNode(Node):
             # send it back to the requester (reverse src/dst, copy in our mac addr)
             reply_eth = pkt.get_reversed_eth()
             reply_arp = pkt.arp[0:8] + intf.mac + intf_ip_packed + pkt.sha + pkt.spa
-            self.send_packet(intf, reply_eth + reply_arp)
+            reply = reply_eth + reply_arp
+            self.dlog('%s replying to ARP request: %s' % (self.name, reply))
+            self.send_packet(intf, reply)
 
     def handle_ipv4_packet(self, intf, pkt):
         """Replies to an ICMP echo request to this node.  Other handling is
@@ -346,7 +353,10 @@ class BasicNode(Node):
                 new_ip = pkt.get_reversed_ip(new_ttl=64)
                 new_icmp = '\x00' + icmp[1:] # change to echo reply type
                 echo_reply = new_eth + new_ip + new_icmp
+                self.dlog('%s replying to echo request: %s' % (self.name, echo_reply))
                 self.send_packet(intf, echo_reply)
+            else:
+                self.dlog('%s ignoring ICMP which is not an echo request' % self.name)
         else:
             self.handle_non_icmp_ip_packet_to_self(intf, pkt)
 
@@ -357,13 +367,14 @@ class BasicNode(Node):
         new_ip = pkt.get_reversed_ip(new_ttl=64)
         new_icmp = '\x03\x02\xfd\xfc' # dest unreach: proto unreach w/cksum
         proto_unreach = new_eth + new_ip + new_icmp
+        self.dlog('%s sending protocol unreachable in response to non-ICMP IP packet: %s' % (self.name, proto_unreach))
         self.send_packet(intf, proto_unreach)
 
     def handle_ipv4_packet_to_other(self, intf, pkt):
         """Called when a IP packet for someone else is received on intf.  eth
         holds the Ethernet frame bytes and ip holds the IP packet bytes.  This
         implementation simply drops the packet."""
-        pass # ignore it
+        self.dlog('%s ignoring IP packet to someone else' % self.name)
 
 class VirtualNode(Node):
     """A node which a user can take control of (i.e., handle packets for)"""
@@ -390,6 +401,8 @@ class VirtualNode(Node):
     def handle_packet(self, incoming_intf, packet):
         """Forwards to the user responsible for handling packets for this virtual node"""
         if self.conn is not None:
+            self.dlog('%s got packet on %s - forwarding to VNS client: %s' %
+                      (self.name, incoming_intf.name, pktstr(packet)))
             self.conn.send(VNSPacket(incoming_intf.name, packet))
 
 class BlackHole(Node):
@@ -403,7 +416,8 @@ class BlackHole(Node):
 
     def handle_packet(self, incoming_intf, packet):
         """Discard all received packets."""
-        pass
+        self.dlog('%s got packet on %s - black-holing it: %s' %
+                  (self.name, incoming_intf.name, pktstr(packet)))
 
 class Gateway(Node):
     """Shuffles packets between a simulated topology and the gateway router
@@ -434,12 +448,13 @@ class Gateway(Node):
         if len(packet) >= 34 and packet[12:14] == '\x08\x00':
             dst_ip = packet[30:34]
             if settings.MAY_FORWARD_TO_PRIVATE_IPS or not self.__is_private_address(dst_ip):
-                logging.debug('ignoring IP packet to private address space: %s' % inet_ntoa(dst_ip))
+                self.dlog('ignoring IP packet to private address space: %s' % inet_ntoa(dst_ip))
                 return
 
         # forward packet out to the real network
         if self.raw_socket:
             try:
+                self.dlog('sending packet out to the real world: %s' % pktstr(packet))
                 self.raw_socket.send(packet)
             except socket.error:
                 # this is recoverable - the network may come back up
@@ -450,6 +465,7 @@ class Gateway(Node):
         """Forwards the specified packet to the first hop in the topology."""
         if self.interfaces:
             if self.interfaces[0].link:
+                self.dlog('got packet from outside - forwarding it: %s' % pktstr(packet))
                 self.interfaces[0].link.send_to_other(packet)
 
 class Host(BasicNode):
@@ -472,6 +488,8 @@ class Hub(Node):
 
     def handle_packet(self, incoming_intf, packet):
         """Forward each received packet to every interface except the one it was received on"""
+        self.dlog('%s got packet on %s - forwarding it out all other ports: %s' %
+                      (self.name, incoming_intf.name, pktstr(packet)))
         for intf in self.interfaces:
             if intf.name != incoming_intf.name:
                 self.send_packet(intf, packet)
@@ -540,6 +558,11 @@ class WebServer(BasicNode):
                 self.next_tcp_port = 10000
             self.conns[client_info] = my_port
             self.conns[my_port] = client_info
+            self.dlog('forwarding new HTTP request: client=%s me=%s' %
+                      (str(client_info), hexstr(my_port)))
+        else:
+            self.dlog('forwarding ongoing HTTP request: client=%s me=%s' %
+                      (str(client_info), hexstr(my_port)))
 
         # rewrite and forward the request to the web server we're proxying
         new_dst = self.web_server_to_proxy_ip
@@ -552,11 +575,14 @@ class WebServer(BasicNode):
     def handle_http_reply(self, intf, pkt):
         """Forward the received packet from the web server to the HTTP client."""
         if pkt.ip_dst != self.web_server_to_proxy_ip:
+            self.dlog('ignoring HTTP reply from unexpected source %s' % addrstr(pkt.ip_dst))
             return # ignore HTTP replies unless they're from our web server
 
         client_info = self.conns.get(pkt.tcp_dst_port)
         if client_info is None:
+            self.dlog('ignoring unexpected HTTP reply to my port %s' % hexstr(pkt.tcp_dst_port))
             return # ignore unexpected replies
+        self.dlog('forwarding HTTP reply to client=%s from me=%s' % (str(client_info), hexstr(pkt.tcp_dst_port)))
 
         # rewrite and forward the reply back to the client its associated with
         (client_ip, client_tcp_port) = client_info
@@ -573,6 +599,7 @@ class WebServer(BasicNode):
             del self.conns[side_from]
             del self.conns[other_side]
             self.fins.pop(other_side, None)
+            self.dlog('HTTP connection state removed (RST or final FIN)')
 
     def __is_full_close(self, pkt, side_from, other_side):
         """Checks to see if pkt from side_from is a FIN.  Returns True if
@@ -669,6 +696,8 @@ class VNSSimulator:
             topo = self.border_addrs.get(addr)
             if topo:
                 topo.handle_packet_to_gateway(packet)
+                logging.debug('sniffed raw packet to %s (topology %d): %s' %
+                              addrstr(addr), topo.id, pktstr(packet))
 
     def handle_recv_msg(self, conn, vns_msg):
         if vns_msg is not None:
@@ -716,8 +745,7 @@ class VNSSimulator:
                 topo = Topology(tid, self.raw_socket)
                 self.topologies[tid] = topo
                 for addr in topo.get_gateway_addrs():
-                    str_addr = hexstr(addr) if len(addr)!=4 else inet_ntoa(addr)
-                    logging.debug('gateway addr: %s' % str_addr)
+                    logging.debug('gateway addr: %s' % addrstr(addr))
                     self.border_addrs[addr] = topo
             except db.Topology.DoesNotExist:
                 self.terminate_connection(conn,
