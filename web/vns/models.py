@@ -182,6 +182,18 @@ class IPAssignment(Model):
         return u'%s: %s <== %s/%d' % (self.topology.__unicode__(),
                                       self.port.__unicode__(), self.ip, self.mask)
 
+class MACAssignment(Model):
+    """Maps a MAC address to a port on a particular node in a particular topology."""
+    topology = ForeignKey(Topology)
+    port = ForeignKey(Port)
+    mac = CharField(max_length=17, help_text='Ethernet address in the form AB:CD:EF:GH:IJ:KL')
+
+    def get_mac(self):
+        """Returns the 6B byte-string form of the MAC address."""
+        octets = self.mac.split(':')
+        assert(len(octets) == 6)
+        return struct.pack('> 6B', [int(h, 16) for h in octets])
+
 class IPBlock(Model):
     """A block of IP addresses which can be allocated to topologies in a
     particular simulator."""

@@ -1,7 +1,7 @@
 from django.contrib import admin
 from web.vns.models import Simulator, Organization, UserProfile, \
                            TopologyTemplate, Node, WebServer, WebServerHostname, Port, Link, \
-                           Topology, TopologyUser, IPAssignment, IPBlock
+                           Topology, TopologyUser, IPAssignment, MACAssignment, IPBlock
 
 def make_user_search_fields(prefix):
     return (prefix + '__username', prefix + '__first_name', prefix + '__last_name')
@@ -68,6 +68,11 @@ class IPAssignmentAdmin(admin.ModelAdmin):
     ordering = ('ip',)
     search_fields = ('ip', 'topology__template__name', 'topology__name', 'port__node__name')
 
+class MACAssignmentAdmin(admin.ModelAdmin):
+    list_display = ('topology', 'port', 'mac')
+    ordering = ('mac',)
+    search_fields = ('mac', 'topology__template__name', 'topology__name', 'port__node__name')
+
 class IPBlockAdmin(admin.ModelAdmin):
     list_display = ('simulator', 'parentIPBlock', 'org', 'subnet', 'mask')
     ordering = ('subnet', 'mask')
@@ -85,4 +90,5 @@ admin.site.register(Link, LinkAdmin)
 admin.site.register(Topology, TopologyAdmin)
 admin.site.register(TopologyUser, TopologyUserAdmin)
 admin.site.register(IPAssignment, IPAssignmentAdmin)
+admin.site.register(MACAssignment, MACAssignmentAdmin)
 admin.site.register(IPBlock, IPBlockAdmin)
