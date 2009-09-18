@@ -139,9 +139,12 @@ class TopologyUser(Model):
     IPs."""
     topology = ForeignKey(Topology)
     ip = IPAddressField()
+    mask = IntegerField(choices=tuple([(i, u'/%d'%i) for i in range(1,33)]),
+                        help_text='Number of bits which are dedicated to a' +
+                                  'common routing prefix.')
 
     def __unicode__(self):
-        return u'%s may interact with %s' % (self.ip, self.topology.__unicode__())
+        return u'%s/%d may interact with %s' % (self.ip, self.mask, self.topology.__unicode__())
 
 class IPAssignment(Model):
     """Maps an IP address to a port on a particular node in a particular
