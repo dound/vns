@@ -123,20 +123,19 @@ class Topology():
         n = self.clients.pop(client_conn)
         n.disconnect(client_conn)
 
-    def get_gateway_addrs(self):
-        """Returns a list of Ethernet and IP addresses (as byte-strings) which
-        belong to gateways (if any) connecting this topology to the outside."""
-        addrs = []
-        sz = len(self.gateway.interfaces)
-        if sz > 1:
-            logging.error('gateway in topology %d has more than 1 interface' % self.id)
+    def has_gateway(self):
+        """Returns True if this topology has a gateway."""
+        return self.gateway is not None
 
-        if sz > 0:
-            intf = self.gateway.interfaces[0]
-            if intf.link:
-                other = intf.link.get_other(intf)
-                addrs.append(other.mac)
-                addrs.append(other.ip)
+    def get_addrs(self):
+        """Returns a list of Ethernet and IP addresses (as byte-strings) which
+        belong to nodes (except the gateway) in this topology."""
+        addrs = []
+        for node in self.nodes:
+            if node is not self.gateway:
+                for intf in node.interfaces:
+                    addrs.append(intf.mac)
+                    addrs.append(intf.ip)
         return addrs
 
     def get_id(self):
@@ -161,7 +160,7 @@ class Topology():
         fmt = 'bad packet request: invalid interface: %s'
         return fmt % (n.name, departure_intf_name)
 
-    def handle_packet_to_gateway(self, packet):
+    def handle_incoming_packet(self, packet):
         """Forwards packet to the node connected to the gateway."""
         if len(self.gateway.interfaces) > 0:
             intf = self.gateway.interfaces[0]
@@ -617,7 +616,7 @@ class VNSSimulator:
     topologies."""
     def __init__(self):
         self.topologies = {} # maps active topology ID to its Topology object
-        self.border_addrs = {} # maps MAC/IP addrs of gateways to their Topology
+        self.topo_addrs = {} # maps MAC/IP addresses to their Topology
         self.clients = {}    # maps active conn to the topology ID it is conn to
         self.server = create_vns_server(VNS_DEFAULT_PORT,
                                         self.handle_recv_msg,
@@ -693,11 +692,11 @@ class VNSSimulator:
         """Forwards packet to the appropriate simulation, if any."""
         addr = VNSSimulator.__get_dst_addr(packet)
         if addr:
-            topo = self.border_addrs.get(addr)
+            topo = self.topo_addrs.get(addr)
             if topo:
-                topo.handle_packet_to_gateway(packet)
                 logging.debug('sniffed raw packet to %s (topology %d): %s' %
                               addrstr(addr), topo.id, pktstr(packet))
+                topo.handle_incoming_packet(packet)
 
     def handle_recv_msg(self, conn, vns_msg):
         if vns_msg is not None:
@@ -730,8 +729,8 @@ class VNSSimulator:
             topo = self.topologies[tid]
             topo.client_disconnected(conn)
             if not topo.is_active():
-                for addr in topo.get_gateway_addrs():
-                    del self.border_addrs[addr]
+                for addr in (topo.get_addrs() if topo.has_gateway() else []):
+                    del self.topo_addrs[addr]
                 del self.topologies[tid]
 
     def handle_open_msg(self, conn, open_msg):
@@ -744,9 +743,9 @@ class VNSSimulator:
             try:
                 topo = Topology(tid, self.raw_socket)
                 self.topologies[tid] = topo
-                for addr in topo.get_gateway_addrs():
-                    logging.debug('gateway addr: %s' % addrstr(addr))
-                    self.border_addrs[addr] = topo
+                for addr in (topo.get_addrs() if topo.has_gateway() else []):
+                    logging.debug('topology addr: %s' % addrstr(addr))
+                    self.topo_addrs[addr] = topo
             except db.Topology.DoesNotExist:
                 self.terminate_connection(conn,
                                           'requested topology (%d) does not exist' % tid)
