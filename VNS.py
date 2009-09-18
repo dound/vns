@@ -10,6 +10,7 @@ import struct
 import sys
 import traceback
 
+from impacket.ImpactDecoder import EthDecoder
 from pcapy import open_live, PcapError
 from twisted.internet import reactor
 
@@ -25,10 +26,22 @@ def log_exception(lvl, msg):
     """Like logging.exception(msg) except you may choose what level to log to."""
     logging.log(lvl, msg + '\n' + traceback.format_exc()[:-1])
 
+def addrstr(addr):
+    """Returns a pretty-printed address."""
+    if len(addr)!= 4:
+        return hexstr(addr)
+    else:
+        return inet_ntoa(addr)
+
 def hexstr(bs):
     """Returns a hexidecimal dump of the specified byte-string."""
     bytes = struct.unpack('> %uB' % len(bs), bs)
     return ''.join(['%0.2X' % byte for byte in bytes])
+
+__decoder = EthDecoder()
+def pktstr(pkt):
+    """Returns a human-readable dump of the specified packet."""
+    return __decoder.decode(pkt)
 
 class ConnectionReturn():
     def __init__(self, fail_reason=None, prev_client=None):
@@ -80,6 +93,15 @@ class Topology():
         # determine who may use this topology
         tus = db.TopologyUser.objects.filter(topology=t)
         self.permitted_user_ips = [tu.ip for tu in tus]
+
+    def log(self, level, msg):
+        """Logs (at the specified level) msg prefixed with topology info."""
+        prefix = 'topology %d: ' % self.id
+        logging.log(level, prefix + msg)
+
+    def dlog(self, msg):
+        """Logs (at the debug level) msg prefixed with topology info."""
+        self.log(logging.DEBUG, msg)
 
     def connect_client(self, client_conn, requested_name):
         """Called when a user tries to connect to a node in this topology.
@@ -239,6 +261,10 @@ class Node:
 
     def disconnect(self, conn):
         pass
+
+    def dlog(self, msg):
+        """Convenience wrapper for self.topo.dlog(msg)."""
+        self.topo.dlog(msg)
 
     @staticmethod
     def get_type_str():
