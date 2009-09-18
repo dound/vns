@@ -736,6 +736,7 @@ class VNSSimulator:
         except KeyError:
             msg = 'client %s sent VNSPacket message but its topology (%d) does not think it is connected to any node' % (conn, tid)
             self.terminate_connection(conn, msg, lvl=logging.WARN)
+            return
 
         if ret is not True: # bad interface name was given
             self.terminate_connection(conn, ret)
