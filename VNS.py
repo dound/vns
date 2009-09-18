@@ -361,10 +361,10 @@ class VirtualNode(Node):
         if self.conn == conn:
             self.conn = None
 
-    def handle_packet(self, intf, packet):
+    def handle_packet(self, incoming_intf, packet):
         """Forwards to the user responsible for handling packets for this virtual node"""
         if self.conn is not None:
-            self.conn.send(VNSPacket(intf.name, packet))
+            self.conn.send(VNSPacket(incoming_intf.name, packet))
 
 class BlackHole(Node):
     """A node which discards all receives packets and sends no packets."""
