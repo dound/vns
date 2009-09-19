@@ -104,6 +104,10 @@ class Packet:
         hdr = self.ip[0:8] + str_ttl + self.ip[9:12] + self.ip_dst + self.ip_src
         return Packet.cksum_ip_hdr(hdr)
 
+    def is_dst_mac_broadcast(self):
+        """Returns True if the destination MAC address is 0xFFFFFFFFFFFF."""
+        return self.mac_dst == '\xFF\xFF\xFF\xFF\xFF\xFF'
+
     def is_arp(self):
         """Returns True if ethertype is 0x0806 (ARP)."""
         return self.ether_type == '\x08\x06'
@@ -111,6 +115,10 @@ class Packet:
     def is_valid_arp(self):
         """Returns True if this packet has an ARP header."""
         return len(self.arp) >= 28
+
+    def is_arp_request(self):
+        """Returns True if arp_type is 0x0001."""
+        return self.is_valid_arp() and self.arp_type == '\x00\x01'
 
     def is_ip(self):
         """Returns True if ethertype is 0x0800 (IP)."""
