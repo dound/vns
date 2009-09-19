@@ -1,8 +1,13 @@
-# define Django-related settings
-import django_settings
+from os import environ
+
+# tell Django about the Django settings file
+environ['DJANGO_SETTINGS_MODULE'] = 'web.settings'
 
 # IP of the server this simulator works for
 VNS_WEB_SERVER_IP = 'localhost'
+
+# location where the VNS web server will listen
+VNS_WEB_SERVER_PORT = 80
 
 # Whether to forward packets addressed to 10/8, 172.16/12, or 192.168/16
 # addresses out to the network (off of the simulator).  This does not affect

@@ -1,49 +1,23 @@
 """The VNS simulator."""
-import ProtocolHelper
 
 import errno
 import hashlib
-import logging.config
+import logging
 import random
 import socket
 from socket import inet_aton, inet_ntoa
 import struct
 import sys
-import traceback
 
-from impacket.ImpactDecoder import EthDecoder
 from pcapy import open_live, PcapError
 from twisted.internet import reactor
 
-import settings
-import web.vns.models as db
-from ProtocolHelper import Packet
+from settings import BORDER_DEV_NAME, MAY_FORWARD_TO_PRIVATE_IPS
+from LoggingHelper import log_exception, addrstr, hexstr, pktstr
+import ProtocolHelper
 from VNSProtocol import VNS_DEFAULT_PORT, create_vns_server
 from VNSProtocol import VNSOpen, VNSClose, VNSPacket, VNSInterface, VNSHardwareInfo
-
-logging.config.fileConfig('logging.conf')
-
-def log_exception(lvl, msg):
-    """Like logging.exception(msg) except you may choose what level to log to."""
-    logging.log(lvl, msg + '\n' + traceback.format_exc()[:-1])
-
-def addrstr(addr):
-    """Returns a pretty-printed address."""
-    if len(addr)!= 4:
-        return hexstr(addr)
-    else:
-        return inet_ntoa(addr)
-
-def hexstr(bs):
-    """Returns a hexidecimal dump of the specified byte-string."""
-    bytes = struct.unpack('> %uB' % len(bs), bs)
-    return ''.join(['%0.2X' % byte for byte in bytes])
-
-__decoder = EthDecoder()
-def pktstr(pkt):
-    """Returns a human-readable dump of the specified packet."""
-    ret = '\n' + str(__decoder.decode(pkt))
-    return ret.replace('\n', '\n    ')
+import web.vns.models as db
 
 class ConnectionReturn():
     def __init__(self, fail_reason=None, prev_client=None):
@@ -321,7 +295,7 @@ class BasicNode(Node):
             return
 
         self.dlog('%s handling packet: %s' % (self.name, pktstr(packet)))
-        pkt = Packet(packet)
+        pkt = ProtocolHelper.Packet(packet)
         if pkt.is_valid_ipv4():
             self.handle_ipv4_packet(intf, pkt)
         elif pkt.is_valid_arp():
@@ -457,7 +431,7 @@ class Gateway(Node):
         """Forwards an IP packet from the simulated topology to the network."""
         if len(packet) >= 34 and packet[12:14] == '\x08\x00':
             dst_ip = packet[30:34]
-            if settings.MAY_FORWARD_TO_PRIVATE_IPS or not self.__is_private_address(dst_ip):
+            if MAY_FORWARD_TO_PRIVATE_IPS or not self.__is_private_address(dst_ip):
                 self.dlog('ignoring IP packet to private address space: %s' % inet_ntoa(dst_ip))
                 return
 
@@ -633,10 +607,10 @@ class VNSSimulator:
                                         self.handle_recv_msg,
                                         None,
                                         self.handle_client_disconnected)
-        if settings.BORDER_DEV_NAME:
-            self.__start_raw_socket(settings.BORDER_DEV_NAME)
+        if BORDER_DEV_NAME:
+            self.__start_raw_socket(BORDER_DEV_NAME)
             # run pcap in another thread (it will run forever)
-            reactor.callInThread(self.__run_pcap, settings.BORDER_DEV_NAME)
+            reactor.callInThread(self.__run_pcap, BORDER_DEV_NAME)
         else:
             self.raw_socket = None
 
@@ -732,7 +706,6 @@ class VNSSimulator:
         if log_it:
             logging.log(lvl, 'terminating client (%s): %s' % (conn, why))
 
-
         # cleanup client and topology info
         tid = self.clients.get(conn)
         if tid is not None:
@@ -808,6 +781,7 @@ class VNSSimulator:
             self.terminate_connection(conn, ret)
 
 def main():
+    logging.config.fileConfig('logging.conf')
     logging.info('VNS Simulator starting up')
     VNSSimulator()
     reactor.run()

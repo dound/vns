@@ -1,4 +1,4 @@
-from os import environ, path
+from os import path
 import re
 import sys
 
@@ -9,15 +9,17 @@ from twisted.python import threadpool
 from twisted.internet import reactor
 import twisted
 
+sys.path.append('.') # make sure we can find the settings and web modules
+
+# this also sets the DJANGO_SETTINGS_MODULE environment variable
+from settings import VNS_WEB_SERVER_PORT as PORT
+
 # twisted version check
 v = re.findall(r'^(\d+)\.(\d+)\.(\d+)([+]r(\d+))?', twisted.__version__)[0]
 tmaj, tmin = int(v[0]), int(v[1])
 if tmaj<8 or (tmaj==8 and tmin<2) or (tmaj==8 and tmin==2 and (v[4]=='' or int(v[4])<27292)):
     print >> sys.stderr, 'Fatal Error: twisted version 8.2.0+r27292 or higher is required!'
     sys.exit(-1)
-
-sys.path.append(path.join(path.dirname(__file__), '').replace('\\','/'))
-from django_settings import VNS_WEB_SERVER_PORT as PORT
 
 def wsgi_resource():
     pool = threadpool.ThreadPool()
