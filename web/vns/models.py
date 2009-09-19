@@ -1,5 +1,5 @@
 import hashlib
-from socket import inet_aton
+from socket import inet_aton, inet_ntoa
 import struct
 
 from django.db.models import AutoField, CharField, DateField, FloatField, ForeignKey, \
@@ -132,6 +132,14 @@ class Topology(Model):
     def __unicode__(self):
         return u'Topology %d' % self.id
 
+def base_subnet(subnet_str):
+    """Converts a subnet string to just the (masked) prefix."""
+    str_prefix, str_mask_bits = subnet_str.split('/')
+    ip_int = struct.unpack('>I', inet_aton(str_prefix))[0]
+    n = int(str_mask_bits)
+    mask = int(n*'1' + (32-n)*'0', 2)
+    return inet_ntoa(struct.pack('>I', ip_int & mask))
+
 class TopologyUser(Model):
     """Lists the IP addresses which may interact with a topology through the
     simulator.  If no IPs are listed, then there will be no restrictions.  This
@@ -145,14 +153,17 @@ class TopologyUser(Model):
 
     def subnet_str(self):
         """Returns the string IP/mask."""
-        return '%s/%d' % (self.ip, self.mask)
+        # TODO: rather than processing with base_subnet now, we should validate
+        #       db entries as they are created to be in this form
+        raw_subnet_str = '%s/%d' % (self.ip, self.mask)
+        return base_subnet(raw_subnet_str)
 
     def md5(self):
         """Returns the MD5 sum of the string IP/mask."""
         return hashlib.md5(self.subnet_str()).digest()
 
     def __unicode__(self):
-        return u'%s/%d may interact with %s' % (self.ip, self.mask, self.topology.__unicode__())
+        return u'%s may interact with %s' % (self.subnet_str(), self.topology.__unicode__())
 
 class IPAssignment(Model):
     """Maps an IP address to a port on a particular node in a particular
