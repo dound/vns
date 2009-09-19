@@ -81,6 +81,10 @@ class Topology():
         """Logs (at the debug level) msg prefixed with topology info."""
         self.log(logging.DEBUG, msg)
 
+    def elog(self, msg):
+        """Logs (at the error level) msg prefixed with topology info."""
+        self.log(logging.ERROR, msg)
+
     def connect_client(self, client_conn, requested_name):
         """Called when a user tries to connect to a node in this topology.
         Returns True if the requested node exists and the client was able to
