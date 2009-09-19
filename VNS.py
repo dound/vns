@@ -10,7 +10,9 @@ from twisted.internet import reactor
 
 from settings import BORDER_DEV_NAME
 from LoggingHelper import log_exception, addrstr, pktstr
+import ProtocolHelper
 from Topology import Topology
+from TopologyResolver import TopologyResolver
 from VNSProtocol import VNS_DEFAULT_PORT, create_vns_server
 from VNSProtocol import VNSOpen, VNSClose, VNSPacket
 
@@ -19,7 +21,7 @@ class VNSSimulator:
     topologies."""
     def __init__(self):
         self.topologies = {} # maps active topology ID to its Topology object
-        self.topo_addrs = {} # maps MAC/IP addresses to their Topology
+        self.resolver = TopologyResolver() # maps MAC/IP addresses to a Topology
         self.clients = {}    # maps active conn to the topology ID it is conn to
         self.server = create_vns_server(VNS_DEFAULT_PORT,
                                         self.handle_recv_msg,
@@ -69,37 +71,30 @@ class VNSSimulator:
             log_exception(logging.CRITICAL, 'failed to open raw socket' + extra)
             sys.exit(-1)
 
-    @staticmethod
-    def __get_dst_addr(packet):
-        """Returns the address the packet is destined to.  This will be the
-        Ethernet frame's destination MAC address except for ARP requests, in
-        which case the destination IP from the ARP packet is used (since the
-        destination MAC would be the broadcast MAC and we don't want to flood
-        every simulation with every ARP request)."""
-        if len(packet) < 14:
-            return None # too small to even have an Ethernet header
-
-        ether_type = packet[12:14]
-        if ether_type == '\x08\x06': # ARP
-            arp = packet[14:]
-            if len(arp) < 28:
-                return None # too small, ignore it
-
-            arp_type = arp[6:8]
-            if arp_type == '\x00\x01': # request
-                return arp[24:28] # dst IP
-
-        return packet[0:6] # dst MAC
-
     def handle_packet_from_outside(self, packet):
         """Forwards packet to the appropriate simulation, if any."""
-        addr = VNSSimulator.__get_dst_addr(packet)
-        if addr:
-            topo = self.topo_addrs.get(addr)
-            if topo:
-                logging.debug('sniffed raw packet to %s (topology %d): %s' %
-                              addrstr(addr), topo.id, pktstr(packet))
-                topo.handle_incoming_packet(packet)
+        if len(packet) < 14:
+            return # too small to even have an Ethernet header
+
+        # determine which topology(ies) should receive this packet
+        pkt = ProtocolHelper.Packet(packet)
+        if pkt.is_valid_ipv4():
+            topos = self.resolver.resolve(pkt.ip_dst, pkt.ip_src)
+            str_addr = 'dst=%s src=%s' % (addrstr(pkt.ip_dst), addrstr(pkt.ip_src))
+            rewrite_dst_mac = True
+        elif pkt.is_dst_mac_broadcast():
+            return # ignore broadcasts
+        else:
+            topos = self.resolver.resolve(pkt.mac_dst)
+            str_addr = 'dst=%s' % addrstr(pkt.mac_dst)
+            rewrite_dst_mac = False
+
+        # forward the packet to the appropriate topology(ies)
+        if topos:
+            logging.debug('sniffed raw packet to %s (topology %d): %s' %
+                          str_addr, ','.join([str(t.id) for t in topos]), pktstr(packet))
+            for topo in topos:
+                topo.handle_incoming_packet(packet, rewrite_dst_mac)
 
     def handle_recv_msg(self, conn, vns_msg):
         if vns_msg is not None:
@@ -119,11 +114,8 @@ class VNSSimulator:
         except:
             return None
 
+        self.resolver.register_topology(topo)
         self.topologies[tid] = topo
-        for addr in (topo.get_addrs() if topo.has_gateway() else []):
-            logging.debug('topology addr: %s' % addrstr(addr))
-            self.topo_addrs[addr] = topo
-
         return topo
 
     def terminate_connection(self, conn, why, notify_client=True, log_it=True, lvl=logging.INFO):
@@ -146,8 +138,7 @@ class VNSSimulator:
             topo = self.topologies[tid]
             topo.client_disconnected(conn)
             if not topo.is_active():
-                for addr in (topo.get_addrs() if topo.has_gateway() else []):
-                    del self.topo_addrs[addr]
+                self.resolver.unregister_topology(topo)
                 del self.topologies[tid]
 
     def handle_open_msg(self, conn, open_msg):

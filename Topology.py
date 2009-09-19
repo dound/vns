@@ -32,7 +32,10 @@ class Topology():
 
         # determine who may use this topology
         tus = db.TopologyUser.objects.filter(topology=t)
-        self.permitted_source_prefixes = [tu.subnet_str() for tu in tus]
+        if len(tus) > 0:
+            self.permitted_source_prefixes = [tu.subnet_str() for tu in tus]
+        else:
+            self.permitted_source_prefixes = ['0.0.0.0/32'] # unrestricted
 
         # Salt for MAC address generation: ensures a topology which reuses
         # shared IPs still gets unique MAC addresses so that ARP requests really
@@ -108,20 +111,34 @@ class Topology():
         """Returns True if this topology has a gateway."""
         return self.gateway is not None
 
-    def get_addrs(self):
-        """Returns a list of Ethernet and IP addresses (as byte-strings) which
-        belong to nodes (except the gateway) in this topology."""
+    def get_my_ip_addrs(self):
+        """Returns a list of IP addresses (as byte-strings) which belong to
+        nodes (except the gateway) in this topology."""
+        addrs = []
+        for node in self.nodes:
+            if node is not self.gateway:
+                for intf in node.interfaces:
+                    addrs.append(intf.ip)
+        return addrs
+
+    def get_my_mac_addrs(self):
+        """Returns a list of Ethernet addresses (as byte-strings) which belong
+        to nodes (except the gateway) in this topology."""
         addrs = []
         for node in self.nodes:
             if node is not self.gateway:
                 for intf in node.interfaces:
                     addrs.append(intf.mac)
-                    addrs.append(intf.ip)
         return addrs
 
     def get_id(self):
         """Returns this topology's unique ID number."""
         return self.id
+
+    def get_source_filters(self):
+        """Returns a list of IP prefixes which should be routed to this
+        topology.  This list will always contain at least one prefix."""
+        return self.permitted_source_prefixes
 
     def handle_packet_from_client(self, conn, pkt_msg):
         """Sends the specified message out the specified port on the node
@@ -141,12 +158,18 @@ class Topology():
         fmt = 'bad packet request: invalid interface: %s'
         return fmt % (n.name, departure_intf_name)
 
-    def handle_incoming_packet(self, packet):
-        """Forwards packet to the node connected to the gateway."""
+    def handle_incoming_packet(self, packet, rewrite_dst_mac):
+        """Forwards packet to the node connected to the gateway.  If
+        rewrite_dst_mac is True then the destination mac is set to that of the
+        first simulated node attached to the gateway."""
         if len(self.gateway.interfaces) > 0:
             intf = self.gateway.interfaces[0]
             if intf.link:
-                intf.link.send_to_other(intf, packet)
+                if rewrite_dst_mac:
+                    new_dst_mac = intf.link.get_other(intf).mac
+                    intf.link.send_to_other(intf, new_dst_mac + packet[6:])
+                else:
+                    intf.link.send_to_other(intf, packet)
 
     def is_active(self):
         """Returns true if any clients are connected."""
