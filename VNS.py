@@ -13,7 +13,6 @@ from LoggingHelper import log_exception, addrstr, pktstr
 from Topology import Topology
 from VNSProtocol import VNS_DEFAULT_PORT, create_vns_server
 from VNSProtocol import VNSOpen, VNSClose, VNSPacket
-import web.vns.models as db
 
 class VNSSimulator:
     """The VNS simulator.  It gives clients control of nodes in simulated
@@ -112,6 +111,21 @@ class VNSSimulator:
             elif vns_msg.get_type() == VNSPacket.get_type():
                 self.handle_packet_msg(conn, vns_msg)
 
+    def start_topology(self, tid):
+        """Handles starting up the specified topology id.  Returns None if it
+        cannot be started."""
+        try:
+            topo = Topology(tid, self.raw_socket)
+        except:
+            return None
+
+        self.topologies[tid] = topo
+        for addr in (topo.get_addrs() if topo.has_gateway() else []):
+            logging.debug('topology addr: %s' % addrstr(addr))
+            self.topo_addrs[addr] = topo
+
+        return topo
+
     def terminate_connection(self, conn, why, notify_client=True, log_it=True, lvl=logging.INFO):
         """Terminates the client connection conn.  This event will be logged
         unless log_it is False.  If notify_client is True, then the client will
@@ -143,15 +157,10 @@ class VNSSimulator:
         try:
             topo = self.topologies[tid]
         except KeyError:
-            try:
-                topo = Topology(tid, self.raw_socket)
-                self.topologies[tid] = topo
-                for addr in (topo.get_addrs() if topo.has_gateway() else []):
-                    logging.debug('topology addr: %s' % addrstr(addr))
-                    self.topo_addrs[addr] = topo
-            except db.Topology.DoesNotExist:
-                self.terminate_connection(conn,
-                                          'requested topology (%d) does not exist' % tid)
+            topo = self.start_topology(tid)
+            if topo is None:
+                msg = 'requested topology (%d) does not exist or could not be instantiated'
+                self.terminate_connection(conn, msg % tid)
                 return
 
         # try to connect the client to the requested node
