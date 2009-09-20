@@ -75,6 +75,8 @@ class Topology():
             intf2 = interfaces_db_to_sim[db_link.port2]
             Link(intf1, intf2, db_link.lossiness)
 
+        logging.info('Topology instantiated:\n%s' % self.str_all(include_clients=False))
+
     def log(self, level, msg):
         """Logs (at the specified level) msg prefixed with topology info."""
         prefix = 'topology %d: ' % self.id
@@ -202,6 +204,22 @@ class Topology():
         logging.critical(err)
         raise db.Topology.DoesNotExist(err)
 
+    def __str__(self):
+        return 'Topology %d' % self.id
+
+    def str_all(self, include_clients=True):
+        """Returns a complete string representation of this topology."""
+        str_hdr = self.__str__()
+        if not include_clients:
+            str_clients = ''
+        elif self.clients:
+            str_clients = 'Clients: %s\n  ' % ','.join([str(c) for c in self.clients])
+        else:
+            str_clients = 'Clients: none connected\n  '
+        str_psp = 'Source IP Prefixes: %s' % ','.join(self.permitted_source_prefixes)
+        str_nodes = 'Nodes:\n    ' + '\n    '.join([n.str_all() for n in self.nodes])
+        return '%s:\n  %s%s\n  %s' % (str_hdr, str_clients, str_psp, str_nodes)
+
 class Link:
     """Information about a connection between two ports.  Tells intf1 and intf2
     about this link too."""
@@ -242,6 +260,15 @@ class Link:
         The packet may be randomly discarded if lossiness is greater than zero."""
         if self.lossiness==0.0 or random.random()>self.lossiness:
             self.get_other(intf_from).owner.handle_packet(intf_from, packet)
+
+    def __str__(self):
+        return '%s: %s:%s <--> %s:%s' % (self.intf1.owner.name, self.intf1.name,
+                                         self.intf2.owner.name, self.intf2.name)
+
+    def str_half(self, intf):
+        """Returns the name and port of the other side of the link."""
+        other_intf = self.get_other(intf)
+        return '-> %s:%s' % (other_intf.owner.name, other_intf.name)
 
 class Node:
     """A node in a topology"""
@@ -297,6 +324,17 @@ class Node:
 
     def __str__(self):
         return '%s (%s)' % (self.name, self.get_type_str())
+
+    @staticmethod
+    def __get_intf_str(intf):
+        str_link = intf.link.str_half(intf) if intf.link else ''
+        return '%s={%s,%s}%s' % (intf.name, addrstr(intf.ip), addrstr(intf.mac), str_link)
+
+    def str_all(self):
+        """Returns a complete string representation of this node."""
+        str_hdr = self.__str__()
+        str_intfs = ','.join([Node.__get_intf_str(i) for i in self.interfaces])
+        return '%s: %s' % (str_hdr, str_intfs)
 
 class BasicNode(Node):
     """A basic node which replies to ARP and ICMP Echo requests.  Further
@@ -408,6 +446,9 @@ class VirtualNode(Node):
             self.dlog('%s got packet on %s - forwarding to VNS client: %s' %
                       (self.name, incoming_intf.name, pktstr(packet)))
             self.conn.send(VNSPacket(incoming_intf.name, packet))
+
+    def __str__(self):
+        return Node.__str__(self) + ' client=%s' % self.conn
 
 class BlackHole(Node):
     """A node which discards all receives packets and sends no packets."""
@@ -615,3 +656,7 @@ class WebServer(BasicNode):
         else:
             self.fins[side_from] = True # cleaned up by __check_for_teardown
             return False
+
+    def __str__(self):
+        ps = ' proxying={%s->%s}' % (self.web_server_to_proxy_hostname, addrstr(self.web_server_to_proxy_ip))
+        return BasicNode.__str__(self) + ps
