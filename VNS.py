@@ -1,7 +1,7 @@
 """The VNS simulator."""
 
 import errno
-import logging
+import logging, logging.config
 import socket
 import sys
 
