@@ -600,7 +600,7 @@ class WebServer(BasicNode):
         new_dst = self.web_server_to_proxy_ip
         new_packet = pkt.modify_tcp_packet(new_dst, pkt.tcp_dst_port,
                                            my_port, reverse_eth=True)
-        intf.link.send_to_other(new_packet)
+        intf.link.send_to_other(intf, new_packet)
 
         self.__check_for_teardown(pkt, client_info, my_port)
 
@@ -620,7 +620,7 @@ class WebServer(BasicNode):
         (client_ip, client_tcp_port) = client_info
         new_packet = pkt.modify_tcp_packet(client_ip, client_tcp_port,
                                            pkt.tcp_src_port, reverse_eth=True)
-        intf.link.send_to_other(new_packet)
+        intf.link.send_to_other(intf, new_packet)
 
         self.__check_for_teardown(pkt, pkt.tcp_dst_port, client_info)
 
