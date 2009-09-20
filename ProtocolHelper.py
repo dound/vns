@@ -127,14 +127,14 @@ class Packet:
     def is_valid_ipv4(self):
         """Returns True if this packet has an IPv4 header."""
         if self.ip and len(self.ip) >= 20:
-            ver = (struct.unpack('>B',self.ip[0:0])[0] & 0xF0) >> 4
+            ver = (struct.unpack('>B',self.ip[0])[0] & 0xF0) >> 4
             return ver == 4
         else:
             return False
 
     def is_tcp(self):
         """Returns True if this packet is a valid IPv4 packet containing TCP."""
-        return self.is_valid_ipv4() and self.ip[9:9] == '\x06'
+        return self.is_valid_ipv4() and self.ip[9] == '\x06'
 
     def is_valid_tcp(self):
         """Returns True if this packet has a TCP header."""
