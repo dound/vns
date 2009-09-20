@@ -187,7 +187,7 @@ class IPAssignment(Model):
     def get_mac(self, salt=''):
         """Maps the string representation of the IP address (as well as any
         salt, if given) into a 6B MAC address whose first byte is 0."""
-        return '\x00' + hashlib.md5(self.ip + salt).digest()[0:5]
+        return '\x00' + hashlib.md5(self.ip.encode('ascii') + salt).digest()[0:5]
 
     def __unicode__(self):
         return u'%s: %s <== %s/%d' % (self.topology.__unicode__(),
