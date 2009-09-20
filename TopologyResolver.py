@@ -95,9 +95,9 @@ class TopologyResolver:
                         if not topos:
                             del st[ps]
                     except ValueError:
-                        logging.error('%s: missing topology in source filter %s for %s' % (topo, addrstr(ps), addrstr(ip)))
+                        logging.error('%s: missing topology in source filter %s for %s' % (topo, ps, addrstr(ip)))
                 except KeyError:
-                    logging.error('%s: missing source filter %s for %s' % (topo, addrstr(ps), addrstr(ip)))
+                    logging.error('%s: missing source filter %s for %s' % (topo, ps, addrstr(ip)))
 
     def resolve_ip(self, dst_ip, src_ip=None):
         """Resolves a src and dst IP address pair to a list of topologies to

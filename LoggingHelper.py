@@ -13,10 +13,14 @@ def log_exception(lvl, msg):
 
 def addrstr(addr):
     """Returns a pretty-printed address."""
-    if len(addr)!= 4:
+    sz = len(addr)
+    if sz == 4: # IP
+        return inet_ntoa(addr)
+    elif sz == 6: # MAC
         return hexstr(addr)
     else:
-        return inet_ntoa(addr)
+        logging.warning('unexpected address length: %d' % sz)
+        return hexstr(addr)
 
 def hexstr(bs):
     """Returns a hexidecimal dump of the specified byte-string."""
