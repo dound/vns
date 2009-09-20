@@ -561,7 +561,7 @@ class WebServer(BasicNode):
 
     def __has_web_server_ip(self):
         """Returns True if the hostname was successfully resolved to an IP."""
-        return self.web_server_to_proxy_ip is None
+        return self.web_server_to_proxy_ip is not None
 
     def handle_non_icmp_ip_packet_to_self(self, intf, pkt):
         """If pkt is part of an HTTP exchange on HTTP_PORT, then the packet is
