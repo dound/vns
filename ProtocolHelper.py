@@ -43,6 +43,7 @@ class Packet:
         self.ether_type   = eth[12:14]
         payload = eth[eth_hlen:]
 
+        self.arp = self.ip = self.tcp = None
         if self.is_ip() and len(payload)>=20:
             self.__decode_ip(payload)
         elif self.is_arp() and len(payload)>=28:
