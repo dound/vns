@@ -79,13 +79,13 @@ class VNSSimulator:
         # determine which topology(ies) should receive this packet
         pkt = ProtocolHelper.Packet(packet)
         if pkt.is_valid_ipv4():
-            topos = self.resolver.resolve(pkt.ip_dst, pkt.ip_src)
+            topos = self.resolver.resolve_ip(pkt.ip_dst, pkt.ip_src)
             str_addr = 'dst=%s src=%s' % (addrstr(pkt.ip_dst), addrstr(pkt.ip_src))
             rewrite_dst_mac = True
         elif pkt.is_dst_mac_broadcast():
             return # ignore broadcasts
         else:
-            topos = self.resolver.resolve(pkt.mac_dst)
+            topos = self.resolver.resolve_mac(pkt.mac_dst)
             str_addr = 'dst=%s' % addrstr(pkt.mac_dst)
             rewrite_dst_mac = False
 
