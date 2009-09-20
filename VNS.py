@@ -92,8 +92,8 @@ class VNSSimulator:
 
         # forward the packet to the appropriate topology(ies)
         if topos:
-            logging.debug('sniffed raw packet to %s (topology %d): %s' %
-                          str_addr, ','.join([str(t.id) for t in topos]), pktstr(packet))
+            logging.debug('sniffed raw packet to %s (topology %s): %s' %
+                          (str_addr, ','.join([str(t.id) for t in topos]), pktstr(packet)))
             for topo in topos:
                 topo.handle_incoming_packet(packet, rewrite_dst_mac)
 
