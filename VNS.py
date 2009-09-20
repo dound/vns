@@ -15,6 +15,7 @@ from Topology import Topology
 from TopologyResolver import TopologyResolver
 from VNSProtocol import VNS_DEFAULT_PORT, create_vns_server
 from VNSProtocol import VNSOpen, VNSClose, VNSPacket
+from web.vns import models as db
 
 class VNSSimulator:
     """The VNS simulator.  It gives clients control of nodes in simulated
@@ -111,7 +112,10 @@ class VNSSimulator:
         cannot be started."""
         try:
             topo = Topology(tid, self.raw_socket)
+        except db.Topology.DoesNotExist, db.IPAssignment.DoesNotExist:
+            return None
         except:
+            log_exception(logging.ERROR, 'topology instantiation unexpectedly failed')
             return None
 
         self.resolver.register_topology(topo)
