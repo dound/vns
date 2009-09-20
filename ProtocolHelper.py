@@ -95,14 +95,18 @@ class Packet:
         """Returns the Ethernet header with its source and destination fields reversed."""
         return self.mac_src + self.mac_dst + self.ether_type
 
-    def get_reversed_ip(self, new_ttl=None):
+    def get_reversed_ip(self, new_ttl=None, new_proto=None):
         """Returns the IP header with its source and destination fields reversed
         as well as the TTL field set and the checksum updated appropriately."""
         if new_ttl is None:
             str_ttl = self.ip[8]
         else:
             str_ttl = struct.pack('>B', new_ttl)
-        hdr = self.ip[0:8] + str_ttl + self.ip[9:12] + self.ip_dst + self.ip_src
+        if new_proto is None:
+            str_proto = self.ip_proto
+        else:
+            str_proto = struct.pack('>B', new_proto)
+        hdr = self.ip[0:8] + str_ttl + str_proto + self.ip[10:12] + self.ip_dst + self.ip_src
         return Packet.cksum_ip_hdr(hdr)
 
     def is_dst_mac_broadcast(self):
