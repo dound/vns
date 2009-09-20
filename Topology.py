@@ -346,6 +346,8 @@ class BasicNode(Node):
             self.handle_ipv4_packet(intf, pkt)
         elif pkt.is_valid_arp():
             self.handle_arp_packet(intf, pkt)
+        else:
+            logging.debug('%s discarding packet which is neither valid IPv4 nor ARP' % self.di())
 
     def handle_arp_packet(self, intf, pkt):
         """Respond to arp if it is a request for the mac address of intf's IP."""
