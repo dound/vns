@@ -359,7 +359,7 @@ class BasicNode(Node):
             reply_eth = pkt.get_reversed_eth()
             reply_arp = pkt.arp[0:8] + intf.mac + intf.ip + pkt.sha + pkt.spa
             reply = reply_eth + reply_arp
-            logging.debug('%s replying to ARP request: %s' % (self.di(), reply))
+            logging.debug('%s replying to ARP request: %s' % (self.di(), pktstr(reply)))
             self.send_packet(intf, reply)
 
     def handle_ipv4_packet(self, intf, pkt):
@@ -382,7 +382,7 @@ class BasicNode(Node):
                 new_ip = pkt.get_reversed_ip(new_ttl=64)
                 new_icmp = '\x00' + icmp[1:] # change to echo reply type
                 echo_reply = new_eth + new_ip + new_icmp
-                logging.debug('%s replying to echo request: %s' % (self.di(), echo_reply))
+                logging.debug('%s replying to echo request: %s' % (self.di(), pktstr(echo_reply)))
                 self.send_packet(intf, echo_reply)
             else:
                 logging.debug('%s ignoring ICMP which is not an echo request' % self.di())
@@ -396,7 +396,7 @@ class BasicNode(Node):
         new_ip = pkt.get_reversed_ip(new_ttl=64, new_proto=1)
         new_icmp = '\x03\x02\xfd\xfc' # dest unreach: proto unreach w/cksum
         proto_unreach = new_eth + new_ip + new_icmp
-        logging.debug('%s sending protocol unreachable in response to non-ICMP IP packet: %s' % (self.di(), proto_unreach))
+        logging.debug('%s sending protocol unreachable in response to non-ICMP IP packet: %s' % (self.di(), pktstr(proto_unreach)))
         self.send_packet(intf, proto_unreach)
 
     def handle_ipv4_packet_to_other(self, intf, pkt):
