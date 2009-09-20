@@ -479,7 +479,7 @@ class Gateway(Node):
         """Forwards an IP packet from the simulated topology to the network."""
         if len(packet) >= 34 and packet[12:14] == '\x08\x00':
             dst_ip = packet[30:34]
-            if MAY_FORWARD_TO_PRIVATE_IPS or not self.__is_private_address(dst_ip):
+            if not MAY_FORWARD_TO_PRIVATE_IPS and self.__is_private_address(dst_ip):
                 logging.debug('%s ignoring IP packet to private address space: %s' % (self.di(), inet_ntoa(dst_ip)))
                 return
 
