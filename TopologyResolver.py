@@ -1,3 +1,5 @@
+import logging
+
 from SubnetTree import SubnetTree
 
 from LoggingHelper import addrstr
@@ -72,16 +74,16 @@ class TopologyResolver:
                 try:
                     topos.remove()
                 except ValueError:
-                    topo.elog('missing topo in list for %s' % addrstr(mac))
+                    logging.error('%s: missing topo in list for %s' % (topo, addrstr(mac)))
             except KeyError:
-                topo.elog('missing topo list for %s' % addrstr(mac))
+                logging.error('%s: missing topo list for %s' % (topo, addrstr(mac)))
 
         for ip in topo.get_my_ip_addrs():
             # get the source filtering tree associated with the destination
             try:
                 st = self.i2t[ip]
             except KeyError:
-                topo.elog('missing subnet tree for %s' % addrstr(ip))
+                logging.error('%s: missing subnet tree for %s' % (topo, addrstr(ip)))
                 continue
 
             # unregister which sources this topo wants packets from
@@ -93,9 +95,9 @@ class TopologyResolver:
                         if not topos:
                             del st[ps]
                     except ValueError:
-                        topo.elog('missing topology in source filter %s for %s' % (addrstr(ps), addrstr(ip)))
+                        logging.error('%s: missing topology in source filter %s for %s' % (topo, addrstr(ps), addrstr(ip)))
                 except KeyError:
-                    topo.elog('missing source filter %s for %s' % (addrstr(ps), addrstr(ip)))
+                    logging.error('%s: missing source filter %s for %s' % (topo, addrstr(ps), addrstr(ip)))
 
     def resolve_ip(self, dst_ip, src_ip=None):
         """Resolves a src and dst IP address pair to a list of topologies to
