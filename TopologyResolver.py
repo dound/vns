@@ -72,7 +72,9 @@ class TopologyResolver:
             try:
                 topos = self.m2t[mac]
                 try:
-                    topos.remove()
+                    topos.remove(mac)
+                    if not topos:
+                        del self.m2t[mac]
                 except ValueError:
                     logging.error('%s: missing topo in list for %s' % (topo, addrstr(mac)))
             except KeyError:
