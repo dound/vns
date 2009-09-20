@@ -114,7 +114,7 @@ class Packet:
 
     def is_valid_arp(self):
         """Returns True if this packet has an ARP header."""
-        return len(self.arp) >= 28
+        return self.arp and len(self.arp) >= 28
 
     def is_arp_request(self):
         """Returns True if arp_type is 0x0001."""
@@ -126,7 +126,7 @@ class Packet:
 
     def is_valid_ipv4(self):
         """Returns True if this packet has an IPv4 header."""
-        if len(self.ip) >= 20:
+        if self.ip and len(self.ip) >= 20:
             ver = (struct.unpack('>B',self.ip[0:0])[0] & 0xF0) >> 4
             return ver == 4
         else:
@@ -138,7 +138,7 @@ class Packet:
 
     def is_valid_tcp(self):
         """Returns True if this packet has a TCP header."""
-        return len(self.tcp) >= 20
+        return self.tcp and len(self.tcp) >= 20
 
     def is_tcp_fin(self):
         """Returns True if the FIN flag is set."""
