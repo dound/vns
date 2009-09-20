@@ -97,7 +97,9 @@ class Packet:
 
     def get_reversed_ip(self, new_ttl=None, new_proto=None):
         """Returns the IP header with its source and destination fields reversed
-        as well as the TTL field set and the checksum updated appropriately."""
+        as well as the TTL field set and the checksum updated appropriately.  If
+        new_ttl and/or new_proto are specified, they will replace the original
+        TTL/protocol fields.  They should be specified as plain integer values."""
         if new_ttl is None:
             str_ttl = self.ip[8]
         else:
