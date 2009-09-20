@@ -569,10 +569,10 @@ class WebServer(BasicNode):
         the default superclass implementation is called."""
         if pkt.is_valid_tcp() and self.__has_web_server_ip():
             if pkt.tcp_dst_port == ProtocolHelper.HTTP_PORT:
-                self.handle_http_request(self, intf, pkt)
+                self.handle_http_request(intf, pkt)
                 return
             elif pkt.tcp_dst_port == ProtocolHelper.HTTP_PORT:
-                self.handle_http_reply(self, intf, pkt)
+                self.handle_http_reply(intf, pkt)
                 return
 
         BasicNode.handle_non_icmp_ip_packet_to_self(self, intf, pkt)
