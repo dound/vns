@@ -570,6 +570,12 @@ class WebServer(BasicNode):
 
         BasicNode.handle_non_icmp_ip_packet_to_self(self, intf, pkt)
 
+    @staticmethod
+    def __ci(ci):
+        """Stringifies a client info 2-tuple."""
+        ip, port = ci
+        return '%s:%s' % (inet_ntoa(ip), struct.unpack('>H', port))
+
     def handle_http_request(self, intf, pkt):
         """Forward the received packet from an HTTP client to the web server."""
         # see if we are already working with this connection
@@ -584,15 +590,16 @@ class WebServer(BasicNode):
             self.conns[client_info] = my_port
             self.conns[my_port] = client_info
             logging.debug('%s forwarding new HTTP request: client=%s me=%s' %
-                          (self.di(), str(client_info), hexstr(my_port)))
+                          (self.di(), self.__ci(client_info), hexstr(my_port)))
         else:
             logging.debug('%s forwarding ongoing HTTP request: client=%s me=%s' %
-                          (self.di(), str(client_info), hexstr(my_port)))
+                          (self.di(), self.__ci(client_info), hexstr(my_port)))
 
         # rewrite and forward the request to the web server we're proxying
         new_dst = self.web_server_to_proxy_ip
-        new_packet = pkt.modify_tcp_packet(new_dst, pkt.tcp_dst_port,
-                                           my_port, reverse_eth=True)
+        new_packet = pkt.modify_tcp_packet(intf.ip, my_port,
+                                           new_dst, pkt.tcp_dst_port,
+                                           reverse_eth=True)
         intf.link.send_to_other(intf, new_packet)
 
         self.__check_for_teardown(pkt, client_info, my_port)
@@ -607,12 +614,13 @@ class WebServer(BasicNode):
         if client_info is None:
             logging.debug('%s ignoring unexpected HTTP reply to my port %s' % (self.di(), hexstr(pkt.tcp_dst_port)))
             return # ignore unexpected replies
-        logging.debug('%s forwarding HTTP reply to client=%s from me=%s' % (self.di(), str(client_info), hexstr(pkt.tcp_dst_port)))
+        logging.debug('%s forwarding HTTP reply to client=%s from me=%s' % (self.di(), self.__ci(client_info), hexstr(pkt.tcp_dst_port)))
 
         # rewrite and forward the reply back to the client its associated with
         (client_ip, client_tcp_port) = client_info
-        new_packet = pkt.modify_tcp_packet(client_ip, client_tcp_port,
-                                           pkt.tcp_src_port, reverse_eth=True)
+        new_packet = pkt.modify_tcp_packet(intf.ip, pkt.tcp_src_port,
+                                           client_ip, client_tcp_port,
+                                           reverse_eth=True)
         intf.link.send_to_other(intf, new_packet)
 
         self.__check_for_teardown(pkt, pkt.tcp_dst_port, client_info)

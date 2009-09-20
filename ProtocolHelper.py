@@ -172,14 +172,16 @@ class Packet:
         csum = tcp_checksum(ip_hdr, tcp_hdr, tcp_data)
         return tcp_hdr[0:16] + struct.pack('> H', csum) + tcp_hdr[18:]
 
-    def modify_tcp_packet(self, new_dst_ip, new_dst_port, new_src_port,
+    def modify_tcp_packet(self,
+                          new_src_ip, new_src_port,
+                          new_dst_ip, new_dst_port,
                           reverse_eth=True):
         """Returns this Ethernet frame (which must contain a TCP header) altered
         so that it is now addressed to the specified IP address and port (IP and
         TCP checksums are updated appropriately); the Ethernet src/dst MACs are
         also swapped if reverse_eth is True."""
         new_eth_hdr = self.get_reversed_eth() if reverse_eth else self.eth
-        new_ip_hdr = Packet.cksum_ip_hdr(self.ip[0:16] + new_dst_ip + self.ip[20:])
+        new_ip_hdr = Packet.cksum_ip_hdr(self.ip[0:12] + new_src_ip + new_dst_ip + self.ip[20:])
 
         new_tcp_hdr_wo_csum = new_src_port + new_dst_port + self.tcp[4:]
         new_tcp_hdr = Packet.cksum_tcp_hdr(new_ip_hdr,
