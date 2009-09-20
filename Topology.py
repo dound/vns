@@ -493,13 +493,6 @@ class Gateway(Node):
                 log_exception(logging.WARN,
                               'unable to forward packet to the real network')
 
-    def handle_packet_from_outside(self, packet):
-        """Forwards the specified packet to the first hop in the topology."""
-        if self.interfaces:
-            if self.interfaces[0].link:
-                logging.debug('%s got packet from outside - forwarding it: %s' % (self.di(), pktstr(packet)))
-                self.interfaces[0].link.send_to_other(packet)
-
 class Host(BasicNode):
     """A host in the network which replies to echo and ARP requests."""
     def __init__(self, topo, name):
