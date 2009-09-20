@@ -246,7 +246,8 @@ class Link:
         handle_packet() to be called on the owner of the receiving interface.
         The packet may be randomly discarded if lossiness is greater than zero."""
         if self.lossiness==0.0 or random.random()>self.lossiness:
-            self.get_other(intf_from).owner.handle_packet(intf_from, packet)
+            intf_to = self.get_other(intf_from)
+            intf_to.owner.handle_packet(intf_to, packet)
 
     def __str__(self):
         return '%s: %s:%s <--> %s:%s' % (self.intf1.owner.name, self.intf1.name,
