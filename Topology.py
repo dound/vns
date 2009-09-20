@@ -35,7 +35,7 @@ class Topology():
         if len(tus) > 0:
             self.permitted_source_prefixes = [tu.subnet_str() for tu in tus]
         else:
-            self.permitted_source_prefixes = ['0.0.0.0/32'] # unrestricted
+            self.permitted_source_prefixes = ['0.0.0.0/0'] # unrestricted
 
         # Salt for MAC address generation: ensures a topology which reuses
         # shared IPs still gets unique MAC addresses so that ARP requests really
