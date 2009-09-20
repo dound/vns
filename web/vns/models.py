@@ -91,8 +91,11 @@ class WebServerHostname(Model):
     """A web server hostname which can be proxied by a simulated web server."""
     hostname = CharField(max_length=256)
 
+    def get_ascii_hostname(self):
+        return self.hostname.encode('ascii')
+
     def __unicode__(self):
-        return u'%s' % self.hostname
+        return self.hostname
 
 class WebServer(Node):
     """A web server node.  It specifies which web server it will proxy (i.e.,

@@ -189,7 +189,8 @@ class Topology():
         elif dn.type == db.Node.HUB_ID:
             return Hub(topo, dn.name)
         elif dn.type == db.Node.WEB_SERVER_ID:
-            return WebServer(topo, dn.name, dn.webserver.web_server_addr.hostname)
+            hostname = dn.webserver.web_server_addr.get_ascii_hostname()
+            return WebServer(topo, dn.name, hostname)
         elif dn.type == db.Node.GATEWAY_ID:
             if self.gateway is not None:
                 err = 'only one gateway per topology is allowed'
