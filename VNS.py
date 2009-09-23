@@ -2,6 +2,7 @@
 
 import errno
 import logging, logging.config
+import os
 import socket
 import sys
 
@@ -205,6 +206,13 @@ class VNSSimulator:
         if ret is not True: # bad interface name was given
             self.terminate_connection(conn, ret)
 
+    def cleanup_and_exit(self):
+        """Cleanly terminate connected clients and then forcibly terminate the program."""
+        logging.info('VNS simulator shutting down')
+        for conn in self.clients.keys():
+            self.terminate_connection(conn, 'the simulator is shutting down')
+        os._exit(0) # force the termination (otherwise the pcap thread keeps going)
+
 class NoOpTwistedLogger:
     """Discards all logging messages (our custom handler takes care of them)."""
     def flush(self):
@@ -217,7 +225,8 @@ def main():
     logging.info('VNS Simulator starting up')
     PythonLoggingObserver().start() # log twisted messages too
     tlog.startLogging(NoOpTwistedLogger(), setStdout=False)
-    VNSSimulator()
+    sim = VNSSimulator()
+    reactor.addSystemEventTrigger("before", "shutdown", sim.cleanup_and_exit)
     reactor.run()
 
 if __name__ == "__main__":
