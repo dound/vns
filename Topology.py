@@ -237,9 +237,7 @@ class Link:
         elif self.intf2 == intf:
             return self.intf1
         else:
-            msg = 'intf %s is neither intf1 (%s) or intf2 (%2)' % (intf, self.intf1, self.intf2)
-            logging.critical(msg)
-            raise RuntimeError(msg)
+            assert False, 'intf %s is not attached to this link %s' % (intf, self)
 
     def send_to_other(self, intf_from, packet):
         """Sends the packet out of the specified interface.  This triggers
@@ -303,6 +301,7 @@ class Node:
 
     def send_packet(self, departing_intf, packet):
         """Sends the packet out departing_intf."""
+        assert departing_intf in self.interfaces, '%s: intf %s does not belong to %s' % (self.topo, departing_intf, self.str_all())
         if departing_intf.link:
             departing_intf.link.send_to_other(departing_intf, packet)
 
