@@ -7,6 +7,8 @@ import sys
 
 from pcapy import open_live, PcapError
 from twisted.internet import reactor
+from twisted.python.log import PythonLoggingObserver
+from twisted.python import log as tlog
 
 from settings import BORDER_DEV_NAME
 from LoggingHelper import log_exception, addrstr, pktstr
@@ -203,9 +205,18 @@ class VNSSimulator:
         if ret is not True: # bad interface name was given
             self.terminate_connection(conn, ret)
 
+class NoOpTwistedLogger:
+    """Discards all logging messages (our custom handler takes care of them)."""
+    def flush(self):
+        pass
+    def write(self, x):
+        pass
+
 def main():
     logging.config.fileConfig('logging.conf')
     logging.info('VNS Simulator starting up')
+    PythonLoggingObserver().start() # log twisted messages too
+    tlog.startLogging(NoOpTwistedLogger(), setStdout=False)
     VNSSimulator()
     reactor.run()
 
