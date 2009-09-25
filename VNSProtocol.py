@@ -1,15 +1,13 @@
 """Defines the VNS protocol and some associated helper functions."""
 
+from socket import inet_ntoa
 import struct
 
-from ltprotocol.ltprotocol import LTMessage, LTProtocol
+from ltprotocol.ltprotocol import LTMessage, LTProtocol, LTTwistedServer
 
 VNS_DEFAULT_PORT = 12345
 VNS_MESSAGES = []
 IDSIZE = 32
-
-def ip_to_str(a):
-    return "%d.%d.%d.%d" % ((a >> 24) & 0xff, (a >> 16) & 0xff, (a >> 8) & 0xff, a & 0xff)
 
 class VNSOpen(LTMessage):
     @staticmethod
@@ -140,7 +138,7 @@ class VNSInterface:
 
     def __str__(self):
         fmt = '%s: mac=%s ip=%s mask=%s'
-        return fmt % (self.name, self.mac, ip_to_str(self.ip), ip_to_str(self.mask))
+        return fmt % (self.name, self.mac, inet_ntoa(self.ip), inet_ntoa(self.mask))
 
 class VNSBanner(LTMessage):
     @staticmethod
@@ -201,7 +199,6 @@ def create_vns_server(port, recv_callback, lost_conn_callback, verbose=True):
 
     @return returns the new LTTwistedServer
     """
-    from ltprotocol.ltprotocol import LTTwistedServer
     server = LTTwistedServer(VNS_PROTOCOL, recv_callback, None, lost_conn_callback, verbose)
     server.listen(port)
     return server
