@@ -6,7 +6,7 @@ from socket import inet_aton, inet_ntoa
 import struct
 
 from settings import MAY_FORWARD_TO_PRIVATE_IPS
-from LoggingHelper import log_exception, addrstr, hexstr, pktstr
+from LoggingHelper import log_exception, addrstr, pktstr
 import ProtocolHelper
 from VNSProtocol import VNSPacket, VNSInterface, VNSHardwareInfo
 import web.vns.models as db
@@ -587,10 +587,11 @@ class WebServer(BasicNode):
         BasicNode.handle_non_icmp_ip_packet_to_self(self, intf, pkt)
 
     @staticmethod
-    def __ci(ci):
-        """Stringifies a client info 2-tuple."""
+    def __cim(ci, myport):
+        """Stringifies a client info 2-tuple and port number belonging to me."""
         ip, port = ci
-        return '%s:%s' % (inet_ntoa(ip), struct.unpack('>H', port))
+        return 'client=%s:%d me=%d' % (inet_ntoa(ip), struct.unpack('>H', port)[0],
+                                       struct.unpack('>H', myport)[0])
 
     def handle_http_request(self, intf, pkt):
         """Forward the received packet from an HTTP client to the web server."""
@@ -605,11 +606,11 @@ class WebServer(BasicNode):
                 self.next_tcp_port = 10000
             self.conns[client_info] = my_port
             self.conns[my_port] = client_info
-            logging.debug('%s forwarding new HTTP request: client=%s me=%s' %
-                          (self.di(), self.__ci(client_info), hexstr(my_port)))
+            logging.debug('%s forwarding new HTTP request: %s' %
+                          (self.di(), self.__cim(client_info, my_port)))
         else:
-            logging.debug('%s forwarding ongoing HTTP request: client=%s me=%s' %
-                          (self.di(), self.__ci(client_info), hexstr(my_port)))
+            logging.debug('%s forwarding ongoing HTTP request: %s' %
+                          (self.di(), self.__cim(client_info, my_port)))
 
         # rewrite and forward the request to the web server we're proxying
         new_dst = self.web_server_to_proxy_ip
@@ -628,9 +629,9 @@ class WebServer(BasicNode):
 
         client_info = self.conns.get(pkt.tcp_dst_port)
         if client_info is None:
-            logging.debug('%s ignoring unexpected HTTP reply to my port %s' % (self.di(), hexstr(pkt.tcp_dst_port)))
+            logging.debug('%s ignoring unexpected HTTP reply to my port %s' % (self.di(), struct.unpack('>H',pkt.tcp_dst_port)[0]))
             return # ignore unexpected replies
-        logging.debug('%s forwarding HTTP reply to client=%s from me=%s' % (self.di(), self.__ci(client_info), hexstr(pkt.tcp_dst_port)))
+        logging.debug('%s forwarding HTTP reply to client from me %s' % (self.di(), self.__cim(client_info, pkt.tcp_dst_port)))
 
         # rewrite and forward the reply back to the client its associated with
         (client_ip, client_tcp_port) = client_info
