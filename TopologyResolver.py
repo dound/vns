@@ -19,6 +19,11 @@ class IterableSubnetTree(SubnetTree):
         SubnetTree.__delitem__(self, key)
         self.keys.__delitem__(key)
 
+    def get_exact(self, key):
+        """Returns the value associated with the specified key if it has been
+        inserted in the tree."""
+        return self.keys[key]
+
     def has_exact(self, key):
         """Returns True if the specified key has been inserted in the tree."""
         return self.keys.has_key(key)
@@ -78,7 +83,7 @@ class TopologyResolver:
             try:
                 topos = self.m2t[mac]
                 try:
-                    topos.remove(mac)
+                    topos.remove(topo)
                     if not topos:
                         del self.m2t[mac]
                 except ValueError:
@@ -97,7 +102,7 @@ class TopologyResolver:
             # unregister which sources this topo wants packets from
             for ps in topo.get_source_filters():
                 try:
-                    topos = st[ps]
+                    topos = st.get_exact(ps)
                     try:
                         topos.remove(topo) # remove this topology's registration
                         if not topos:
