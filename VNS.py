@@ -11,7 +11,7 @@ from twisted.internet import reactor
 from twisted.python.log import PythonLoggingObserver
 from twisted.python import log as tlog
 
-from settings import BORDER_DEV_NAME
+from settings import BORDER_DEV_NAME, PCAP_FILTER
 from LoggingHelper import log_exception, addrstr, pktstr
 import ProtocolHelper
 from Topology import Topology
@@ -47,7 +47,6 @@ class VNSSimulator:
         MAX_LEN      = 1514    # max size of packet to capture
         PROMISCUOUS  = 1       # promiscuous mode?
         READ_TIMEOUT = 100     # in milliseconds
-        PCAP_FILTER  = ''      # empty => get everything (or we could use a BPF filter)
         MAX_PKTS     = -1      # number of packets to capture; -1 => no limit
 
         # the method which will be called when a packet is captured

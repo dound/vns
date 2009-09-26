@@ -21,3 +21,12 @@ MAY_FORWARD_TO_PRIVATE_IPS = True
 # appropriate topology.  Packets coming off simulated topology's will be put out
 # on this interface.  If it is the empty string, then the similar is isolated.
 BORDER_DEV_NAME = 'eth0'
+
+# The list of IPs to NOT inject from the real world to the simulator.  Usually,
+# you want the simulator machine's own IP address to be in this list.
+IP_ADDRS_TO_FILTER_OUT = ['']
+
+# The filter describing what packets to inject from those sniffed from the real
+# world.  The default is to inject everything except IP packets to or from
+# addresses in the IP_ADDRS_TO_FILTER_OUT list.
+PCAP_FILTER = ' and '.join(['not ip dst %s and not ip src %s' % (a,a) for a in IP_ADDRS_TO_FILTER_OUT])
