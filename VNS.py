@@ -15,6 +15,7 @@ from settings import BORDER_DEV_NAME
 from LoggingHelper import log_exception, addrstr, pktstr
 import ProtocolHelper
 from Topology import Topology
+from TopologyInteractionProtocol import TI_DEFAULT_PORT, create_ti_server, TIOpen, TIPacket, TIBanner
 from TopologyResolver import TopologyResolver
 from VNSProtocol import VNS_DEFAULT_PORT, create_vns_server
 from VNSProtocol import VNSOpen, VNSClose, VNSPacket
@@ -30,6 +31,10 @@ class VNSSimulator:
         self.server = create_vns_server(VNS_DEFAULT_PORT,
                                         self.handle_recv_msg,
                                         self.handle_client_disconnected)
+        self.ti_clients = {} # maps active TI conns to the topology ID it is conn to
+        self.ti_server = create_ti_server(TI_DEFAULT_PORT,
+                                          self.handle_recv_ti_msg,
+                                          self.handle_ti_client_disconnected)
         if BORDER_DEV_NAME:
             self.__start_raw_socket(BORDER_DEV_NAME)
             # run pcap in another thread (it will run forever)
@@ -101,13 +106,15 @@ class VNSSimulator:
 
     def handle_recv_msg(self, conn, vns_msg):
         if vns_msg is not None:
-            logging.debug('recv VNS msg: %s', vns_msg)
+            logging.debug('recv VNS msg: %s' % vns_msg)
             if vns_msg.get_type() == VNSOpen.get_type():
                 self.handle_open_msg(conn, vns_msg)
             elif vns_msg.get_type() == VNSClose.get_type():
                 self.handle_close_msg(conn)
             elif vns_msg.get_type() == VNSPacket.get_type():
                 self.handle_packet_msg(conn, vns_msg)
+            else:
+                logging.debug('unexpected VNS message received: %s' % vns_msg)
 
     def start_topology(self, tid):
         """Handles starting up the specified topology id.  Returns None if it
@@ -211,6 +218,63 @@ class VNSSimulator:
         for conn in self.clients.keys():
             self.terminate_connection(conn, 'the simulator is shutting down')
         os._exit(0) # force the termination (otherwise the pcap thread keeps going)
+
+    def handle_recv_ti_msg(self, conn, ti_msg):
+        if ti_msg is not None:
+            logging.debug('recv VNS TI msg: %s' % ti_msg)
+            if ti_msg.get_type() == TIOpen.get_type():
+                self.handle_ti_open_msg(conn, ti_msg)
+            elif ti_msg.get_type() == TIPacket.get_type():
+                self.handle_ti_packet_msg(conn, ti_msg)
+            else:
+                logging.debug('unexpected VNS TI message received: %s' % ti_msg)
+
+    def handle_ti_open_msg(self, conn, open_msg):
+        tid = open_msg.topo_id
+        if not self.topologies.has_key(tid):
+            self.terminate_ti_connection(conn, 'Topology %d is not currently active' % tid)
+        else:
+            self.ti_clients[conn] = tid
+
+    def handle_ti_packet_msg(self, conn, pm):
+        try:
+            tid = self.ti_clients[conn]
+        except KeyError:
+            self.terminate_ti_connection(conn, 'no topology mapping known (forgot to send TIOpen?)')
+            return
+
+        try:
+            topo = self.topologies[tid]
+        except KeyError:
+            self.terminate_ti_connection(conn, 'topology %d is no longer active' % tid)
+            return
+
+        ret = topo.send_packet_from_node(pm.node_name, pm.intf_name, pm.ethernet_frame)
+        if ret != True:
+            self.terminate_ti_connection(conn, ret)
+
+    def handle_ti_client_disconnected(self, conn):
+        self.terminate_ti_connection(conn,
+                                     'client disconnected (%s)' % conn,
+                                     notify_client=False)
+
+    def terminate_ti_connection(self, conn, why, notify_client=True, log_it=True, lvl=logging.INFO):
+        """Terminates the TI client connection conn.  This event will be logged
+        unless log_it is False.  If notify_client is True, then the client will
+        be sent a TIBanner message with an explanation."""
+        # terminate the client
+        if conn.connected:
+            if notify_client:
+                conn.send(TIBanner(why))
+            conn.transport.loseConnection()
+
+        if log_it:
+            logging.log(lvl, 'terminating TI client (%s): %s' % (conn, why))
+
+        # cleanup TI client info
+        tid = self.ti_clients.get(conn)
+        if tid is not None:
+            del self.ti_clients[conn]
 
 class NoOpTwistedLogger:
     """Discards all logging messages (our custom handler takes care of them)."""

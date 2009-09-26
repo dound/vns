@@ -160,6 +160,21 @@ class Topology():
                 else:
                     intf.link.send_to_other(intf, packet)
 
+    def send_packet_from_node(self, node_name, intf_name, ethernet_frame):
+        """Sends a packet from the request node's specified interface.  True is
+        returned on success; otherwise a string describing the error is returned."""
+        for n in self.nodes:
+            if n.name == node_name:
+                for intf in n.interfaces:
+                    if intf.name == intf_name:
+                        if intf.link:
+                            intf.link.send_to_other(intf, ethernet_frame)
+                            return True
+                        else:
+                            return '%s:%s has no link attached to it' % (node_name, intf_name)
+                return 'there is no interface %s on node %s' % (intf_name, n.str_all())
+        return 'there is no node named %s' % node_name
+
     def is_active(self):
         """Returns true if any clients are connected."""
         return len(self.clients) > 0
