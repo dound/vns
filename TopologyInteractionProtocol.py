@@ -154,7 +154,7 @@ class TIModifyLink(TINodePortHeader):
         return '%sABLE link connected to %s' % (prefix, TINodePortHeader.__str__(self))
 TI_MESSAGES.append(TIModifyLink)
 
-class TIError(LTMessage):
+class TIBanner(LTMessage):
     @staticmethod
     def get_type():
         return 5
@@ -171,11 +171,11 @@ class TIError(LTMessage):
 
     @staticmethod
     def unpack(body):
-        return TIError(body)
+        return TIBanner(body)
 
     def __str__(self):
         return 'ERROR: %s' % self.msg
-TI_MESSAGES.append(TIError)
+TI_MESSAGES.append(TIBanner)
 
 TI_PROTOCOL = LTProtocol(TI_MESSAGES, 'H', 'H')
 
