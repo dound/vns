@@ -1,5 +1,6 @@
 """Defines the VNS protocol and some associated helper functions."""
 
+import re
 from socket import inet_ntoa
 import struct
 
@@ -8,6 +9,11 @@ from ltprotocol.ltprotocol import LTMessage, LTProtocol, LTTwistedServer
 VNS_DEFAULT_PORT = 12345
 VNS_MESSAGES = []
 IDSIZE = 32
+
+__clean_re = re.compile(r'\x00*')
+def strip_null_chars(s):
+    """Remove null characters from a string."""
+    return __clean_re.sub('', s)
 
 class VNSOpen(LTMessage):
     @staticmethod
@@ -32,8 +38,11 @@ class VNSOpen(LTMessage):
 
     @staticmethod
     def unpack(body):
-        t = struct.unpack(VNSOpen.FORMAT, body)
-        return VNSOpen(t[0], t[2], t[3], t[4]) # t[1] is pad => ignored
+        t = struct.unpack(VNSOpen.FORMAT, body) # t[1] is pad => ignored
+        vhost = strip_null_chars(t[2])
+        user = strip_null_chars(t[3])
+        pw = strip_null_chars(t[4])
+        return VNSOpen(t[0], vhost, user, pw)
 
     def __str__(self):
         return 'OPEN: topo_id=%u host=%s user=%s' % (self.topo_id, self.vhost, self.user)
@@ -60,7 +69,7 @@ class VNSClose(LTMessage):
     @staticmethod
     def unpack(body):
         t = struct.unpack(VNSClose.FORMAT, body)
-        return VNSClose(t[0])
+        return VNSClose(strip_null_chars(t[0]))
 
     def __str__(self):
         return 'CLOSE: %s' % self.msg
@@ -88,7 +97,8 @@ class VNSPacket(LTMessage):
     @staticmethod
     def unpack(body):
         t = struct.unpack(VNSPacket.HEADER_FORMAT, body[:VNSPacket.HEADER_SIZE])
-        return VNSPacket(t[0], body[VNSPacket.HEADER_SIZE:])
+        intf_name = strip_null_chars(t[0])
+        return VNSPacket(intf_name, body[VNSPacket.HEADER_SIZE:])
 
     def __str__(self):
         return 'PACKET: %uB on %s' % (len(self.ethernet_frame), self.intf_name)
@@ -161,7 +171,7 @@ class VNSBanner(LTMessage):
     @staticmethod
     def unpack(body):
         t = struct.unpack(VNSBanner.FORMAT, body)
-        return VNSBanner(t[0])
+        return VNSBanner(strip_null_chars(t[0]))
 
     def __str__(self):
         return 'BANNER: %s' % self.msg

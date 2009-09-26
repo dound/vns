@@ -5,6 +5,7 @@ import struct
 from ltprotocol.ltprotocol import LTMessage, LTProtocol, LTTwistedServer
 
 from LoggingHelper import pktstr
+from VNSProtocol import strip_null_chars
 
 TI_DEFAULT_PORT = 12346
 TI_MESSAGES = []
@@ -54,7 +55,9 @@ class TINodePortHeader(LTMessage):
     @staticmethod
     def unpack_hdr(body):
         t = struct.unpack(TINodePortHeader.HEADER_FORMAT, body[:TINodePortHeader.HEADER_SIZE])
-        return (t[0], t[1], body[TINodePortHeader.HEADER_SIZE:])
+        node_name = strip_null_chars(t[0])
+        intf_name = strip_null_chars(t[1])
+        return (node_name, intf_name, body[TINodePortHeader.HEADER_SIZE:])
 
     def __str__(self):
         return '%s:%s' % (self.node_name, self.intf_name)

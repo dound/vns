@@ -134,7 +134,7 @@ class Topology():
         controlled by conn.  If conn does not control a node, then a KeyError is
         raised.  If conn's node does not have an interface with the specified
         name then an error message is returned.  Otherwise, True is returned."""
-        departure_intf_name = pkt_msg.intf_name.replace('\x00', '')
+        departure_intf_name = pkt_msg.intf_name
         n = self.clients[conn]
         for intf in n.interfaces:
             if intf.name == departure_intf_name:
