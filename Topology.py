@@ -580,7 +580,7 @@ class WebServer(BasicNode):
             if pkt.tcp_dst_port == ProtocolHelper.HTTP_PORT:
                 self.handle_http_request(intf, pkt)
                 return
-            elif pkt.tcp_dst_port == ProtocolHelper.HTTP_PORT:
+            elif pkt.tcp_src_port == ProtocolHelper.HTTP_PORT:
                 self.handle_http_reply(intf, pkt)
                 return
 
