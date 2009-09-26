@@ -29,7 +29,6 @@ class VNSSimulator:
         self.clients = {}    # maps active conn to the topology ID it is conn to
         self.server = create_vns_server(VNS_DEFAULT_PORT,
                                         self.handle_recv_msg,
-                                        None,
                                         self.handle_client_disconnected)
         if BORDER_DEV_NAME:
             self.__start_raw_socket(BORDER_DEV_NAME)
