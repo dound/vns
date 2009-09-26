@@ -154,7 +154,7 @@ class TopologyResolver:
         packet to this dst should be forwarded."""
         try:
             topos = self.m2t[dst_mac]
-            logging.debug('MAC %s resolved to topo %d' % (addrstr(dst_mac), ','.join([str(t.id) for t in topos])))
+            logging.debug('MAC %s resolved to topo %s' % (addrstr(dst_mac), ','.join([str(t.id) for t in topos])))
             return topos
         except KeyError:
             # logging.debug('Ignoring packet to MAC %s' % addrstr(dst_mac))
