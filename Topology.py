@@ -623,7 +623,7 @@ class WebServer(BasicNode):
 
     def handle_http_reply(self, intf, pkt):
         """Forward the received packet from the web server to the HTTP client."""
-        if pkt.ip_dst != self.web_server_to_proxy_ip:
+        if pkt.ip_src != self.web_server_to_proxy_ip:
             logging.debug('%s ignoring HTTP reply from unexpected source %s' % (self.di(), addrstr(pkt.ip_dst)))
             return # ignore HTTP replies unless they're from our web server
 
