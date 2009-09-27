@@ -1,6 +1,7 @@
 import hashlib
 import logging
 import random
+import re
 import socket
 from socket import inet_aton, inet_ntoa
 import struct
@@ -194,7 +195,7 @@ class Topology():
             return Hub(topo, dn.name)
         elif dn.type == db.Node.WEB_SERVER_ID:
             hostname = dn.webserver.web_server_addr.get_ascii_hostname()
-            return WebServer(topo, dn.name, hostname)
+            return WebServer(topo, dn.name, hostname, dn.webserver.replace_hostname_in_http_replies)
         elif dn.type == db.Node.GATEWAY_ID:
             if self.gateway is not None:
                 err = 'only one gateway per topology is allowed'
@@ -540,10 +541,18 @@ class WebServer(BasicNode):
     web_server_to_proxy_hostname parameter) on TCP port 80.  Like
     Host, it also replies to echo and ARP requests.  It serves the specified
     website by acting as a proxy for that website."""
-    def __init__(self, topo, name, web_server_to_proxy_hostname):
+    def __init__(self, topo, name, web_server_to_proxy_hostname, repl_hn_in_replies):
         BasicNode.__init__(self, topo, name)
         self.web_server_to_proxy_hostname = web_server_to_proxy_hostname
         self.__init_web_server_ip()
+        if repl_hn_in_replies:
+            # match 'a' tags which have a 'href' field containing the hostname
+            # of the server we're proxying
+            self.reply_re = re.compile(r'(<a.*?)(href="[^"]*)(%s)([^"]*")' % web_server_to_proxy_hostname)
+            self.reply_sub_f = None # will be set when add_interface() is first called
+        else:
+            self.reply_re = None
+            self.reply_sub_f = None
 
         # Each request is from a unique socket (TCP port and IP pair).  It is
         # then forwarded from a different local TCP port to the web server this
@@ -563,6 +572,23 @@ class WebServer(BasicNode):
             self.web_server_to_proxy_ip = None
             log_exception(logging.WARN,
                           'unable to resolve web server hostname: ' + self.web_server_to_proxy_hostname)
+
+    def add_interface(self, name, mac, ip, mask):
+        if self.reply_re and not self.reply_sub_f:
+            str_ip = inet_ntoa(ip)
+            len_diff = len(self.web_server_to_proxy_hostname) - len(str_ip)
+            if len_diff < 0:
+                logging.error('impossible hostname substitution request - ' + \
+                              'DB should not permit this: hostname=%s (len=%d) < ip=%s (len=%d)' %
+                              (self.web_server_to_proxy_hostname, len(self.web_server_to_proxy_hostname),
+                               str_ip, len(str_ip)))
+                self.reply_re = None # can't do it
+            else:
+                # swap out the hostname for our IP; length MUST be the same to
+                # make TCP happy, so add spaces before the 'href' field as needed
+                extra_padding = ' ' * len_diff
+                self.reply_sub_f = lambda m : m.groups()[0] + extra_padding + m.groups()[1] + str_ip + m.groups()[3]
+        return BasicNode.add_interface(self, name, mac, ip, mask)
 
     @staticmethod
     def get_type_str():
@@ -632,6 +658,10 @@ class WebServer(BasicNode):
             logging.debug('%s ignoring unexpected HTTP reply to my port %s' % (self.di(), struct.unpack('>H',pkt.tcp_dst_port)[0]))
             return # ignore unexpected replies
         logging.debug('%s forwarding HTTP reply to client from me %s' % (self.di(), self.__cim(client_info, pkt.tcp_dst_port)))
+
+        if self.reply_sub_f:
+            sz = len(pkt.tcp_data)
+            pkt.tcp_data = self.reply_re.sub(self.reply_sub_f, pkt.tcp_data)
 
         # rewrite and forward the reply back to the client its associated with
         (client_ip, client_tcp_port) = client_info

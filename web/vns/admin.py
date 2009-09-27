@@ -33,7 +33,7 @@ class NodeAdmin(admin.ModelAdmin):
     search_fields = ('template__name', 'name', 'type__name')
 
 class WebServerAdmin(admin.ModelAdmin):
-    list_display = ('template', 'name', 'type', 'web_server_addr')
+    list_display = ('template', 'name', 'type', 'web_server_addr', 'replace_hostname_in_http_replies')
     ordering = ('template', 'name')
     search_fields = ('template__name', 'name', 'type__name', 'web_server_addr')
 

@@ -2,7 +2,7 @@ import hashlib
 from socket import inet_aton, inet_ntoa
 import struct
 
-from django.db.models import AutoField, CharField, DateField, FloatField, ForeignKey, \
+from django.db.models import AutoField, BooleanField, CharField, DateField, FloatField, ForeignKey, \
                              IntegerField, IPAddressField, ManyToManyField, Model
 from django.contrib.auth.models import User
 
@@ -103,6 +103,15 @@ class WebServer(Node):
     limited to choices in the WebServerHostname table to prevent users from
     using the system to retrieve content from questionable sources."""
     web_server_addr = ForeignKey(WebServerHostname)
+    replace_hostname_in_http_replies = \
+        BooleanField(default=True,
+                     help_text='If true, then HTTP replies will have any ' + \
+                               'occurrence of the hostname within the "href"' + \
+                               'field of the "a" tag replaced with this ' + \
+                               'node\'s IP address.')
+
+    def __unicode__(self):
+        return Node.__unicode__(self) + ' -> %s' % self.web_server_addr.__unicode__()
 
 class Port(Model):
     """A port on a node in a topology template."""
