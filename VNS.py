@@ -3,6 +3,7 @@
 import errno
 import logging, logging.config
 import os
+from os.path import dirname
 import socket
 import sys
 
@@ -283,7 +284,9 @@ class NoOpTwistedLogger:
         pass
 
 def main():
-    logging.config.fileConfig('logging.conf')
+    dir = dirname(__file__)
+    dir = dir if dir else '.'
+    logging.config.fileConfig(dir + '/logging.conf')
     logging.info('VNS Simulator starting up')
     PythonLoggingObserver().start() # log twisted messages too
     tlog.startLogging(NoOpTwistedLogger(), setStdout=False)
