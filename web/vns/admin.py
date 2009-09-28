@@ -54,7 +54,7 @@ class LinkAdmin(admin.ModelAdmin):
                      'port2__node__name', 'lossiness')
 
 class TopologyAdmin(admin.ModelAdmin):
-    list_display = ('owner', 'id', 'template')
+    list_display = ('owner', 'id', 'template', 'enabled')
     ordering = ('owner', 'id')
     search_fields = ('id', 'owner__name', 'template__name')
 

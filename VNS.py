@@ -15,7 +15,7 @@ from twisted.python import log as tlog
 from settings import BORDER_DEV_NAME, PCAP_FILTER
 from LoggingHelper import log_exception, addrstr, pktstr
 import ProtocolHelper
-from Topology import Topology
+from Topology import Topology, TopologyCreationException
 from TopologyInteractionProtocol import TI_DEFAULT_PORT, create_ti_server, TIOpen, TIPacket, TIBanner
 from TopologyResolver import TopologyResolver
 from VNSProtocol import VNS_DEFAULT_PORT, create_vns_server
@@ -117,19 +117,25 @@ class VNSSimulator:
                 logging.debug('unexpected VNS message received: %s' % vns_msg)
 
     def start_topology(self, tid):
-        """Handles starting up the specified topology id.  Returns None if it
-        cannot be started."""
+        """Handles starting up the specified topology id.  Returns a 2-tuple.
+        The first element is None and the second is a string if an error occurs;
+        otherwise the first element is the topology."""
         try:
             topo = Topology(tid, self.raw_socket)
-        except db.Topology.DoesNotExist, db.IPAssignment.DoesNotExist:
-            return None
+        except TopologyCreationException as e:
+            return (None, str(e))
+        except db.Topology.DoesNotExist:
+            return (None, 'topology %d does not exist' % tid)
+        except db.IPAssignment.DoesNotExist:
+            return (None, 'topology %d is missing an IP assignment' % tid)
         except:
-            log_exception(logging.ERROR, 'topology instantiation unexpectedly failed')
-            return None
+            msg = 'topology instantiation unexpectedly failed'
+            log_exception(logging.ERROR, msg)
+            return (None, msg)
 
         self.resolver.register_topology(topo)
         self.topologies[tid] = topo
-        return topo
+        return (topo, None)
 
     def terminate_connection(self, conn, why, notify_client=True, log_it=True, lvl=logging.INFO):
         """Terminates the client connection conn.  This event will be logged
@@ -161,10 +167,9 @@ class VNSSimulator:
         try:
             topo = self.topologies[tid]
         except KeyError:
-            topo = self.start_topology(tid)
+            (topo, err_msg) = self.start_topology(tid)
             if topo is None:
-                msg = 'requested topology (%d) does not exist or could not be instantiated'
-                self.terminate_connection(conn, msg % tid)
+                self.terminate_connection(conn, err_msg)
                 return
 
         # try to connect the client to the requested node

@@ -140,9 +140,11 @@ class Topology(Model):
                              'topology by specifying this number.')
     owner = ForeignKey(User)
     template = ForeignKey(TopologyTemplate)
+    enabled = BooleanField(help_text='Whether this topology is active.')
 
     def __unicode__(self):
-        return u'Topology %d' % self.id
+        str_enabled = '' if self.enabled else ' (disabled)'
+        return u'Topology %d%s' % (self.id, str_enabled)
 
 def base_subnet(subnet_str):
     """Converts a subnet string to just the (masked) prefix."""

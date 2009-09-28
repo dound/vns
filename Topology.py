@@ -20,6 +20,13 @@ class ConnectionReturn():
     def is_success(self):
         return self.fail_reason is None
 
+class TopologyCreationException(Exception):
+    def __init__(self, problem):
+        self.problem = problem
+
+    def __str__(self):
+        return self.problem
+
 class Topology():
     """A topology to simulate."""
     def __init__(self, tid, raw_socket):
@@ -29,6 +36,8 @@ class Topology():
         self.clients = {}
 
         t = db.Topology.objects.get(pk=tid)
+        if not t.enabled:
+            raise TopologyCreationException('topology %d is disabled' % tid)
         self.id = tid
 
         # determine who may use this topology
