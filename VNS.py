@@ -1,5 +1,6 @@
 """The VNS simulator."""
 
+import datetime
 import errno
 import logging, logging.config
 import os
@@ -26,6 +27,10 @@ class VNSSimulator:
     """The VNS simulator.  It gives clients control of nodes in simulated
     topologies."""
     def __init__(self):
+        # close out any hanging stats records (shouldn't be any unless the
+        # server was shutdown abnormally with no chance to cleanup)
+        db.StatsTopology.objects.filter(active=True).update(active=False)
+
         self.topologies = {} # maps active topology ID to its Topology object
         self.resolver = TopologyResolver() # maps MAC/IP addresses to a Topology
         self.clients = {}    # maps active conn to the topology ID it is conn to
@@ -116,12 +121,12 @@ class VNSSimulator:
             else:
                 logging.debug('unexpected VNS message received: %s' % vns_msg)
 
-    def start_topology(self, tid):
+    def start_topology(self, tid, client_ip):
         """Handles starting up the specified topology id.  Returns a 2-tuple.
         The first element is None and the second is a string if an error occurs;
         otherwise the first element is the topology."""
         try:
-            topo = Topology(tid, self.raw_socket)
+            topo = Topology(tid, self.raw_socket, client_ip)
         except TopologyCreationException as e:
             return (None, str(e))
         except db.Topology.DoesNotExist:
@@ -159,6 +164,12 @@ class VNSSimulator:
             if not topo.is_active():
                 self.resolver.unregister_topology(topo)
                 del self.topologies[tid]
+                topo_stats = topo.get_stats()
+                topo_stats.active = False
+                deltaT = datetime.datetime.now() - topo_stats.time_connected
+                deltaTsecs = deltaT.seconds + 60*60*24*deltaT.days
+                topo_stats.total_time_connected_sec = deltaTsecs
+                topo_stats.save()
 
     def handle_open_msg(self, conn, open_msg):
         # get the topology the client is trying to connect to
@@ -167,7 +178,8 @@ class VNSSimulator:
         try:
             topo = self.topologies[tid]
         except KeyError:
-            (topo, err_msg) = self.start_topology(tid)
+            client_ip = conn.transport.getPeer().host
+            (topo, err_msg) = self.start_topology(tid, client_ip)
             if topo is None:
                 self.terminate_connection(conn, err_msg)
                 return

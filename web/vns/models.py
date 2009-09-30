@@ -2,7 +2,8 @@ import hashlib
 from socket import inet_aton, inet_ntoa
 import struct
 
-from django.db.models import AutoField, BooleanField, CharField, DateField, FloatField, ForeignKey, \
+from django.db.models import AutoField, BooleanField, CharField, DateField, \
+                             DateTimeField, FloatField, ForeignKey, \
                              IntegerField, IPAddressField, ManyToManyField, Model
 from django.contrib.auth.models import User
 
@@ -232,3 +233,22 @@ class IPBlock(Model):
 
     def __unicode__(self):
         return u'%s/%d' % (self.subnet, self.mask)
+
+class StatsTopology(Model):
+    """Statistics about Topology during a single session."""
+    topology = ForeignKey(Topology)
+    client_ip = IPAddressField(help_text='IP address of the first client to connect to the topology')
+    time_connected = DateTimeField(auto_now_add=True)
+    total_time_connected_sec = IntegerField(default=0)
+    num_pkts_to_topo = IntegerField(default=0, help_text='Counts packets arriving from the real world or through the topology interaction protocol.')
+    num_pkts_from_topo = IntegerField(default=0, help_text='Counts packets sent from the topology out to the real world.')
+    num_pkts_to_client = IntegerField(default=0, help_text='Counts packets sent to any client node in the topology.')
+    num_pkts_from_client = IntegerField(default=0, help_text='Counts packets sent from any client node in the topology.')
+    active = BooleanField(default=True, help_text='True as long as this topology is still running on the simulator.')
+
+    def __unicode__(self):
+        return (u'Topology %d stats: ' % self.topology.id) + \
+               (u'Started by client at %s; ' % self.client_ip) + \
+               (u'Active for %dsec; ' % self.total_time_connected_sec) + \
+               (u'# Packets [Topo to=%d from=%d] ' % (self.nums_pkts_to_topo, self.nums_pkts_from_topo)) + \
+               (u'[User to=%d from=%d]' % (self.nums_pkts_to_client, self.nums_pkts_from_client))

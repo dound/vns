@@ -1,5 +1,5 @@
 from django.contrib import admin
-from web.vns.models import Simulator, Organization, UserProfile, \
+from web.vns.models import Simulator, Organization, UserProfile, StatsTopology, \
                            TopologyTemplate, Node, WebServer, WebServerHostname, Port, Link, \
                            Topology, TopologyUser, IPAssignment, MACAssignment, IPBlock
 
@@ -78,6 +78,11 @@ class IPBlockAdmin(admin.ModelAdmin):
     ordering = ('subnet', 'mask')
     search_fields = ('simulator__name', 'org__name', 'subnet', 'mask')
 
+class StatsTopologyAdmin(admin.ModelAdmin):
+    list_display = ('topology', 'client_ip', 'time_connected', 'total_time_connected_sec', 'num_pkts_to_topo', 'num_pkts_from_topo', 'num_pkts_to_client', 'num_pkts_from_client', 'active')
+    ordering = ('time_connected',)
+    search_fields = ('topology__template__name', 'topology__name', 'client_ip')
+
 admin.site.register(Simulator, SimulatorAdmin)
 admin.site.register(Organization, OrganizationAdmin)
 admin.site.register(UserProfile, UserProfileAdmin)
@@ -92,3 +97,4 @@ admin.site.register(TopologyUser, TopologyUserAdmin)
 admin.site.register(IPAssignment, IPAssignmentAdmin)
 admin.site.register(MACAssignment, MACAssignmentAdmin)
 admin.site.register(IPBlock, IPBlockAdmin)
+admin.site.register(StatsTopology, StatsTopologyAdmin)
