@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block title %}Current VNS Usage{% endblock %}
+
+{% block content %}
+    <h2>Active Topologies</h2>
+    {% for ts in stats_list %}
+        <p>{{ ts.template.name }} Topology:
+            <ul>
+                <li>Client: {{ ts.username }} from {{ ts.client_ip }}</li>
+                <li>Connected at: {{ ts.time_connected }}</li>
+                <li>Total traffic (# packets): {{ ts.total_num_packets }}</li>
+            </ul>
+        </p>
+        </hr>
+    {% empty %}
+    <p>There are no active topologies at this time.</p>
+    {% endfor %}
+{% endblock %}
