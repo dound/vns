@@ -48,6 +48,8 @@ class VNSSimulator:
         else:
             self.raw_socket = None
 
+        self.periodic_callback()
+
     def __run_pcap(self, dev):
         """Start listening for packets coming in from the outside world."""
         MAX_LEN      = 1514    # max size of packet to capture
@@ -83,6 +85,11 @@ class VNSSimulator:
                 extra = ''
             log_exception(logging.CRITICAL, 'failed to open raw socket' + extra)
             sys.exit(-1)
+
+    def periodic_callback(self):
+        for topo in self.topologies.values():
+            topo.save_stats()
+        reactor.callLater(60, self.periodic_callback)
 
     def handle_packet_from_outside(self, packet):
         """Forwards packet to the appropriate simulation, if any."""

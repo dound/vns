@@ -199,6 +199,9 @@ class Topology():
         """Returns true if any clients are connected."""
         return len(self.clients) > 0
 
+    def save_stats(self):
+        self.stats.save_if_changed()
+
     def __make_node(self, dn, raw_socket):
         """Converts the given database node into a simulator node object."""
         # TODO: need to distinguish between nodes THIS simulator simulates,
