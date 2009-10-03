@@ -79,9 +79,9 @@ class IPBlockAdmin(admin.ModelAdmin):
     search_fields = ('simulator__name', 'org__name', 'subnet', 'mask')
 
 class StatsTopologyAdmin(admin.ModelAdmin):
-    list_display = ('topology', 'client_ip', 'time_connected', 'total_time_connected_sec', 'num_pkts_to_topo', 'num_pkts_from_topo', 'num_pkts_to_client', 'num_pkts_from_client', 'active')
+    list_display = ('template', 'username', 'client_ip', 'time_connected', 'total_time_connected_sec', 'num_pkts_to_topo', 'num_pkts_from_topo', 'num_pkts_to_client', 'num_pkts_from_client', 'active')
     ordering = ('time_connected',)
-    search_fields = ('topology__template__name', 'topology__name', 'client_ip')
+    search_fields = ('template__name', 'username', 'client_ip')
 
 admin.site.register(Simulator, SimulatorAdmin)
 admin.site.register(Organization, OrganizationAdmin)

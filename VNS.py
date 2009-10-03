@@ -121,12 +121,12 @@ class VNSSimulator:
             else:
                 logging.debug('unexpected VNS message received: %s' % vns_msg)
 
-    def start_topology(self, tid, client_ip):
+    def start_topology(self, tid, client_ip, username):
         """Handles starting up the specified topology id.  Returns a 2-tuple.
         The first element is None and the second is a string if an error occurs;
         otherwise the first element is the topology."""
         try:
-            topo = Topology(tid, self.raw_socket, client_ip)
+            topo = Topology(tid, self.raw_socket, client_ip, username)
         except TopologyCreationException as e:
             return (None, str(e))
         except db.Topology.DoesNotExist:
@@ -179,7 +179,7 @@ class VNSSimulator:
             topo = self.topologies[tid]
         except KeyError:
             client_ip = conn.transport.getPeer().host
-            (topo, err_msg) = self.start_topology(tid, client_ip)
+            (topo, err_msg) = self.start_topology(tid, client_ip, open_msg.user)
             if topo is None:
                 self.terminate_connection(conn, err_msg)
                 return

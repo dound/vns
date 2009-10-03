@@ -29,7 +29,7 @@ class TopologyCreationException(Exception):
 
 class Topology():
     """A topology to simulate."""
-    def __init__(self, tid, raw_socket, client_ip):
+    def __init__(self, tid, raw_socket, client_ip, username):
         """Reads topology with the specified id from the database.  A
         DoesNotExist exception (Topology or IPAssignment) is raised if this fails."""
         # maps clients connected to this topology to the node they are connected to
@@ -86,8 +86,7 @@ class Topology():
             Link(intf1, intf2, db_link.lossiness)
 
         self.stats = db.StatsTopology()
-        self.stats.topology = t
-        self.stats.client_ip = client_ip
+        self.stats.init(t.template, client_ip, username)
         self.stats.save()
         logging.info('Topology instantiated:\n%s' % self.str_all(include_clients=False))
 
@@ -158,7 +157,7 @@ class Topology():
             if intf.name == departure_intf_name:
                 logging.debug('%s: client sending packet from %s out %s: %s' %
                               (self, n.name, intf.name, pktstr(pkt_msg.ethernet_frame)))
-                self.stats.num_pkts_from_client += 1
+                self.stats.note_pkt_from_client()
                 n.send_packet(intf, pkt_msg.ethernet_frame)
                 return True
 
@@ -173,7 +172,7 @@ class Topology():
         if len(self.gateway.interfaces) > 0:
             intf = self.gateway.interfaces[0]
             if intf.link:
-                self.stats.num_pkts_to_topo += 1
+                self.stats.note_pkt_to_topo()
                 if rewrite_dst_mac:
                     new_dst_mac = intf.link.get_other(intf).mac
                     intf.link.send_to_other(intf, new_dst_mac + packet[6:])
@@ -188,7 +187,7 @@ class Topology():
                 for intf in n.interfaces:
                     if intf.name == intf_name:
                         if intf.link:
-                            self.stats.num_pkts_to_topo += 1
+                            self.stats.note_pkt_to_topo()
                             intf.link.send_to_other(intf, ethernet_frame)
                             return True
                         else:
@@ -469,7 +468,7 @@ class VirtualNode(Node):
         if self.conn is not None:
             logging.debug('%s got packet on %s - forwarding to VNS client: %s' %
                           (self.di(), incoming_intf.name, pktstr(packet)))
-            self.topo.stats.num_pkts_to_client += 1
+            self.topo.stats.note_pkt_to_client()
             self.conn.send(VNSPacket(incoming_intf.name, packet))
 
     def __str__(self):
@@ -525,7 +524,7 @@ class Gateway(Node):
         if self.raw_socket:
             try:
                 logging.debug('%s sending packet out to the real world: %s' % (self.di(), pktstr(packet)))
-                self.topo.stats.num_pkts_from_topo += 1
+                self.topo.stats.note_pkt_from_topo()
                 self.raw_socket.send(packet)
             except socket.error:
                 # this is recoverable - the network may come back up

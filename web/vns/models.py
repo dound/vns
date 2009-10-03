@@ -236,8 +236,9 @@ class IPBlock(Model):
 
 class StatsTopology(Model):
     """Statistics about Topology during a single session."""
-    topology = ForeignKey(Topology)
+    template = ForeignKey(TopologyTemplate)
     client_ip = IPAddressField(help_text='IP address of the first client to connect to the topology')
+    username = CharField(max_length=100)
     time_connected = DateTimeField(auto_now_add=True)
     total_time_connected_sec = IntegerField(default=0)
     num_pkts_to_topo = IntegerField(default=0, help_text='Counts packets arriving from the real world or through the topology interaction protocol.')
@@ -246,9 +247,39 @@ class StatsTopology(Model):
     num_pkts_from_client = IntegerField(default=0, help_text='Counts packets sent from any client node in the topology.')
     active = BooleanField(default=True, help_text='True as long as this topology is still running on the simulator.')
 
+    def init(self, template, client_ip, username):
+        self.template = template
+        self.client_ip = client_ip
+        self.username = username
+        self.changed = False
+
+    def note_pkt_to_topo(self):
+        self.num_pkts_to_topo += 1
+        self.changed = True
+
+    def note_pkt_from_topo(self):
+        self.num_pkts_from_topo += 1
+        self.changed = True
+
+    def note_pkt_to_client(self):
+        self.num_pkts_to_client += 1
+        self.changed = True
+
+    def note_pkt_from_client(self):
+        self.num_pkts_from_client += 1
+        self.changed = True
+
+    def save_if_changed(self):
+        if self.changed:
+            self.changed = False
+            self.save()
+
+    def total_num_packets(self):
+        return self.num_pkts_from_client + self.num_pkts_from_topo + self.num_pkts_to_client + self.num_pkts_to_topo
+
     def __unicode__(self):
-        return (u'Topology %d stats: ' % self.topology.id) + \
-               (u'Started by client at %s; ' % self.client_ip) + \
+        return (u'Template %s stats: ' % self.template.name) + \
+               (u'Started by client %s at %s; ' % (self.username, self.client_ip)) + \
                (u'Active for %dsec; ' % self.total_time_connected_sec) + \
-               (u'# Packets [Topo to=%d from=%d] ' % (self.nums_pkts_to_topo, self.nums_pkts_from_topo)) + \
-               (u'[User to=%d from=%d]' % (self.nums_pkts_to_client, self.nums_pkts_from_client))
+               (u'# Packets [Topo to=%d from=%d] ' % (self.num_pkts_to_topo, self.num_pkts_from_topo)) + \
+               (u'[User to=%d from=%d]' % (self.num_pkts_to_client, self.num_pkts_from_client))
