@@ -39,8 +39,9 @@ class Topology():
         # a list of packets destined to the first hop pending an ARP translation
         self.pending_incoming_packets = []
 
-        # last time an ARP translation was done
+        # last time an ARP translation was completed / requested
         self.last_arp_translation = 0
+        self.last_arp_translation_request = 0
 
         # current ARP translation
         self.arp_translation = None
@@ -229,6 +230,11 @@ class Topology():
         if len(self.pending_incoming_packets) > 5:
             self.pending_incoming_packets = self.pending_incoming_packets[1:]
 
+        if not self.is_ok_to_send_arp_request():
+            return # we already sent an ARP request recently, so be patient!
+        else:
+            self.last_arp_translation_request = time.time()
+
         gw_intf = self.gw_intf_to_first_hop
         dst_mac = '\xFF\xFF\xFF\xFF\xFF\xFF' # broadcast
         src_mac = gw_intf.mac
@@ -276,6 +282,11 @@ class Topology():
     def is_arp_cache_valid(self):
         """Returns True if the ARP cache entry to the first hop is valid."""
         return time.time() - self.last_arp_translation <= ARP_CACHE_TIMEOUT
+
+    def is_ok_to_send_arp_request(self):
+        """Returns True if a reasonable amount of time has passed since the
+        last ARP request was sent."""
+        return time.time() - self.last_arp_translation_request >= 5 # 5 seconds
 
     def save_stats(self):
         self.stats.save_if_changed()
