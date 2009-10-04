@@ -155,7 +155,7 @@ def base_subnet(subnet_str):
     mask = int(n*'1' + (32-n)*'0', 2)
     return inet_ntoa(struct.pack('>I', ip_int & mask))
 
-class TopologyUser(Model):
+class TopologySourceIPFilter(Model):
     """Lists the IP addresses which may interact with a topology through the
     simulator.  If no IPs are listed, then there will be no restrictions.  This
     is most useful for enabling different topologies to share (reuse) simulator

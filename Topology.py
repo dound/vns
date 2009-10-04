@@ -40,8 +40,8 @@ class Topology():
             raise TopologyCreationException('topology %d is disabled' % tid)
         self.id = tid
 
-        # determine who may use this topology
-        tus = db.TopologyUser.objects.filter(topology=t)
+        # determine what IPs may interact with this topology
+        tus = db.TopologySourceIPFilter.objects.filter(topology=t)
         if len(tus) > 0:
             self.permitted_source_prefixes = [tu.subnet_str() for tu in tus]
         else:
