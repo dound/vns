@@ -127,6 +127,10 @@ class Packet:
         """Returns True if arp_type is 0x0001."""
         return self.is_valid_arp() and self.arp_type == '\x00\x01'
 
+    def is_arp_reply(self):
+        """Returns True if arp_type is 0x0002."""
+        return self.is_valid_arp() and self.arp_type == '\x00\x02'
+
     def is_ip(self):
         """Returns True if ethertype is 0x0800 (IP)."""
         return self.ether_type == '\x08\x00'

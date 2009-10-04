@@ -31,3 +31,6 @@ IP_ADDRS_TO_FILTER_OUT = []
 # addresses in the IP_ADDRS_TO_FILTER_OUT list.
 PCAP_FILTER = ' and '.join(['not ip dst %s and not ip src %s' % (a,a) for a in IP_ADDRS_TO_FILTER_OUT])
 
+# How long may a topology's gateway cache the ARP translation of the first hop
+# node on the topology (in seconds).
+ARP_CACHE_TIMEOUT = 30

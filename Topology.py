@@ -5,8 +5,9 @@ import re
 import socket
 from socket import inet_aton, inet_ntoa
 import struct
+import time
 
-from settings import MAY_FORWARD_TO_PRIVATE_IPS
+from settings import ARP_CACHE_TIMEOUT, MAY_FORWARD_TO_PRIVATE_IPS
 from LoggingHelper import log_exception, addrstr, pktstr
 import ProtocolHelper
 from VNSProtocol import VNSPacket, VNSInterface, VNSHardwareInfo
@@ -34,6 +35,15 @@ class Topology():
         DoesNotExist exception (Topology or IPAssignment) is raised if this fails."""
         # maps clients connected to this topology to the node they are connected to
         self.clients = {}
+
+        # a list of packets destined to the first hop pending an ARP translation
+        self.pending_incoming_packets = []
+
+        # last time an ARP translation was done
+        self.last_arp_translation = 0
+
+        # current ARP translation
+        self.arp_translation = None
 
         t = db.Topology.objects.get(pk=tid)
         if not t.enabled:
@@ -93,6 +103,13 @@ class Topology():
             intf1 = interfaces_db_to_sim[db_link.port1]
             intf2 = interfaces_db_to_sim[db_link.port2]
             Link(intf1, intf2, db_link.lossiness)
+
+        # get the interface to the first hop (if a first hop exists)
+        self.gw_intf_to_first_hop = None
+        if len(self.gateway.interfaces) > 0:
+            intf = self.gateway.interfaces[0]
+            if intf.link:
+                self.gw_intf_to_first_hop = intf
 
         self.stats = db.StatsTopology()
         self.stats.init(t.template, client_ip, username)
@@ -182,15 +199,48 @@ class Topology():
         """Forwards packet to the node connected to the gateway.  If
         rewrite_dst_mac is True then the destination mac is set to that of the
         first simulated node attached to the gateway."""
-        if len(self.gateway.interfaces) > 0:
-            intf = self.gateway.interfaces[0]
-            if intf.link:
-                self.stats.note_pkt_to_topo()
-                if rewrite_dst_mac:
-                    new_dst_mac = intf.link.get_other(intf).mac
-                    intf.link.send_to_other(intf, new_dst_mac + packet[6:])
+        gw_intf = self.gw_intf_to_first_hop
+        if gw_intf:
+            self.stats.note_pkt_to_topo()
+            if rewrite_dst_mac:
+                if self.is_arp_cache_valid():
+                    new_dst_mac = self.arp_translation
+                    gw_intf.link.send_to_other(gw_intf, new_dst_mac + packet[6:])
                 else:
-                    intf.link.send_to_other(intf, packet)
+                    self.need_arp_translation_for_pkt(packet)
+            else:
+                gw_intf.link.send_to_other(gw_intf, packet)
+
+    def need_arp_translation_for_pkt(self, ethernet_frame):
+        """Delays forwarding a packet to the node connected to the gateway until
+        it replies to an ARP request."""
+        self.pending_incoming_packets.append(ethernet_frame)
+        if len(self.pending_incoming_packets) > 5:
+            self.pending_incoming_packets = self.pending_incoming_packets[1:]
+
+        gw_intf = self.gw_intf_to_first_hop
+        dst_mac = '\xFF\xFF\xFF\xFF\xFF\xFF' # broadcast
+        src_mac = gw_intf.mac
+        eth_type = '\x08\x06'
+        eth_hdr = dst_mac + src_mac + eth_type
+        dst_ip = gw_intf.link.get_other(gw_intf).ip
+        src_ip = gw_intf.ip
+        # hdr: HW=Eth, Proto=IP, HWLen=6, ProtoLen=4, Type=Request
+        arp_hdr = '\x00\x01\x08\x00\x06\x04\x00\x01'
+        arp_request = eth_hdr + arp_hdr + src_mac + src_ip + dst_mac + dst_ip
+        gw_intf.link.send_to_other(gw_intf, arp_request)
+
+    def update_arp_translation(self, addr):
+        """Updates the ARP translation to the first hop and sends out any
+        pending packets."""
+        self.arp_translation = addr
+        self.last_arp_translation = time.time()
+        gw_intf = self.gw_intf_to_first_hop
+        if gw_intf:
+            for packet in self.pending_incoming_packets:
+                new_pkt = self.arp_translation + packet[6:]
+                gw_intf.link.send_to_other(gw_intf, new_pkt)
+            self.pending_incoming_packets = [] # clear the list
 
     def send_packet_from_node(self, node_name, intf_name, ethernet_frame):
         """Sends a packet from the request node's specified interface.  True is
@@ -211,6 +261,10 @@ class Topology():
     def is_active(self):
         """Returns true if any clients are connected."""
         return len(self.clients) > 0
+
+    def is_arp_cache_valid(self):
+        """Returns True if the ARP cache entry to the first hop is valid."""
+        return time.time() - self.last_arp_translation <= ARP_CACHE_TIMEOUT
 
     def save_stats(self):
         self.stats.save_if_changed()
@@ -534,6 +588,13 @@ class Gateway(Node):
             dst_ip = packet[30:34]
             if not MAY_FORWARD_TO_PRIVATE_IPS and self.__is_private_address(dst_ip):
                 logging.debug('%s ignoring IP packet to private address space: %s' % (self.di(), inet_ntoa(dst_ip)))
+                return
+
+        if len(packet) >= 42 and packet[12:14] == '\x08\06' and self.topo.gw_intf_to_first_hop:
+            pkt = ProtocolHelper.Packet(packet)
+            if pkt.is_arp_reply() and pkt.dha == self.topo.gw_intf_to_first_hop.mac:
+                logging.debug('%s: handling ARP reply from first hop to gateway' % self.di())
+                self.topo.update_arp_translation(pkt.sha)
                 return
 
         # forward packet out to the real network
