@@ -79,8 +79,7 @@ class Packet:
             payload = ip[ip_hlen:]
             if self.is_tcp() and len(payload)>=20:
                 self.__decode_tcp(payload)
-            else:
-                self.ip_payload = payload
+            self.ip_payload = payload
 
     def __decode_tcp(self, tcp):
         tcp_hlen = 4 * ((struct.unpack('> B', tcp[12])[0] & 0xF0) >> 4)
@@ -95,7 +94,7 @@ class Packet:
         """Returns the Ethernet header with its source and destination fields reversed."""
         return self.mac_src + self.mac_dst + self.ether_type
 
-    def get_reversed_ip(self, new_ttl=None, new_proto=None):
+    def get_reversed_ip(self, new_ttl=None, new_proto=None, new_tlen=None):
         """Returns the IP header with its source and destination fields reversed
         as well as the TTL field set and the checksum updated appropriately.  If
         new_ttl and/or new_proto are specified, they will replace the original
@@ -108,7 +107,11 @@ class Packet:
             str_proto = self.ip_proto
         else:
             str_proto = struct.pack('>B', new_proto)
-        hdr = self.ip[0:8] + str_ttl + str_proto + self.ip[10:12] + self.ip_dst + self.ip_src
+        if new_tlen is None:
+            str_tlen = self.ip[2:4]
+        else:
+            str_tlen = struct.pack('>H', new_tlen)
+        hdr = self.ip[0:2] + str_tlen + self.ip[4:8] + str_ttl + str_proto + self.ip[10:12] + self.ip_dst + self.ip_src
         return Packet.cksum_ip_hdr(hdr)
 
     def is_dst_mac_broadcast(self):
@@ -171,10 +174,35 @@ class Packet:
         return ip_hdr[0:10] + struct.pack('> H', csum) + ip_hdr[12:]
 
     @staticmethod
+    def cksum_icmp_pkt(icmp_pkt):
+        """Returns the provided ICMP header with the checksum set."""
+        icmp_with_zero_csum = icmp_pkt[0:2] + '\x00\x00' + icmp_pkt[4:]
+        csum = checksum(icmp_with_zero_csum)
+        return icmp_pkt[0:2] + struct.pack('> H', csum) + icmp_pkt[4:]
+
+    @staticmethod
     def cksum_tcp_hdr(ip_hdr, tcp_hdr, tcp_data):
         """Returns the provided TCP header with the checksum set."""
         csum = tcp_checksum(ip_hdr, tcp_hdr, tcp_data)
         return tcp_hdr[0:16] + struct.pack('> H', csum) + tcp_hdr[18:]
+
+    def generate_icmp_proto_unreach(self):
+        """Generates an ICMP protocol unreachable message for this IP packet.
+        The ICMP portion of the message is returned."""
+        icmp_hdr = '\x03\x02\xfc\xfd' # dest unreach: proto unreach w/cksum
+        # data is four "0" bytes followed by the IP header and 8B of its payload
+        icmp_data = '\x00\x00\x00\x00' + self.ip + self.ip_payload[:8]
+        return Packet.cksum_icmp_pkt(icmp_hdr + icmp_data)
+
+    def generate_complete_icmp_proto_unreach(self):
+        """Generates an ICMP protocol unreachable message for this IP packet.
+        The full Ethernet frame is constructed, assuming the packet will be sent
+        back via the way it came."""
+        new_eth = self.get_reversed_eth()
+        new_icmp = self.generate_icmp_proto_unreach()
+        tlen = len(self.ip) + len(new_icmp)
+        new_ip = self.get_reversed_ip(new_ttl=64, new_proto=1, new_tlen=tlen)
+        return new_eth + new_ip + new_icmp
 
     def modify_tcp_packet(self,
                           new_src_ip, new_src_port,

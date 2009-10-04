@@ -509,10 +509,7 @@ class BasicNode(Node):
     def handle_non_icmp_ip_packet_to_self(self, intf, pkt):
         """Handles IP packets which are not ICMP packets by replying with a
         protocol unreachable ICMP message."""
-        new_eth = pkt.get_reversed_eth()
-        new_ip = pkt.get_reversed_ip(new_ttl=64, new_proto=1)
-        new_icmp = '\x03\x02\xfd\xfc' # dest unreach: proto unreach w/cksum
-        proto_unreach = new_eth + new_ip + new_icmp
+        proto_unreach = pkt.generate_complete_icmp_proto_unreach()
         logging.debug('%s sending protocol unreachable in response to non-ICMP IP packet: %s' % (self.di(), pktstr(proto_unreach)))
         self.send_packet(intf, proto_unreach)
 
