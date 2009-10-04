@@ -194,7 +194,7 @@ class VNSSimulator:
         # try to connect the client to the requested node
         self.clients[conn] = tid
         requested_name = open_msg.vhost.replace('\x00', '')
-        ret = topo.connect_client(conn, requested_name)
+        ret = topo.connect_client(conn, '', requested_name)
         if not ret.is_success():
             self.terminate_connection(conn, ret)
         if ret.prev_client:

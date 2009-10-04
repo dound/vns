@@ -40,6 +40,15 @@ class Topology():
             raise TopologyCreationException('topology %d is disabled' % tid)
         self.id = tid
 
+        # determine who may connect to nodes in this topology
+        if t.public:
+            # anyone may use it
+            self.permitted_clients = None
+        else:
+            tufs = db.TopologyUserFilter.objects.filter(topology=t)
+            self.permitted_clients = [tuf.username for tuf in tufs]
+            self.permitted_clients.append(t.owner)
+
         # determine what IPs may interact with this topology
         tus = db.TopologySourceIPFilter.objects.filter(topology=t)
         if len(tus) > 0:
@@ -90,10 +99,14 @@ class Topology():
         self.stats.save()
         logging.info('Topology instantiated:\n%s' % self.str_all(include_clients=False))
 
-    def connect_client(self, client_conn, requested_name):
+    def connect_client(self, client_conn, client_user, requested_name):
         """Called when a user tries to connect to a node in this topology.
         Returns True if the requested node exists and the client was able to
         connect to it.  Otherwise it returns an error message."""
+        if self.permitted_clients is not None: # otherwise anyone can use it
+            if not self.permitted_clients.has_key(client_user):
+                return ConnectionReturn('%s is not authorized to use this topology' % client_user)
+
         for n in self.nodes:
             if n.name == requested_name:
                 self.clients[client_conn] = n

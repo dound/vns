@@ -142,6 +142,7 @@ class Topology(Model):
     owner = ForeignKey(User)
     template = ForeignKey(TopologyTemplate)
     enabled = BooleanField(help_text='Whether this topology is active.')
+    public = BooleanField(help_text='Whether any user may connect to a node on this topology.')
 
     def __unicode__(self):
         str_enabled = '' if self.enabled else ' (disabled)'
@@ -179,6 +180,15 @@ class TopologySourceIPFilter(Model):
 
     def __unicode__(self):
         return u'%s may interact with %s' % (self.subnet_str(), self.topology.__unicode__())
+
+class TopologyUserFilter(Model):
+    """Lists the users which may interact with a topology by connecting to a
+    virtual client in the topology.  A topology's owner always has this privilege."""
+    topology = ForeignKey(Topology)
+    user = ForeignKey(User)
+
+    def __unicode__(self):
+        return u'%s may interact with %s' % (self.user(), self.topology.__unicode__())
 
 class IPAssignment(Model):
     """Maps an IP address to a port on a particular node in a particular

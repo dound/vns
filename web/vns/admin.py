@@ -1,7 +1,7 @@
 from django.contrib import admin
 from web.vns.models import Simulator, Organization, UserProfile, StatsTopology, \
                            TopologyTemplate, Node, WebServer, WebServerHostname, Port, Link, \
-                           Topology, TopologyUser, IPAssignment, MACAssignment, IPBlock
+                           Topology, TopologySourceIPFilter, TopologyUserFilter, IPAssignment, MACAssignment, IPBlock
 
 def make_user_search_fields(prefix):
     return (prefix + '__username', prefix + '__first_name', prefix + '__last_name')
@@ -54,14 +54,19 @@ class LinkAdmin(admin.ModelAdmin):
                      'port2__node__name', 'lossiness')
 
 class TopologyAdmin(admin.ModelAdmin):
-    list_display = ('owner', 'id', 'template', 'enabled')
+    list_display = ('owner', 'id', 'template', 'enabled', 'public')
     ordering = ('owner', 'id')
     search_fields = ('id', 'owner__name', 'template__name')
 
-class TopologyUserAdmin(admin.ModelAdmin):
+class TopologySourceIPFilterAdmin(admin.ModelAdmin):
     list_display = ('topology', 'ip')
     ordering = ('ip',)
     search_fields = ('ip', 'topology__template__name', 'topology__name')
+
+class TopologyUserFilterAdmin(admin.ModelAdmin):
+    list_display = ('topology', 'user')
+    ordering = ('topology',)
+    search_fields = ('user__username', 'topology__template__name', 'topology__name')
 
 class IPAssignmentAdmin(admin.ModelAdmin):
     list_display = ('topology', 'port', 'ip', 'mask')
@@ -93,7 +98,8 @@ admin.site.register(WebServerHostname, WebServerHostnameAdmin)
 admin.site.register(Port, PortAdmin)
 admin.site.register(Link, LinkAdmin)
 admin.site.register(Topology, TopologyAdmin)
-admin.site.register(TopologyUser, TopologyUserAdmin)
+admin.site.register(TopologySourceIPFilter, TopologySourceIPFilterAdmin)
+admin.site.register(TopologyUserFilter, TopologyUserFilterAdmin)
 admin.site.register(IPAssignment, IPAssignmentAdmin)
 admin.site.register(MACAssignment, MACAssignmentAdmin)
 admin.site.register(IPBlock, IPBlockAdmin)
