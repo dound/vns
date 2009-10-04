@@ -89,12 +89,8 @@ class Topology():
         for dp in db_ports:
             sn = nodes_db_to_sim[dp.node]
             # TODO: we're hitting the DB a lot here; could optimize a bit
-            ipa = db.IPAssignment.objects.get(topology=t, port=dp)
-            try:
-                mac = db.MACAssignment.objects.get(topology=t, port=dp).get_mac()
-            except db.MACAssignment.DoesNotExist:
-                mac = ipa.get_mac(self.mac_salt)
-            intf = sn.add_interface(dp.name, mac, ipa.get_ip(), ipa.get_mask())
+            mac, ip, mask = self.__get_addr_assignments_for_node(t, sn, dp)
+            intf = sn.add_interface(dp.name, mac, ip, mask)
             interfaces_db_to_sim[dp] = intf
 
         # read in this topology's links
@@ -115,6 +111,21 @@ class Topology():
         self.stats.init(t.template, client_ip, username)
         self.stats.save()
         logging.info('Topology instantiated:\n%s' % self.str_all(include_clients=False))
+
+    def __get_addr_assignments_for_node(self, t, sn, dp):
+        if sn.get_type_str() == 'Gateway':
+            # TODO: get the appropriate simulator object (assuming there's only one for now)
+            sim = db.Simulator.objects.all()[0]
+            ip = inet_aton(sim.gatewayIP)
+            mac = ''.join([struct.pack('>B', int(b, 16)) for b in sim.gatewayMAC.split(':')])
+            return (mac, ip, '\x00\x00\x00\x00')
+        else:
+            ipa = db.IPAssignment.objects.get(topology=t, port=dp)
+            try:
+                mac = db.MACAssignment.objects.get(topology=t, port=dp).get_mac()
+            except db.MACAssignment.DoesNotExist:
+                mac = ipa.get_mac(self.mac_salt)
+            return (mac, ipa.get_ip(), ipa.get_mask())
 
     def connect_client(self, client_conn, client_user, requested_name):
         """Called when a user tries to connect to a node in this topology.

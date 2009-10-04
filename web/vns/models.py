@@ -13,6 +13,7 @@ class Simulator(Model):
     ip = IPAddressField(unique=True,
                         help_text='IP address where the server is located.')
     gatewayIP = IPAddressField(help_text='First hop IP address outside of the simulator.')
+    gatewayMAC = CharField(max_length=17, help_text='Ethernet address in the form AB:CD:EF:GH:IJ:KL')
 
     def __unicode__(self):
         return u'%s' % self.name
