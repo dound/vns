@@ -145,7 +145,8 @@ class VNSSimulator:
             log_exception(logging.ERROR, msg)
             return (None, msg)
 
-        self.resolver.register_topology(topo)
+        if topo.has_gateway():
+            self.resolver.register_topology(topo)
         self.topologies[tid] = topo
         return (topo, None)
 
@@ -169,7 +170,8 @@ class VNSSimulator:
             topo = self.topologies[tid]
             topo.client_disconnected(conn)
             if not topo.is_active():
-                self.resolver.unregister_topology(topo)
+                if topo.has_gateway():
+                    self.resolver.unregister_topology(topo)
                 del self.topologies[tid]
                 topo_stats = topo.get_stats()
                 topo_stats.active = False
