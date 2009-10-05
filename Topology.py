@@ -468,7 +468,9 @@ class BasicNode(Node):
 
         logging.debug('%s handling packet: %s' % (self.di(), pktstr(packet)))
         pkt = ProtocolHelper.Packet(packet)
-        if pkt.is_valid_ipv4():
+        if pkt.mac_dst != intf.mac and not (pkt.is_valid_arp() and pkt.mac_dst=='\xFF\xFF\xFF\xFF\xFF\xFF'):
+            logging.debug('%s dropping packet (not to my mac addr %s): %s' % (self.di(), addrstr(intf.mac), pktstr(packet)))
+        elif pkt.is_valid_ipv4():
             self.handle_ipv4_packet(intf, pkt)
         elif pkt.is_valid_arp():
             self.handle_arp_packet(intf, pkt)
