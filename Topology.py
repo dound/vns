@@ -508,7 +508,7 @@ class BasicNode(Node):
             if icmp[0] == '\x08': # echo request
                 new_eth = pkt.get_reversed_eth()
                 new_ip = pkt.get_reversed_ip(new_ttl=64)
-                new_icmp = '\x00' + icmp[1:] # change to echo reply type
+                new_icmp = ProtocolHelper.Packet.cksum_icmp_pkt('\x00' + icmp[1:]) # change to echo reply type
                 echo_reply = new_eth + new_ip + new_icmp
                 logging.debug('%s replying to echo request: %s' % (self.di(), pktstr(echo_reply)))
                 self.send_packet(intf, echo_reply)
