@@ -33,6 +33,8 @@ class Topology():
     def __init__(self, tid, raw_socket, client_ip, username):
         """Reads topology with the specified id from the database.  A
         DoesNotExist exception (Topology or IPAssignment) is raised if this fails."""
+        self.raw_socket = raw_socket
+
         # maps clients connected to this topology to the node they are connected to
         self.clients = {}
 
@@ -75,6 +77,7 @@ class Topology():
         # read in this topology's nodes
         db_nodes = db.Node.objects.filter(template=t.template)
         self.gateway = None
+        self.web_server_ip_addrs = {} # maps IP address to web server node
         self.nodes = [self.__make_node(dn, raw_socket) for dn in db_nodes]
 
         # remember the DB to simulator object mapping
@@ -213,6 +216,9 @@ class Topology():
         first simulated node attached to the gateway."""
         gw_intf = self.gw_intf_to_first_hop
         if gw_intf:
+            if self.__is_packet_from_proxy_to_web_server(packet):
+                return # already handled
+
             self.stats.note_pkt_to_topo()
             if rewrite_dst_mac:
                 if self.is_arp_cache_valid():
@@ -222,6 +228,20 @@ class Topology():
                     self.need_arp_translation_for_pkt(packet)
             else:
                 gw_intf.link.send_to_other(gw_intf, packet)
+
+    def __is_packet_from_proxy_to_web_server(self, packet):
+        """Checks to see if this packet is from a proxy to its web server and
+        should be forwarded directly to it (not through the topology).  If so,
+        it takes care of this and returns True.  Otherwise False is returned."""
+        if len(packet)>=24 and packet[12:14]=='\x08\x00' and packet[23]=='\x06': # TCP/IP?
+            pkt = ProtocolHelper.Packet(packet)
+            if pkt.is_valid_tcp() and pkt.tcp_src_port == ProtocolHelper.HTTP_PORT: # from HTTP port?
+                ws = self.web_server_ip_addrs.get(pkt.ip_dst) # to one of our web servers?
+                if ws:
+                    logging.debug('Gateway forwarding packet directly to %s for handling (from proxy): %s' % (ws.di(), pktstr(packet)))
+                    ws.handle_http_reply(ws.interfaces[0], pkt)
+                    return True
+        return False
 
     def need_arp_translation_for_pkt(self, ethernet_frame):
         """Delays forwarding a packet to the node connected to the gateway until
@@ -274,6 +294,14 @@ class Topology():
                             return '%s:%s has no link attached to it' % (node_name, intf_name)
                 return 'there is no interface %s on node %s' % (intf_name, n.str_all())
         return 'there is no node named %s' % node_name
+
+    def send_packet_to_gateway(self, ethernet_frame):
+        """Sends an Ethernet frame to the gateway; the destination MAC address
+        is set appropriately."""
+        if self.gw_intf_to_first_hop and self.raw_socket:
+            mac_dst = self.gw_intf_to_first_hop.mac
+            new_eth_frame = mac_dst + ethernet_frame[6:]
+            self.raw_socket.send(new_eth_frame)
 
     def is_active(self):
         """Returns true if any clients are connected."""
@@ -707,6 +735,10 @@ class WebServer(BasicNode):
                 # make TCP happy, so add spaces before the 'href' field as needed
                 extra_padding = ' ' * len_diff
                 self.reply_sub_f = lambda m : m.groups()[0] + extra_padding + m.groups()[1] + str_ip + m.groups()[3]
+
+        # tell the topology about this web server's IP
+        self.topo.web_server_ip_addrs[ip] = self
+
         return BasicNode.add_interface(self, name, mac, ip, mask)
 
     @staticmethod
@@ -726,6 +758,7 @@ class WebServer(BasicNode):
                 self.handle_http_request(intf, pkt)
                 return
             elif pkt.tcp_src_port == ProtocolHelper.HTTP_PORT:
+                logging.warning('Did not expect to get an HTTP reply through this path anymore')
                 self.handle_http_reply(intf, pkt)
                 return
 
@@ -762,7 +795,10 @@ class WebServer(BasicNode):
         new_packet = pkt.modify_tcp_packet(intf.ip, my_port,
                                            new_dst, pkt.tcp_dst_port,
                                            reverse_eth=True)
-        intf.link.send_to_other(intf, new_packet)
+
+        # send it directly - the router on the topology shouldn't even know
+        logging.debug('%s sending packet out to the real world directly (to proxy): %s' % (self.di(), pktstr(new_packet)))
+        self.topo.send_packet_to_gateway(new_packet)
 
         self.__check_for_teardown(pkt, client_info, my_port)
 
