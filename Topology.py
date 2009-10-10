@@ -11,7 +11,7 @@ from settings import ARP_CACHE_TIMEOUT, MAY_FORWARD_TO_PRIVATE_IPS
 from LoggingHelper import log_exception, addrstr, pktstr
 import ProtocolHelper
 from VNSProtocol import VNSPacket, VNSInterface, VNSHardwareInfo
-import web.vns.models as db
+import web.vnswww.models as db
 
 class ConnectionReturn():
     def __init__(self, fail_reason=None, prev_client=None):

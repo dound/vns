@@ -21,7 +21,7 @@ from TopologyInteractionProtocol import TI_DEFAULT_PORT, create_ti_server, TIOpe
 from TopologyResolver import TopologyResolver
 from VNSProtocol import VNS_DEFAULT_PORT, create_vns_server
 from VNSProtocol import VNSOpen, VNSClose, VNSPacket
-from web.vns import models as db
+from web.vnswww import models as db
 
 class VNSSimulator:
     """The VNS simulator.  It gives clients control of nodes in simulated

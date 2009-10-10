@@ -48,7 +48,7 @@ INSTALLED_APPS = (
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
-    'web.vns'
+    'web.vnswww'
 )
 
-AUTH_PROFILE_MODULE = "vns.UserProfile"
+AUTH_PROFILE_MODULE = "vnswww.UserProfile"

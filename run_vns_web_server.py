@@ -9,7 +9,11 @@ from twisted.python import threadpool
 from twisted.internet import reactor
 import twisted
 
-sys.path.append('.') # make sure we can find the settings and web modules
+# make sure we can find the settings and web modules (as well as the root vns module)
+vns_root_dir = path.join(path.dirname(path.abspath(__file__)), '').replace('\\','/')
+one_above_vns_root_dir = path.abspath(vns_root_dir + '/..')
+sys.path.append(vns_root_dir)
+sys.path.append(one_above_vns_root_dir)
 
 # this also sets the DJANGO_SETTINGS_MODULE environment variable
 from settings import VNS_WEB_SERVER_PORT as PORT

@@ -3,7 +3,7 @@ from django.contrib import admin
 from django.views.generic import list_detail
 from django.views.generic.simple import direct_to_template
 
-from vns import models as db
+from vnswww import models as db
 
 admin.autodiscover()
 
@@ -13,7 +13,7 @@ summary_info = {
     'template_object_name': 'stats'
 }
 
-urlpatterns = patterns('vns.views',
+urlpatterns = patterns('web.vnswww.views',
     (r'^admin/', include(admin.site.urls)),
     (r'^summary/?$', list_detail.object_list, summary_info),
     (r'^vns.css$', direct_to_template, {'mimetype':'text/css', 'template':'vns.css'}),

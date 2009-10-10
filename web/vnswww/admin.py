@@ -1,7 +1,7 @@
 from django.contrib import admin
-from web.vns.models import Simulator, Organization, UserProfile, StatsTopology, \
-                           TopologyTemplate, Node, WebServer, WebServerHostname, Port, Link, \
-                           Topology, TopologySourceIPFilter, TopologyUserFilter, IPAssignment, MACAssignment, IPBlock
+from models import Simulator, Organization, UserProfile, StatsTopology, \
+                   TopologyTemplate, Node, WebServer, WebServerHostname, Port, Link, \
+                   Topology, TopologySourceIPFilter, TopologyUserFilter, IPAssignment, MACAssignment, IPBlock
 
 def make_user_search_fields(prefix):
     return (prefix + '__username', prefix + '__first_name', prefix + '__last_name')
