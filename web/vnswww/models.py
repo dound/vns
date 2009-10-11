@@ -260,6 +260,14 @@ class IPBlockAllocation(Model):
     def __unicode__(self):
         return u'%s <- %s/%d (from %s)' % (self.topology, self.start_addr, self.mask, self.block_from)
 
+class RecentIPBlockAllocation(Model):
+    """Tracks the IP allocation a user got for a particular template last time
+    that user instantiated it."""
+    user = ForeignKey(User)
+    template = ForeignKey(TopologyTemplate)
+    start_addr = IPAddressField()
+    mask = make_mask_field()
+
 class StatsTopology(Model):
     """Statistics about Topology during a single session."""
     template = ForeignKey(TopologyTemplate)
