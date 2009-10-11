@@ -7,6 +7,11 @@ from django.db.models import AutoField, BooleanField, CharField, DateField, \
                              IntegerField, IPAddressField, ManyToManyField, Model
 from django.contrib.auth.models import User
 
+def make_mask_field():
+    return IntegerField(choices=tuple([(i, u'/%d'%i) for i in range(1,33)]),
+                        help_text='Number of bits which are dedicated to a' +
+                                  'common routing prefix.')
+
 class Simulator(Model):
     """A VNS simulation server."""
     name = CharField(max_length=30, unique=True)
@@ -164,9 +169,7 @@ class TopologySourceIPFilter(Model):
     IPs."""
     topology = ForeignKey(Topology)
     ip = IPAddressField()
-    mask = IntegerField(choices=tuple([(i, u'/%d'%i) for i in range(1,33)]),
-                        help_text='Number of bits which are dedicated to a' +
-                                  'common routing prefix.')
+    mask = make_mask_field()
 
     def subnet_str(self):
         """Returns the string IP/mask."""
@@ -198,9 +201,7 @@ class IPAssignment(Model):
     topology = ForeignKey(Topology)
     port = ForeignKey(Port)
     ip = IPAddressField()
-    mask = IntegerField(choices=tuple([(i, u'/%d'%i) for i in range(1,33)]),
-                        help_text='Number of bits which are dedicated to a' +
-                                  'common routing prefix.')
+    mask = make_mask_field()
 
     def get_ip(self):
         """Returns the 4-byte integer representation of the IP."""
@@ -251,9 +252,7 @@ class IPBlockAllocation(Model):
     topology = ForeignKey(Topology, null=True, blank=True,
                           help_text='')
     start_addr = IPAddressField()
-    mask = IntegerField(choices=tuple([(i, u'/%d'%i) for i in range(1,33)]),
-                        help_text='Number of bits which are dedicated to a' +
-                                  'common routing prefix.')
+    mask = make_mask_field()
 
     def size(self):
         return 2 ** (32 - self.mask)
