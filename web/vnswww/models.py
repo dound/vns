@@ -245,6 +245,22 @@ class IPBlock(Model):
     def __unicode__(self):
         return u'%s/%d' % (self.subnet, self.mask)
 
+class IPBlockAllocation(Model):
+    """Marks a block of IP addresses as allocated to a particular topology."""
+    block_from = ForeignKey(IPBlock)
+    topology = ForeignKey(Topology, null=True, blank=True,
+                          help_text='')
+    start_addr = IPAddressField()
+    mask = IntegerField(choices=tuple([(i, u'/%d'%i) for i in range(1,33)]),
+                        help_text='Number of bits which are dedicated to a' +
+                                  'common routing prefix.')
+
+    def size(self):
+        return 2 ** (32 - self.mask)
+
+    def __unicode__(self):
+        return u'%s <- %s/%d (from %s)' % (self.topology, self.start_addr, self.mask, self.block_from)
+
 class StatsTopology(Model):
     """Statistics about Topology during a single session."""
     template = ForeignKey(TopologyTemplate)

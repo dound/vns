@@ -1,7 +1,8 @@
 from django.contrib import admin
 from models import Simulator, Organization, UserProfile, StatsTopology, \
                    TopologyTemplate, Node, WebServer, WebServerHostname, Port, Link, \
-                   Topology, TopologySourceIPFilter, TopologyUserFilter, IPAssignment, MACAssignment, IPBlock
+                   Topology, TopologySourceIPFilter, TopologyUserFilter, \
+                   IPAssignment, MACAssignment, IPBlock, IPBlockAllocation
 
 def make_user_search_fields(prefix):
     return (prefix + '__username', prefix + '__first_name', prefix + '__last_name')
@@ -83,6 +84,11 @@ class IPBlockAdmin(admin.ModelAdmin):
     ordering = ('subnet', 'mask')
     search_fields = ('simulator__name', 'org__name', 'subnet', 'mask')
 
+class IPBlockAllocationAdmin(admin.ModelAdmin):
+    list_display = ('block_from', 'topology', 'start_addr', 'mask')
+    ordering = ('start_addr',)
+    search_fields = ('block_from__org__name', 'topology__id', 'start_addr')
+
 class StatsTopologyAdmin(admin.ModelAdmin):
     list_display = ('template', 'username', 'client_ip', 'time_connected', 'total_time_connected_sec', 'num_pkts_to_topo', 'num_pkts_from_topo', 'num_pkts_to_client', 'num_pkts_from_client', 'active')
     ordering = ('time_connected',)
@@ -103,4 +109,5 @@ admin.site.register(TopologyUserFilter, TopologyUserFilterAdmin)
 admin.site.register(IPAssignment, IPAssignmentAdmin)
 admin.site.register(MACAssignment, MACAssignmentAdmin)
 admin.site.register(IPBlock, IPBlockAdmin)
+admin.site.register(IPBlockAllocation, IPBlockAllocationAdmin)
 admin.site.register(StatsTopology, StatsTopologyAdmin)
