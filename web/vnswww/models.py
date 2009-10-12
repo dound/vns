@@ -68,6 +68,24 @@ class TopologyTemplate(Model):
     visibility = IntegerField(choices=VISIBILITY_CHOICES,
                               help_text='Who may see and use this template.')
 
+    def get_root_port(self):
+        """Returns the "root" port of the topology.  This is the port connected
+        to the gateway (if one exists).  Otherwise, it is the port whose name
+        comes first on the node whose name comes first (lexicographic order).
+        None is only returned if the template has no ports."""
+        try:
+            gw = Node.objects.get(template=self, type=Node.GATEWAY_ID)
+            gw_port = Port.objects.get(node=gw)
+            gw_link = Link.objects.get(Link.Q_either_port(gw_port))
+            return gw_link.get_other(gw_port)
+        except (Node.DoesNotExist, Port.DoesNotExist, Link.DoesNotExist):
+            # no gateway, gateway port, or gateway link: just choose an
+            # arbitrary port (first node and first port on that node [abc order])
+            try:
+                return Port.objects.filter(node__template=self).order_by('node__name', 'name')[0]
+            except IndexError:
+                return None # no ports in this topology
+
     def __unicode__(self):
         return u'%s' % self.name
 
