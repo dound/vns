@@ -168,31 +168,27 @@ class PortTreeNode():
         self.port = port
         self.subtree = subtree
         self.sz = None
+        self.unmask_sz = None
 
-    def assign_addr(self, start_addr, num_addrs):
-        """Assigns addresses to the tree of nodes rooted at this node.  The
-        assigned address will be stored in node.port_addr.  start_addr must be
-        an aligned subnet containing num_addrs (i.e., if num_addrs is 8, then
-        log2(8)=3 => start_addr must have the lowest 3 bits zeroed)."""
-        assert self.__assign_addr_params_ok(start_addr, num_addrs)
+    def assign_addr(self, start_addr):
+        """Assigns addresses to the tree of nodes rooted at this node.
+        start_addr must be an aligned subnet containing 2**self.unmask_sz
+        addresses (i.e., if unmask_sz is 3, then start_addr must have the lowest
+        3 bits zeroed).  A list of 2-tuples is returned which contains the
+        port<->address pairs."""
+        assert ((start_addr >> self.unmask_sz) << self.unmask_sz)==start_addr, 'start_addr=%d is not aligned to /%d' % (start_addr, 32-self.unmask_sz)
 
         # give myself the lowest address
-        self.port_addr = start_addr
+        ret = [(self.port, start_addr)]
         start_addr += 1
 
         # give my subtrees addresses from the end of my block (go from large to small)
+        num_addrs = 1 << self.unmask_sz # 2 ** unmask_sz
         for st in sorted(self.subtree):
-            assert num_addrs >= st.sz, 'not enough addresses for my subtree'
             st_start = start_addr + num_addrs - st.sz - 1
-            st.assign_addr(st_start, st.sz)
+            ret += st.assign_addr(st_start)
             num_addrs -= st.sz
-
-    def __assign_addr_params_ok(self, start_addr, num_addrs):
-        mask = int(math.log(num_addrs,2))
-        assert 2**mask == num_addrs, 'num_addrs=%d != power of 2' % num_addrs
-        assert ((start_addr >> mask) << mask)==start_addr, 'start_addr=%d is not aligned to /%d' % (start_addr, 32-mask)
-        assert num_addrs >= 1, 'not enough addresses for myself'
-        return True
+        return ret
 
     def compute_subnet_size(self, must_be_power_of_2=True):
         """Computes the number of ports in this subnet and all sub-subnets.  If
@@ -202,8 +198,9 @@ class PortTreeNode():
         for ptn in self.subtree:
             self.sz += ptn.compute_subnet_size(must_be_power_of_2)
 
+        self.unmask_sz = int(math.ceil(math.log(self.sz, 2)))
         if must_be_power_of_2:
-            self.sz = 2 ** int(math.ceil(math.log(self.sz, 2)))
+            self.sz = 1 << self.unmask_sz
 
         return self.sz
 
