@@ -1,9 +1,11 @@
 import hashlib
+import math
+import random
 from socket import inet_aton, inet_ntoa
 import struct
 
 from django.db.models import AutoField, BooleanField, CharField, DateField, \
-                             DateTimeField, FloatField, ForeignKey, \
+                             DateTimeField, FloatField, ForeignKey, Q, \
                              IntegerField, IPAddressField, ManyToManyField, Model
 from django.contrib.auth.models import User
 
@@ -138,10 +140,106 @@ class WebServer(Node):
     def __unicode__(self):
         return Node.__unicode__(self) + ' -> %s' % self.web_server_addr.__unicode__()
 
+class PortTreeNode():
+    """A node in a tree of ports."""
+    def __init__(self, port, subtree=[]):
+        self.port = port
+        self.subtree = subtree
+        self.sz = None
+
+    def assign_addr(self, start_addr, num_addrs):
+        """Assigns addresses to the tree of nodes rooted at this node.  The
+        assigned address will be stored in node.port_addr.  start_addr must be
+        an aligned subnet containing num_addrs (i.e., if num_addrs is 8, then
+        log2(8)=3 => start_addr must have the lowest 3 bits zeroed)."""
+        assert self.__assign_addr_params_ok(start_addr, num_addrs)
+
+        # give myself the lowest address
+        self.port_addr = start_addr
+        start_addr += 1
+
+        # give my subtrees addresses from the end of my block (go from large to small)
+        for st in sorted(self.subtree):
+            assert num_addrs >= st.sz, 'not enough addresses for my subtree'
+            st_start = start_addr + num_addrs - st.sz - 1
+            st.assign_addr(st_start, st.sz)
+            num_addrs -= st.sz
+
+    def __assign_addr_params_ok(self, start_addr, num_addrs):
+        mask = int(math.log(num_addrs,2))
+        assert 2**mask == num_addrs, 'num_addrs=%d != power of 2' % num_addrs
+        assert ((start_addr >> mask) << mask)==start_addr, 'start_addr=%d is not aligned to /%d' % (start_addr, 32-mask)
+        assert num_addrs >= 1, 'not enough addresses for myself'
+        return True
+
+    def compute_subnet_size(self, must_be_power_of_2=True):
+        """Computes the number of ports in this subnet and all sub-subnets.  If
+        must_be_power_of_2 is True, then each subnet will be rounded up to the
+        nearest power of 2."""
+        self.sz = 1 # count self.port
+        for ptn in self.subtree:
+            self.sz += ptn.compute_subnet_size(must_be_power_of_2)
+
+        if must_be_power_of_2:
+            self.sz = 2 ** int(math.ceil(math.log(self.sz, 2)))
+
+        return self.sz
+
+    def __cmp__(self, other):
+        """Larger subtrees come before smaller subtrees (high to low).  Break
+        ties by comparing interface name (reverse lexicographic order)."""
+        if self.sz == other.sz:
+            return cmp(other.port.name, self.port.name)
+        else:
+            return cmp(other.sz, self.sz)
+
+    def __str__(self):
+        str_self = '%s:%s' % (self.port.node.name, self.port.name)
+        if self.subtree:
+            str_st = ', '.join(ptn.__str__() for ptn in self.subtree)
+            return '(%s --> [%s])' % (str_self, str_st)
+        else:
+            return str_self
+
 class Port(Model):
     """A port on a node in a topology template."""
     node = ForeignKey(Node)
     name = CharField(max_length=5)
+
+    def get_tree(self):
+        """Returns the topology tree (from a depth-first search) rooted at this
+        port excluding any ports attached to nodes in the completed_nodes
+        dictionary.  In particular, the root node is returned.  Each node is a
+        PortTreeNode consisting of the Port the node represents and a list of
+        nodes (its subtrees)."""
+        return self.__get_tree({})
+
+    def __get_tree(self, completed_nodes):
+        # the node this port is attached to is now on the completed list
+        assert not completed_nodes.has_key(self.node), 'loop due to node re-exploration'
+        completed_nodes[self.node] = True
+
+        # get other ports on this node which haven't been touched yet
+        other_ports = Port.objects.filter(node=self.node).exclude(name=self.name)
+        if not other_ports:
+            return PortTreeNode(self) # leaf!
+
+        # non-leaf: connected to other ports
+        subtree = []
+        for port in other_ports:
+            try:
+                link = Link.objects.get(Link.Q_either_port(port))
+                conn_port = link.get_other(port)
+                if completed_nodes.has_key(conn_port.node):
+                    # already explored the link from this port, so it has no new subtree to add
+                    subtree.append(PortTreeNode(port))
+                else:
+                    subtree.append(PortTreeNode(port, [conn_port.__get_tree(completed_nodes)]))
+            except Link.DoesNotExist:
+                # no link from the other port, so it has no subtree
+                subtree.append(PortTreeNode(port))
+
+        return PortTreeNode(self, subtree)
 
     def __unicode__(self):
         return u'%s: %s: %s' % (self.node.template.name, self.node.name, self.name)
@@ -152,6 +250,16 @@ class Link(Model):
     port2 = ForeignKey(Port, related_name='port2_id')
     lossiness = FloatField(default=0.0,
                            help_text='% of packets lost by this link: [0.0, 1.0]')
+
+    @staticmethod
+    def Q_either_port(port):
+        return Q(port1=port) | Q(port2=port)
+
+    def get_other(self, port):
+        if self.port1 == port:
+            return self.port2
+        else:
+            return self.port1
 
     def __unicode__(self):
         return u'%s: %s:%s <--> %s:%s' % (self.port1.node.template.name,
