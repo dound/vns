@@ -224,6 +224,8 @@ class VNSOpenTemplate(LTMessage):
     def get_type():
         return 64
 
+    NO_SRC_FILTERS = [('0.0.0.0', 0)]
+
     def __init__(self, template_name, virtualHostID, src_filters):
         """src_filters should be a list of (ip, mask) tuples (an empty list is
         interpreted as having no source filters).  The IP addresses should be
@@ -232,13 +234,25 @@ class VNSOpenTemplate(LTMessage):
         LTMessage.__init__(self)
         self.template_name = template_name
         self.vrhost = virtualHostID
-        self.src_filters = src_filters
+        self.__set_src_filters(src_filters)
 
     def length(self):
         return VNSOpenTemplate.HEADER_SIZE + 30 + 5*len(self.src_filters)
 
     HEADER_FORMAT = '> 30s %us' % IDSIZE
     HEADER_SIZE = struct.calcsize(HEADER_FORMAT)
+
+    def get_src_filters(self):
+        """Returns a list of source filters -- always has at least one entry.
+        Each element is a 2-tuple of an IP address (string form) and an integer
+        indicating the number of masked bits."""
+        return self.src_filters
+
+    def __set_src_filters(self, src_filters):
+        if src_filters:
+            self.src_filters = VNSOpenTemplate.NO_SRC_FILTERS
+        else:
+            self.src_filters = src_filters
 
     def pack(self):
         body = ''.join((inet_aton(ip) + struct.pack('>B', mask)) for ip,mask in self.src_filters)
