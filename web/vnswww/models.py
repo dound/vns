@@ -2,6 +2,7 @@ import hashlib
 import math
 import random
 from socket import inet_aton, inet_ntoa
+import string
 import struct
 
 from django.db.models import AutoField, BooleanField, CharField, DateField, \
@@ -45,9 +46,30 @@ class UserProfile(Model):
         (4, u'TA'),
     )
 
+    SIM_KEY_SZ = 64 # size in bytes
+
     user = ForeignKey(User, unique=True)
     org  = ForeignKey(Organization)
     pos  = IntegerField(choices=POSITION_CHOICES)
+    sim_key = CharField(max_length=SIM_KEY_SZ,
+                        help_text="The ASCII string (system-generated) "+
+                                  "which the user uses to authenticate with the simulator.")
+
+    def get_sim_auth_key_bytes(self):
+        """Returns a byte-string representation of the simulator auth key."""
+        return ''.join(struct.pack('>B', ord(c)) for c in self.sim_key)
+
+    def get_sim_auth_key(self):
+        return self.sim_key
+
+    def set_sim_auth_key(self, str):
+        """Sets the simulator auth key to the specified hexidecimal string."""
+        assert len(str)==UserProfile.SIM_KEY_SZ
+        self.sim_key = str
+
+    def generate_and_set_new_sim_auth_key(self):
+        chars = string.ascii_letters + string.digits + string.punctuation
+        self.set_sim_auth_key(''.join(random.choice(chars) for _ in range(UserProfile.SIM_KEY_SZ)))
 
     def __unicode__(self):
         return u'%s' % self.user.__unicode__()
