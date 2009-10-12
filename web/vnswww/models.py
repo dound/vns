@@ -170,23 +170,32 @@ class PortTreeNode():
         self.sz = None
         self.unmask_sz = None
 
-    def assign_addr(self, start_addr):
+    def assign_addr(self, start_addr, parent_node=None, parent_mask=None):
         """Assigns addresses to the tree of nodes rooted at this node.
         start_addr must be an aligned subnet containing 2**self.unmask_sz
         addresses (i.e., if unmask_sz is 3, then start_addr must have the lowest
-        3 bits zeroed).  A list of 2-tuples is returned which contains the
-        port<->address pairs."""
+        3 bits zeroed).  A list of 3-tuples is returned which contains the
+        (port,address,mask) triples."""
         assert ((start_addr >> self.unmask_sz) << self.unmask_sz)==start_addr, 'start_addr=%d is not aligned to /%d' % (start_addr, 32-self.unmask_sz)
 
-        # give myself the lowest address
-        ret = [(self.port, start_addr)]
+        # Choose the subnet mask of this assignment.  If DFS reached this port
+        # through a port on the same node, then use the subnet mask associated
+        # with the next layer (e.g., this PortTreeNode's own subnet size).
+        # Otherwise, just go with the parent's subnet size.
+        if self.port.node==parent_node or parent_mask is None:
+            mask = 32 - self.unmask_sz
+        else:
+            mask = parent_mask
+
+        # give myself the lowest address in this subnet
+        ret = [(self.port, start_addr, mask)]
         start_addr += 1
 
         # give my subtrees addresses from the end of my block (go from large to small)
         num_addrs = 1 << self.unmask_sz # 2 ** unmask_sz
         for st in sorted(self.subtree):
             st_start = start_addr + num_addrs - st.sz - 1
-            ret += st.assign_addr(st_start)
+            ret += st.assign_addr(st_start, self.port.node, mask)
             num_addrs -= st.sz
         return ret
 
