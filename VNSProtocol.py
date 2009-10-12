@@ -1,7 +1,7 @@
 """Defines the VNS protocol and some associated helper functions."""
 
 import re
-from socket import inet_ntoa
+from socket import inet_aton, inet_ntoa
 import struct
 
 from ltprotocol.ltprotocol import LTMessage, LTProtocol, LTTwistedServer
@@ -196,6 +196,151 @@ class VNSHardwareInfo(LTMessage):
         return 'Hardware Info: %s' % ' || '.join([str(intf) for intf in self.interfaces])
 VNS_MESSAGES.append(VNSHardwareInfo)
 
+class VNSRtable(LTMessage):
+    @staticmethod
+    def get_type():
+        return 32
+
+    def __init__(self, rtable):
+        LTMessage.__init__(self)
+        self.rtable = str(rtable)
+
+    def length(self):
+        return len(self.rtable)
+
+    def pack(self):
+        return self.rtable
+
+    @staticmethod
+    def unpack(body):
+        return VNSRtable(body)
+
+    def __str__(self):
+        return 'RTABLE: %s' % self.rtable
+VNS_MESSAGES.append(VNSRtable)
+
+class VNSOpenTemplate(LTMessage):
+    @staticmethod
+    def get_type():
+        return 64
+
+    def __init__(self, template_name, virtualHostID, src_filters):
+        """src_filters should be a list of (ip, mask) tuples (an empty list is
+        interpreted as having no source filters).  The IP addresses should be
+        strings and the masks should be an integer (specifying the number of
+        bits set in the mask)."""
+        LTMessage.__init__(self)
+        self.template_name = template_name
+        self.vrhost = virtualHostID
+        self.src_filters = src_filters
+
+    def length(self):
+        return VNSOpenTemplate.HEADER_SIZE + 30 + 5*len(self.src_filters)
+
+    HEADER_FORMAT = '> 30s %us' % IDSIZE
+    HEADER_SIZE = struct.calcsize(HEADER_FORMAT)
+
+    def pack(self):
+        body = ''.join((inet_aton(ip) + struct.pack('>B', mask)) for ip,mask in self.src_filters)
+        return struct.pack(VNSOpenTemplate.HEADER_FORMAT, self.template_name, self.vrhost) + body
+
+    @staticmethod
+    def unpack(body):
+        t = struct.unpack(VNSOpenTemplate.HEADER_FORMAT, body[:VNSOpenTemplate.HEADER_SIZE])
+        template_name = strip_null_chars(t[0])
+        vrhost = strip_null_chars(t[1])
+        src_filters = []
+        sf_bytes = body[VNSOpenTemplate.HEADER_SIZE:]
+        for i in range(len(sf_bytes) / 5):
+            ip = inet_ntoa(sf_bytes[i*5:i*5+4])
+            mask = struct.unpack('>B', sf_bytes[i*5+4])[0]
+            if mask < 0 or mask > 32:
+                raise VNSProtocolException('mask must be between 0 and 32 but it was %d' % mask)
+            src_filters.append((ip, mask))
+        return VNSOpenTemplate(template_name, vrhost, src_filters)
+
+    def __str__(self):
+        str_filters = ','.join('%s/%d' % (ip, mask) for ip,mask in self.src_filters)
+        return 'OPEN_TEMPLATE: %s for noed=%s with filters=%s' % (self.template_name, self.vrhost, str_filters)
+VNS_MESSAGES.append(VNSOpenTemplate)
+
+class VNSAuthRequest(LTMessage):
+    @staticmethod
+    def get_type():
+        return 128
+
+    def __init__(self, salt):
+        LTMessage.__init__(self)
+        self.salt = salt
+
+    def length(self):
+        return len(self.salt)
+
+    def pack(self):
+        return self.salt
+
+    @staticmethod
+    def unpack(body):
+        return VNSAuthRequest(body)
+
+    def __str__(self):
+        return 'AUTH_REQUEST: ' + ' salt length=%uB' % len(self.salt)
+VNS_MESSAGES.append(VNSAuthRequest)
+
+class VNSAuthReply(LTMessage):
+    @staticmethod
+    def get_type():
+        return 256
+
+    def __init__(self, username, sha1_of_salted_pw):
+        LTMessage.__init__(self)
+        self.username = username
+        self.ssp = sha1_of_salted_pw
+
+    def length(self):
+        return len(self.username) + len(self.ssp)
+
+    def pack(self):
+        return struct.pack('>I', len(self.username)) + self.username + self.ssp
+
+    @staticmethod
+    def unpack(body):
+        username_len = struct.unpack('>I', body[:4])
+        body = body[4:]
+        username = body[:username_len]
+        ssp = body[username_len:]
+        return VNSAuthReply(username, ssp)
+
+    def __str__(self):
+        return 'AUTH_REPLY: ' + ' username=' + self.username
+VNS_MESSAGES.append(VNSAuthReply)
+
+class VNSAuthStatus(LTMessage):
+    @staticmethod
+    def get_type():
+        return 512
+
+    def __init__(self, auth_ok, msg):
+        LTMessage.__init__(self)
+        self.auth_ok = bool(auth_ok)
+        self.msg = msg
+
+    def length(self):
+        return 1 + len(self.msg)
+
+    def pack(self):
+        return struct.pack('>B', self.auth_ok) + self.msg
+
+    @staticmethod
+    def unpack(body):
+        auth_ok = struct.unpack('>B', body[:1])
+        msg = body[1:]
+        return VNSAuthStatus(auth_ok, msg)
+
+    def __str__(self):
+        return 'AUTH_STATUS: ' + ' auth_ok=%s msg=%s' % (str(self.auth_ok), self.msg)
+VNS_MESSAGES.append(VNSAuthStatus)
+
 VNS_PROTOCOL = LTProtocol(VNS_MESSAGES, 'I', 'I')
 
 def create_vns_server(port, recv_callback, lost_conn_callback, verbose=True):
@@ -204,6 +349,7 @@ def create_vns_server(port, recv_callback, lost_conn_callback, verbose=True):
     @param port  the port to listen on
     @param recv_callback  the function to call with received message content
                          (takes two arguments: transport, msg)
+    @param new_conn_callback   called with one argument (a LTProtocol) when a connection is started
     @param lost_conn_callback  called with one argument (a LTProtocol) when a connection is lost
     @param verbose        whether to print messages when they are sent
 
