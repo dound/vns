@@ -2,6 +2,7 @@
 
 import datetime
 import errno
+import hashlib
 import logging, logging.config
 import os
 from os.path import dirname
@@ -20,7 +21,7 @@ from Topology import Topology, TopologyCreationException
 from TopologyInteractionProtocol import TI_DEFAULT_PORT, create_ti_server, TIOpen, TIPacket, TIBanner
 from TopologyResolver import TopologyResolver
 from VNSProtocol import VNS_DEFAULT_PORT, create_vns_server
-from VNSProtocol import VNSOpen, VNSClose, VNSPacket
+from VNSProtocol import VNSOpen, VNSClose, VNSPacket, VNSOpenTemplate, VNSRtable, VNSAuthRequest, VNSAuthReply, VNSAuthStatus
 from web.vnswww import models as db
 
 class VNSSimulator:
@@ -34,8 +35,13 @@ class VNSSimulator:
         self.topologies = {} # maps active topology ID to its Topology object
         self.resolver = TopologyResolver() # maps MAC/IP addresses to a Topology
         self.clients = {}    # maps active conn to the topology ID it is conn to
+        self.server_old = create_vns_server(12345,
+                                        self.handle_recv_msg,
+                                        self.handle_new_client,
+                                        self.handle_client_disconnected)
         self.server = create_vns_server(VNS_DEFAULT_PORT,
                                         self.handle_recv_msg,
+                                        self.handle_new_client,
                                         self.handle_client_disconnected)
         self.ti_clients = {} # maps active TI conns to the topology ID it is conn to
         self.ti_server = create_ti_server(TI_DEFAULT_PORT,
@@ -119,7 +125,14 @@ class VNSSimulator:
     def handle_recv_msg(self, conn, vns_msg):
         if vns_msg is not None:
             logging.debug('recv VNS msg: %s' % vns_msg)
-            if vns_msg.get_type() == VNSOpen.get_type():
+            if vns_msg.get_type() == VNSAuthReply.get_type():
+                self.handle_auth_reply(conn, vns_msg)
+                return
+            elif not conn.vns_authorized:
+                logging.warning('received non-auth-reply from unauthenticated user %s: terminating the user' % conn)
+                self.terminate_connection(conn, 'simulator expected authentication reply')
+            # user is authenticated => any other messages are ok
+            elif vns_msg.get_type() == VNSOpen.get_type():
                 self.handle_open_msg(conn, vns_msg)
             elif vns_msg.get_type() == VNSClose.get_type():
                 self.handle_close_msg(conn)
@@ -182,26 +195,64 @@ class VNSSimulator:
 
     def handle_open_msg(self, conn, open_msg):
         # get the topology the client is trying to connect to
-        tid = open_msg.topo_id
-        logging.info('new client %s connected to topology %d' % (conn, tid))
+        self.handle_connect_to_topo(conn, open_msg.topo_id, open_msg.user, open_msg.vhost)
+
+    def handle_connect_to_topo(self, conn, tid, username, vhost):
+        logging.info('client %s connected to topology %d' % (conn, tid))
         try:
             topo = self.topologies[tid]
         except KeyError:
             client_ip = conn.transport.getPeer().host
-            (topo, err_msg) = self.start_topology(tid, client_ip, open_msg.user)
+            (topo, err_msg) = self.start_topology(tid, client_ip, username)
             if topo is None:
                 self.terminate_connection(conn, err_msg)
                 return
 
         # try to connect the client to the requested node
         self.clients[conn] = tid
-        requested_name = open_msg.vhost.replace('\x00', '')
+        requested_name = vhost.replace('\x00', '')
         ret = topo.connect_client(conn, '', requested_name)
         if not ret.is_success():
             self.terminate_connection(conn, ret)
         if ret.prev_client:
             self.terminate_connection(ret.prev_client,
                                       'a new client (%s) has connected to the topology' % conn)
+
+    def handle_new_client_old(self, conn):
+        logging.debug("Old style client %s connected: bypassing auth" % conn)
+        conn.vns_auth_salt = None
+        conn.vns_authorized = True
+        conn.vns_user_profile = 'old_style_client'
+    def handle_new_client(self, conn):
+        """Sends an authentication request to the new user."""
+        logging.debug("client %s connected: sending auth request" % conn)
+        conn.vns_auth_salt = os.urandom(20)
+        conn.vns_authorized = False
+        conn.vns_user_profile = None
+        conn.send(VNSAuthRequest(conn.vns_auth_salt))
+
+    def handle_auth_reply(self, conn, ar):
+        if not conn.vns_auth_salt:
+            msg = 'unexpectedly received authentication reply from conn_user=%s ar_user=%s at %s'
+            self.terminate_connection(conn, msg % (conn.vns_user_profile, ar.username, conn))
+            return
+
+        try:
+            up = db.UserProfile.objects.get(user__username=ar.username)
+        except db.UserProfile.DoesNotExist:
+            logging.info('unrecognized username tried to login: %s' % ar.username)
+            self.terminate_connection(conn, "authentication failed")
+            return
+
+        expected = hashlib.sha1(conn.vns_auth_salt + str(up.get_sim_auth_key())).digest()
+        if ar.ssp != expected:
+            logging.info('user %s provided an incorrect password' % ar.username)
+            self.terminate_connection(conn, "authentication failed")
+        else:
+            conn.vns_auth_salt = None # only need one auth reply
+            conn.vns_authorized = True
+            conn.vns_user_profile = up
+            conn.send(VNSAuthStatus(True, 'authenticated %s as %s' % (conn, ar.username)))
 
     def handle_client_disconnected(self, conn):
         self.terminate_connection(conn,
@@ -301,6 +352,12 @@ class VNSSimulator:
         tid = self.ti_clients.get(conn)
         if tid is not None:
             del self.ti_clients[conn]
+
+def sha1(s):
+    """Return the SHA1 digest of the string s"""
+    d = hashlib.sha1()
+    d.update(s)
+    return d.digest()
 
 class NoOpTwistedLogger:
     """Discards all logging messages (our custom handler takes care of them)."""
