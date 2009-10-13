@@ -6,7 +6,7 @@ import struct
 
 from ltprotocol.ltprotocol import LTMessage, LTProtocol, LTTwistedServer
 
-VNS_DEFAULT_PORT = 12345
+VNS_DEFAULT_PORT = 3250
 VNS_MESSAGES = []
 IDSIZE = 32
 
