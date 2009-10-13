@@ -201,22 +201,27 @@ class VNSRtable(LTMessage):
     def get_type():
         return 32
 
-    def __init__(self, rtable):
+    def __init__(self, virtualHostID, rtable):
         LTMessage.__init__(self)
+        self.vrhost = virtualHostID
         self.rtable = str(rtable)
 
     def length(self):
-        return len(self.rtable)
+        return VNSRtable.HEADER_SIZE + len(self.rtable)
+
+    HEADER_FORMAT = '> %us' % IDSIZE
+    HEADER_SIZE = struct.calcsize(HEADER_FORMAT)
 
     def pack(self):
-        return self.rtable
+        return struct.pack(VNSRtable.HEADER_FORMAT, self.vrhost) + self.rtable
 
     @staticmethod
     def unpack(body):
-        return VNSRtable(body)
+        vrhost = strip_null_chars(body[:IDSIZE])
+        return VNSRtable(vrhost, body[IDSIZE:])
 
     def __str__(self):
-        return 'RTABLE: %s' % self.rtable
+        return 'RTABLE: node=%s:\n%s' % (self.vrhost, self.rtable)
 VNS_MESSAGES.append(VNSRtable)
 
 class VNSOpenTemplate(LTMessage):
