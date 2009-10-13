@@ -324,7 +324,7 @@ class VNSAuthReply(LTMessage):
 
     @staticmethod
     def unpack(body):
-        username_len = struct.unpack('>I', body[:4])
+        username_len = struct.unpack('>I', body[:4])[0]
         body = body[4:]
         username = body[:username_len]
         ssp = body[username_len:]
@@ -352,7 +352,7 @@ class VNSAuthStatus(LTMessage):
 
     @staticmethod
     def unpack(body):
-        auth_ok = struct.unpack('>B', body[:1])
+        auth_ok = struct.unpack('>B', body[:1])[0]
         msg = body[1:]
         return VNSAuthStatus(auth_ok, msg)
 
