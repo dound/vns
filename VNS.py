@@ -211,7 +211,8 @@ class VNSSimulator:
         # try to connect the client to the requested node
         self.clients[conn] = tid
         requested_name = vhost.replace('\x00', '')
-        ret = topo.connect_client(conn, '', requested_name)
+        user = conn.vns_user_profile.user if conn.vns_user_profile else None
+        ret = topo.connect_client(conn, user, requested_name)
         if not ret.is_success():
             self.terminate_connection(conn, ret)
         if ret.prev_client:
@@ -222,7 +223,7 @@ class VNSSimulator:
         logging.debug("Old style client %s connected: bypassing auth" % conn)
         conn.vns_auth_salt = None
         conn.vns_authorized = True
-        conn.vns_user_profile = 'old_style_client'
+        conn.vns_user_profile = None
     def handle_new_client(self, conn):
         """Sends an authentication request to the new user."""
         logging.debug("client %s connected: sending auth request" % conn)
