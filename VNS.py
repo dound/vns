@@ -252,7 +252,8 @@ class VNSSimulator:
             conn.vns_auth_salt = None # only need one auth reply
             conn.vns_authorized = True
             conn.vns_user_profile = up
-            conn.send(VNSAuthStatus(True, 'authenticated %s as %s' % (conn, ar.username)))
+            msg = 'authenticated %s as %s' % (conn, ar.username)
+            conn.send(VNSAuthStatus(True, msg))
 
     def handle_client_disconnected(self, conn):
         self.terminate_connection(conn,
