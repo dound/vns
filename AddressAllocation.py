@@ -8,6 +8,59 @@ import struct
 
 import web.vnswww.models as db
 
+def instantiate_template(owner, template, ip_block_from, src_filters):
+    """Instantiates a new Topology object, allocates a block of addresses for
+    it, and assigns addresses to each port in it.  The block will come from
+    ip_block_from.  The topology will be assigned the specified source filters.
+    A tuple is returned -- if the first element is not None, then an error has
+    occurred and nothing was instantiated (the first element is an error
+    message).  Otherwise, elements 2-4 are the Topology, IPBlockAllocation, and
+    PortTreeNode root node objects."""
+    # build a depth-first "tree" of the topology from the port connected to the gateway
+    root = template.get_root_port()
+    if not root:
+        return ("template '%s' has no ports" % template.name,)
+    tree = root.get_tree()
+    num_addrs = tree.compute_subnet_size()
+
+    # allocate a subblock of IPs for the new topology
+    allocs = allocate_ip_block(ip_block_from, 1, num_addrs, src_filters)
+    if not allocs:
+        return ("insufficient free IP addresses",)
+    alloc = allocs[0]
+
+    # create the topology and assign IP addresses
+    start_addr = struct.unpack('>I', inet_aton(alloc.start_addr))[0]
+    assignments = tree.assign_addr(start_addr, alloc.size())
+    t = db.Topology()
+    t.owner = owner
+    t.template = template
+    t.enabled = True
+    t.public = False
+    t.save()
+    alloc.topology = t
+    alloc.save()
+    logging.info("Instantiated a new topology for %s from '%s': %s" % (owner, t.template.name, alloc))
+
+    for sf_ip, sf_mask in src_filters:
+        tsif = db.TopologySourceIPFilter()
+        tsif.topology = t
+        tsif.ip = sf_ip
+        tsif.mask = sf_mask
+        tsif.save()
+        logging.info('IP source filter for new topology %d: %s' % (t.id, tsif))
+
+    for port, ip, mask_sz in assignments:
+        ipa = db.IPAssignment()
+        ipa.topology = t
+        ipa.port = port
+        ipa.ip = inet_ntoa(struct.pack('>I', ip))
+        ipa.mask = mask_sz
+        ipa.save()
+        logging.info('IP assignment for new topology %d: %s' % (t.id, ipa))
+
+    return (None, t, alloc, tree)
+
 def allocate_ip_block(block_from, num_blocks_to_alloc, num_addrs_per_block, src_filters):
     """Finds and allocates num_blocks_to_alloc block(s) each of size
     num_addrs_per_block.  A list of IPBlockAllocation records are returned.  The
