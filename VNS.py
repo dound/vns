@@ -15,6 +15,7 @@ from twisted.python.log import PythonLoggingObserver
 from twisted.python import log as tlog
 
 from settings import BORDER_DEV_NAME, PCAP_FILTER
+import AddressAllocation
 from LoggingHelper import log_exception, addrstr, pktstr
 import ProtocolHelper
 from Topology import Topology, TopologyCreationException
@@ -37,7 +38,7 @@ class VNSSimulator:
         self.clients = {}    # maps active conn to the topology ID it is conn to
         self.server_old = create_vns_server(12345,
                                         self.handle_recv_msg,
-                                        self.handle_new_client,
+                                        self.handle_new_client_old,
                                         self.handle_client_disconnected)
         self.server = create_vns_server(VNS_DEFAULT_PORT,
                                         self.handle_recv_msg,
@@ -138,6 +139,8 @@ class VNSSimulator:
                 self.handle_close_msg(conn)
             elif vns_msg.get_type() == VNSPacket.get_type():
                 self.handle_packet_msg(conn, vns_msg)
+            elif vns_msg.get_type() == VNSOpenTemplate.get_type():
+                self.handle_open_template_msg(conn, vns_msg)
             else:
                 logging.debug('unexpected VNS message received: %s' % vns_msg)
 
@@ -219,11 +222,48 @@ class VNSSimulator:
             self.terminate_connection(ret.prev_client,
                                       'a new client (%s) has connected to the topology' % conn)
 
+    def handle_open_template_msg(self, conn, ot):
+        try:
+            template = db.TopologyTemplate.objects.get(name=ot.template_name)
+        except db.TopologyTemplate.DoesNotExist:
+            self.terminate_connection(conn, "template '%s' does not exist" % ot.template_name)
+            return
+
+        # find an IP block to allocate IPs from for this user
+        blocks = db.IPBlock.objects.filter(org=conn.vns_user_profile.org)
+        if not blocks:
+            self.terminate_connection(conn, "your organization (%s) has no available IP blocks" % conn.vns_user_profile.org)
+            return
+        ip_block_from = blocks[0]
+
+        err_msg, topo, alloc, tree = AddressAllocation.instantiate_template(conn.vns_user_profile.user,
+                                                                            template,
+                                                                            ip_block_from,
+                                                                            ot.get_src_filters())
+        if err_msg:
+            self.terminate_connection(conn, err_msg)
+        else:
+            rtable_msg = VNSRtable(ot.vrhost, VNSSimulator.build_rtable(topo))
+            conn.send(rtable_msg)
+            logging.debug('Sent client routing table message: %s' % rtable_msg)
+            who = conn.vns_user_profile.user.username
+            self.handle_connect_to_topo(conn, topo.id, who, ot.vrhost)
+
+    @staticmethod
+    def build_rtable(topo):
+        # TODO: write this function for real; just a quick hack for now
+        s1 = db.IPAssignment.objects.get(topology=topo, port__node=db.Node.objects.get(template=topo.template, name='Server 1'))
+        s2 = db.IPAssignment.objects.get(topology=topo, port__node=db.Node.objects.get(template=topo.template, name='Server 2'))
+        return '\n'.join(['0.0.0.0  172.24.74.17  0.0.0.0  eth0',
+                          '%s  %s  255.255.255.254  eth1' % (s1.ip, s1.ip),
+                          '%s  %s  255.255.255.254  eth2' % (s2.ip, s2.ip)])
+
     def handle_new_client_old(self, conn):
         logging.debug("Old style client %s connected: bypassing auth" % conn)
         conn.vns_auth_salt = None
         conn.vns_authorized = True
         conn.vns_user_profile = None
+
     def handle_new_client(self, conn):
         """Sends an authentication request to the new user."""
         logging.debug("client %s connected: sending auth request" % conn)
