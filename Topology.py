@@ -137,7 +137,7 @@ class Topology():
         Returns True if the requested node exists and the client was able to
         connect to it.  Otherwise it returns an error message."""
         if self.permitted_clients is not None: # otherwise anyone can use it
-            if not self.permitted_clients.has_key(client_user):
+            if client_user not in self.permitted_clients:
                 return ConnectionReturn('%s is not authorized to use this topology' % client_user)
 
         for n in self.nodes:
