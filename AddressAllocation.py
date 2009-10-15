@@ -206,13 +206,13 @@ def __realloc_if_available_work(ra, ip_block_from):
     # the recent allocation must not be in use
     try:
         # does the closest active allocation BEFORE the recent alloc overlap it?
-        closest_pre_alloc = db.IPBlockAllocation.objects.filter(ip__lte=ra.start_addr).order_by('-ip')[0]
+        closest_pre_alloc = db.IPBlockAllocation.objects.filter(start_addr__lte=ra.start_addr).order_by('-start_addr')[0]
         sa_pre = struct.unpack('>I', inet_aton(closest_pre_alloc.start_addr))[0]
         if is_overlapping(start_addr, ra.mask, sa_pre, closest_pre_alloc.mask):
             return None
 
         # does the closest active allocation AFTER to the recent alloc overlap it?
-        closest_post_alloc = db.IPBlockAllocation.objects.filter(ip__gte=ra.start_addr).order_by('ip')[0]
+        closest_post_alloc = db.IPBlockAllocation.objects.filter(start_addr__gte=ra.start_addr).order_by('start_addr')[0]
         sa_post = struct.unpack('>I', inet_aton(closest_post_alloc.start_addr))[0]
         if is_overlapping(start_addr, ra.mask, sa_post, closest_post_alloc.mask):
             return None
