@@ -2,7 +2,8 @@ from django.contrib import admin
 from models import Simulator, Organization, UserProfile, StatsTopology, \
                    TopologyTemplate, Node, WebServer, WebServerHostname, Port, Link, \
                    Topology, TopologySourceIPFilter, TopologyUserFilter, \
-                   IPAssignment, MACAssignment, IPBlock, IPBlockAllocation
+                   IPAssignment, MACAssignment, IPBlock, IPBlockAllocation, \
+                   RecentIPBlockAllocation
 
 def make_user_search_fields(prefix):
     return (prefix + '__username', prefix + '__first_name', prefix + '__last_name')
@@ -55,7 +56,7 @@ class LinkAdmin(admin.ModelAdmin):
                      'port2__node__name', 'lossiness')
 
 class TopologyAdmin(admin.ModelAdmin):
-    list_display = ('owner', 'id', 'template', 'enabled', 'public')
+    list_display = ('owner', 'id', 'template', 'enabled', 'public', 'temporary')
     ordering = ('owner', 'id')
     search_fields = ('id', 'owner__name', 'template__name')
 
@@ -89,6 +90,11 @@ class IPBlockAllocationAdmin(admin.ModelAdmin):
     ordering = ('start_addr',)
     search_fields = ('block_from__org__name', 'topology__id', 'start_addr')
 
+class RecentIPBlockAllocationAdmin(admin.ModelAdmin):
+    list_display = ('user', 'template', 'start_addr', 'mask')
+    ordering = ('user', 'template')
+    search_fields = ('user.username', 'template.name', 'start_addr')
+
 class StatsTopologyAdmin(admin.ModelAdmin):
     list_display = ('template', 'username', 'client_ip', 'time_connected', 'total_time_connected_sec', 'num_pkts_to_topo', 'num_pkts_from_topo', 'num_pkts_to_client', 'num_pkts_from_client', 'active')
     ordering = ('time_connected',)
@@ -110,4 +116,5 @@ admin.site.register(IPAssignment, IPAssignmentAdmin)
 admin.site.register(MACAssignment, MACAssignmentAdmin)
 admin.site.register(IPBlock, IPBlockAdmin)
 admin.site.register(IPBlockAllocation, IPBlockAllocationAdmin)
+admin.site.register(RecentIPBlockAllocation, RecentIPBlockAllocationAdmin)
 admin.site.register(StatsTopology, StatsTopologyAdmin)
