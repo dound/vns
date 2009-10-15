@@ -423,6 +423,9 @@ class RecentIPBlockAllocation(Model):
     start_addr = IPAddressField()
     mask = make_mask_field()
 
+    def __unicode__(self):
+        return u'%s <- %s/%d (for %s)' % (self.template, self.start_addr, self.mask, self.user)
+
 class StatsTopology(Model):
     """Statistics about Topology during a single session."""
     template = ForeignKey(TopologyTemplate)
