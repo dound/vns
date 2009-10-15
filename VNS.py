@@ -223,7 +223,7 @@ class VNSSimulator:
         user = conn.vns_user_profile.user if conn.vns_user_profile else None
         ret = topo.connect_client(conn, user, requested_name)
         if not ret.is_success():
-            self.terminate_connection(conn, ret)
+            self.terminate_connection(conn, ret.fail_reason)
         if ret.prev_client:
             self.terminate_connection(ret.prev_client,
                                       'a new client (%s) has connected to the topology' % conn)

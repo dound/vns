@@ -153,8 +153,9 @@ class Topology():
         return ConnectionReturn('there is no node named %s' % requested_name)
 
     def client_disconnected(self, client_conn):
-        n = self.clients.pop(client_conn)
-        n.disconnect(client_conn)
+        n = self.clients.pop(client_conn, None)
+        if n:
+            n.disconnect(client_conn)
 
     def has_gateway(self):
         """Returns True if this topology has a gateway."""
