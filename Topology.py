@@ -52,6 +52,7 @@ class Topology():
         if not t.enabled:
             raise TopologyCreationException('topology %d is disabled' % tid)
         self.id = tid
+        self.temporary = t.temporary
 
         # determine who may connect to nodes in this topology
         if t.public:
@@ -158,6 +159,10 @@ class Topology():
     def has_gateway(self):
         """Returns True if this topology has a gateway."""
         return self.gateway is not None
+
+    def is_temporary(self):
+        """Returns True if this topology is only temporary."""
+        return self.temporary
 
     def get_my_ip_addrs(self):
         """Returns a list of IP addresses (as byte-strings) which belong to

@@ -8,6 +8,22 @@ import struct
 
 import web.vnswww.models as db
 
+def free_topology(tid):
+    """Deletes the topology associated with tid, as well as any IPAssignment,
+    MACAssignment, TopologySourceIPFilter, TopologyUserFilter, and
+    IPBlockAllocation objects belonging to it."""
+    try:
+        topo = db.Topology.objects.get(pk=tid)
+        db.TopologySourceIPFilter.objects.filter(topology=topo).delete()
+        db.TopologyUserFilter.objects.filter(topology=topo).delete()
+        db.IPAssignment.objects.filter(topology=topo).delete()
+        db.MACAssignment.objects.filter(topology=topo).delete()
+        db.IPBlockAllocation.objects.filter(topology=topo).delete()
+        topo.delete()
+        logging.info('freed topology %d' % tid)
+    except db.Topology.DoesNotExist:
+        logging.warning('asked to free non-existent topology %d' % tid)
+
 def instantiate_template(owner, template, ip_block_from, src_filters, temporary,
                          use_recent_alloc_logic=True):
     """Instantiates a new Topology object, allocates a block of addresses for
