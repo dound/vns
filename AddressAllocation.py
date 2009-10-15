@@ -16,19 +16,17 @@ def instantiate_template(owner, template, ip_block_from, src_filters, temporary,
     A tuple is returned -- if the first element is not None, then an error has
     occurred and nothing was instantiated (the first element is an error
     message).  Otherwise, elements 2-4 are the Topology, IPBlockAllocation, and
-    PortTreeNode root node objects (root may be None if not computed)."""
+    PortTreeNode root node objects."""
+    # build a depth-first "tree" of the topology from the port connected to the gateway
+    root = template.get_root_port()
+    if not root:
+        return ("template '%s' has no ports" % template.name,)
+    tree = root.get_tree()
+    num_addrs = tree.compute_subnet_size()
+
     # try to give the user the allocation they most recently had
     alloc = __realloc_if_available(owner, template, ip_block_from) if use_recent_alloc_logic else None
-    if alloc:
-        tree = None
-    else:
-        # build a depth-first "tree" of the topology from the port connected to the gateway
-        root = template.get_root_port()
-        if not root:
-            return ("template '%s' has no ports" % template.name,)
-        tree = root.get_tree()
-        num_addrs = tree.compute_subnet_size()
-
+    if not alloc:
         # allocate a subblock of IPs for the new topology
         allocs = allocate_ip_block(ip_block_from, 1, num_addrs, src_filters)
         if not allocs:
