@@ -8,7 +8,7 @@ import struct
 
 import web.vnswww.models as db
 
-def instantiate_template(owner, template, ip_block_from, src_filters):
+def instantiate_template(owner, template, ip_block_from, src_filters, temporary):
     """Instantiates a new Topology object, allocates a block of addresses for
     it, and assigns addresses to each port in it.  The block will come from
     ip_block_from.  The topology will be assigned the specified source filters.
@@ -37,6 +37,7 @@ def instantiate_template(owner, template, ip_block_from, src_filters):
     t.template = template
     t.enabled = True
     t.public = False
+    t.temporary = temporary
     t.save()
     alloc.topology = t
     alloc.save()

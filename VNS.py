@@ -239,7 +239,8 @@ class VNSSimulator:
         err_msg, topo, alloc, tree = AddressAllocation.instantiate_template(conn.vns_user_profile.user,
                                                                             template,
                                                                             ip_block_from,
-                                                                            ot.get_src_filters())
+                                                                            ot.get_src_filters(),
+                                                                            True)
         if err_msg:
             self.terminate_connection(conn, err_msg)
         else:

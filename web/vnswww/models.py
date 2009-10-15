@@ -303,6 +303,7 @@ class Topology(Model):
     template = ForeignKey(TopologyTemplate)
     enabled = BooleanField(help_text='Whether this topology is active.')
     public = BooleanField(help_text='Whether any user may connect to a node on this topology.')
+    temporary = BooleanField(help_text='Whether this topology was only allocated temporarily.')
 
     def __unicode__(self):
         str_enabled = '' if self.enabled else ' (disabled)'
