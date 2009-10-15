@@ -280,7 +280,7 @@ class VNSOpenTemplate(LTMessage):
 
     def __str__(self):
         str_filters = ','.join('%s/%d' % (ip, mask) for ip,mask in self.src_filters)
-        return 'OPEN_TEMPLATE: %s for noed=%s with filters=%s' % (self.template_name, self.vrhost, str_filters)
+        return 'OPEN_TEMPLATE: %s for node=%s with filters=%s' % (self.template_name, self.vrhost, str_filters)
 VNS_MESSAGES.append(VNSOpenTemplate)
 
 class VNSAuthRequest(LTMessage):
