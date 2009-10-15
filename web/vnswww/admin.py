@@ -72,12 +72,12 @@ class TopologyUserFilterAdmin(admin.ModelAdmin):
 
 class IPAssignmentAdmin(admin.ModelAdmin):
     list_display = ('topology', 'port', 'ip', 'mask')
-    ordering = ('ip',)
+    ordering = ('topology__owner', 'topology', 'ip')
     search_fields = ('ip', 'topology__template__name', 'topology__name', 'port__node__name')
 
 class MACAssignmentAdmin(admin.ModelAdmin):
     list_display = ('topology', 'port', 'mac')
-    ordering = ('mac',)
+    ordering = ('topology__owner', 'topology', 'mac')
     search_fields = ('mac', 'topology__template__name', 'topology__name', 'port__node__name')
 
 class IPBlockAdmin(admin.ModelAdmin):
