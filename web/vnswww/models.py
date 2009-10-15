@@ -413,7 +413,11 @@ class IPBlockAllocation(Model):
         return 2 ** (32 - self.mask)
 
     def __unicode__(self):
-        return u'%s <- %s/%d (from %s)' % (self.topology, self.start_addr, self.mask, self.block_from)
+        suffix = '%s/%d (from %s)' % (self.start_addr, self.mask, self.block_from)
+        if self.topology:
+            return u'%s <- %s' % (self.topology, suffix)
+        else:
+            return suffix
 
 class RecentIPBlockAllocation(Model):
     """Tracks the IP allocation a user got for a particular template last time
