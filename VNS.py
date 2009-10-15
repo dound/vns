@@ -240,7 +240,7 @@ class VNSSimulator:
                                                                             template,
                                                                             ip_block_from,
                                                                             ot.get_src_filters(),
-                                                                            True)
+                                                                            True, True)
         if err_msg:
             self.terminate_connection(conn, err_msg)
         else:

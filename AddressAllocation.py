@@ -8,26 +8,32 @@ import struct
 
 import web.vnswww.models as db
 
-def instantiate_template(owner, template, ip_block_from, src_filters, temporary):
+def instantiate_template(owner, template, ip_block_from, src_filters, temporary,
+                         use_recent_alloc_logic=True):
     """Instantiates a new Topology object, allocates a block of addresses for
     it, and assigns addresses to each port in it.  The block will come from
     ip_block_from.  The topology will be assigned the specified source filters.
     A tuple is returned -- if the first element is not None, then an error has
     occurred and nothing was instantiated (the first element is an error
     message).  Otherwise, elements 2-4 are the Topology, IPBlockAllocation, and
-    PortTreeNode root node objects."""
-    # build a depth-first "tree" of the topology from the port connected to the gateway
-    root = template.get_root_port()
-    if not root:
-        return ("template '%s' has no ports" % template.name,)
-    tree = root.get_tree()
-    num_addrs = tree.compute_subnet_size()
+    PortTreeNode root node objects (root may be None if not computed)."""
+    # try to give the user the allocation they most recently had
+    alloc = __realloc_if_available(owner, template, ip_block_from) if use_recent_alloc_logic else None
+    if alloc:
+        tree = None
+    else:
+        # build a depth-first "tree" of the topology from the port connected to the gateway
+        root = template.get_root_port()
+        if not root:
+            return ("template '%s' has no ports" % template.name,)
+        tree = root.get_tree()
+        num_addrs = tree.compute_subnet_size()
 
-    # allocate a subblock of IPs for the new topology
-    allocs = allocate_ip_block(ip_block_from, 1, num_addrs, src_filters)
-    if not allocs:
-        return ("insufficient free IP addresses",)
-    alloc = allocs[0]
+        # allocate a subblock of IPs for the new topology
+        allocs = allocate_ip_block(ip_block_from, 1, num_addrs, src_filters)
+        if not allocs:
+            return ("insufficient free IP addresses",)
+        alloc = allocs[0]
 
     # create the topology and assign IP addresses
     start_addr = struct.unpack('>I', inet_aton(alloc.start_addr))[0]
@@ -59,6 +65,15 @@ def instantiate_template(owner, template, ip_block_from, src_filters, temporary)
         ipa.mask = mask_sz
         ipa.save()
         logging.info('IP assignment for new topology %d: %s' % (t.id, ipa))
+
+    # save the allocation as a "recent" allocation for this user
+    if use_recent_alloc_logic:
+        recent_alloc = db.RecentIPBlockAllocation()
+        recent_alloc.user = owner
+        recent_alloc.template = t.template
+        recent_alloc.start_addr = alloc.start_addr
+        recent_alloc.mask = alloc.mask
+        recent_alloc.save()
 
     return (None, t, alloc, tree)
 
@@ -162,6 +177,57 @@ def is_any_overlapping(ip, num_masked_bits, ip_mask_list):
         if is_overlapping(ip, num_masked_bits, ip2_int, num_masked_bits2):
             return True
     return False
+
+def __realloc_if_available(owner, template, ip_block_from):
+    """Checks to see if owner has previously allocated the specified template
+    from ip_block_from.  If so, then previously allocated block is checked to
+    see if it is available.  If so, then it is allocated and returned.
+    Otherwise, None is returned.  Any record of a recent allocation is deleted."""
+    recent_allocs = db.RecentIPBlockAllocation.objects.filter(user=owner, template=template)
+    if recent_allocs:
+        ra = recent_allocs[0]
+        ret = __realloc_if_available_work(ra, ip_block_from)
+        if ret:
+            logging.info('Reallocated %s' % ra)
+        else:
+            logging.info('Unable to reallocate %s' % ra)
+        recent_allocs.delete()
+        return ret
+    else:
+        return None
+
+def __realloc_if_available_work(ra, ip_block_from):
+    # the recent allocation must be from the block we're trying to allocate from
+    start_addr = struct.unpack('>I', inet_aton(ra.start_addr))[0]
+    start_addr_from = struct.unpack('>I', inet_aton(ip_block_from.subnet))[0]
+    if not is_overlapping(start_addr, ra.mask, start_addr_from, ip_block_from.mask):
+        return None
+
+    # the recent allocation must not be in use
+    try:
+        # does the closest active allocation BEFORE the recent alloc overlap it?
+        closest_pre_alloc = db.IPBlockAllocation.objects.filter(ip__lte=ra.start_addr).order_by('-ip')[0]
+        sa_pre = struct.unpack('>I', inet_aton(closest_pre_alloc.start_addr))[0]
+        if is_overlapping(start_addr, ra.mask, sa_pre, closest_pre_alloc.mask):
+            return None
+
+        # does the closest active allocation AFTER to the recent alloc overlap it?
+        closest_post_alloc = db.IPBlockAllocation.objects.filter(ip__gte=ra.start_addr).order_by('ip')[0]
+        sa_post = struct.unpack('>I', inet_aton(closest_post_alloc.start_addr))[0]
+        if is_overlapping(start_addr, ra.mask, sa_post, closest_post_alloc.mask):
+            return None
+    except IndexError:
+        pass
+
+    # it isn't in use => allocate it
+    new_alloc = db.IPBlockAllocation()
+    new_alloc.block_from = ip_block_from
+    new_alloc.topology = None
+    new_alloc.start_addr = ra.start_addr
+    new_alloc.mask = ra.mask
+    new_alloc.save()
+    logging.info('RE-allocated new block of addresses: %s' % new_alloc)
+    return new_alloc
 
 def __str_ip_to_int(str_ip):
     """Converts a string to an IP address and returns the associated int value."""
