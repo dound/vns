@@ -53,6 +53,18 @@ class VNSClose(LTMessage):
     def get_type():
         return 2
 
+    @staticmethod
+    def get_banners_and_close(msg):
+        """Split msg up into the minimum number of VNSBanner messages and VNSClose it will fit in."""
+        msgs = []
+        n = len(msg)/255 + 1
+        for i in range(n):
+            if i+1 < n:
+                msgs.append(VNSBanner(msg[i*255:(i+1)*255]))
+            else:
+                msgs.append(VNSClose(msg[i*255:(i+1)*255]))
+        return msgs
+
     def __init__(self, msg):
         LTMessage.__init__(self)
         self.msg = str(msg)
@@ -154,6 +166,15 @@ class VNSBanner(LTMessage):
     @staticmethod
     def get_type():
         return 8
+
+    @staticmethod
+    def get_banners(msg):
+        """Split msg up into the minimum number of VNSBanner messages it will fit in."""
+        msgs = []
+        n = len(msg)/255 + 1
+        for i in range(n):
+            msgs.append(VNSBanner(msg[i*255:(i+1)*255]))
+        return msgs
 
     def __init__(self, msg):
         LTMessage.__init__(self)
