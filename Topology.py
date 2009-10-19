@@ -720,8 +720,7 @@ class WebServer(BasicNode):
     def __init_web_server_ip(self):
         """Resolves the target web server hostname to an IP address."""
         try:
-            inet_aton(self.web_server_to_proxy_hostname)
-            self.web_server_to_proxy_ip = self.web_server_to_proxy_hostname # just a plain IP address
+            self.web_server_to_proxy_ip = inet_aton(self.web_server_to_proxy_hostname) # just a plain IP address
             return
         except socket.error:
             pass # must be a hostname; try to resolve it
