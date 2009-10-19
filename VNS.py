@@ -22,7 +22,7 @@ from Topology import Topology, TopologyCreationException
 from TopologyInteractionProtocol import TI_DEFAULT_PORT, create_ti_server, TIOpen, TIPacket, TIBanner
 from TopologyResolver import TopologyResolver
 from VNSProtocol import VNS_DEFAULT_PORT, create_vns_server
-from VNSProtocol import VNSOpen, VNSClose, VNSPacket, VNSOpenTemplate, VNSRtable, VNSAuthRequest, VNSAuthReply, VNSAuthStatus
+from VNSProtocol import VNSOpen, VNSClose, VNSPacket, VNSOpenTemplate, VNSBanner, VNSRtable, VNSAuthRequest, VNSAuthReply, VNSAuthStatus
 from web.vnswww import models as db
 
 class VNSSimulator:
@@ -98,9 +98,23 @@ class VNSSimulator:
             sys.exit(-1)
 
     def periodic_callback(self):
+        # save statistics values
         for topo in self.topologies.values():
             topo.save_stats()
-        reactor.callLater(60, self.periodic_callback)
+
+        # see if there is any admin message to be sent to all clients
+        try:
+            bts = db.SystemInfo.objects.get(name='banner_to_send')
+            msg_for_clients = bts.value
+            bts.delete()
+            logging.info('sending message to clients: %s' % msg_for_clients)
+            for conn in self.clients.keys():
+                for m in VNSBanner.get_banners(msg_for_clients):
+                    conn.send(m)
+        except db.SystemInfo.DoesNotExist:
+            pass
+
+        reactor.callLater(30, self.periodic_callback)
 
     def handle_packet_from_outside(self, packet):
         """Forwards packet to the appropriate simulation, if any."""
@@ -177,7 +191,8 @@ class VNSSimulator:
         # terminate the client
         if conn.connected:
             if notify_client:
-                conn.send(VNSClose(why))
+                for m in VNSClose.get_banners_and_close(why):
+                    conn.send(m)
             conn.transport.loseConnection()
 
         if log_it:
