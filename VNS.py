@@ -63,7 +63,7 @@ class VNSSimulator:
 
     def __run_pcap(self, dev):
         """Start listening for packets coming in from the outside world."""
-        MAX_LEN      = 1514    # max size of packet to capture
+        MAX_LEN      = 2000    # max size of packet to capture
         PROMISCUOUS  = 1       # promiscuous mode?
         READ_TIMEOUT = 100     # in milliseconds
         MAX_PKTS     = -1      # number of packets to capture; -1 => no limit
