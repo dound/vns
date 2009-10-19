@@ -340,9 +340,15 @@ class VNSSimulator:
 
     def cleanup_and_exit(self):
         """Cleanly terminate connected clients and then forcibly terminate the program."""
-        logging.info('VNS simulator shutting down')
+        # see if the admin put a reason for the shutdown in the database
+        try:
+            why = db.SystemInfo.objects.get(name='shutdown_reason').value
+        except db.SystemInfo.DoesNotExist:
+            why = 'the simulator is shutting down'
+
+        logging.info('VNS simulator shutting down: %s' % why)
         for conn in self.clients.keys():
-            self.terminate_connection(conn, 'the simulator is shutting down')
+            self.terminate_connection(conn, why)
         os._exit(0) # force the termination (otherwise the pcap thread keeps going)
 
     def handle_recv_ti_msg(self, conn, ti_msg):

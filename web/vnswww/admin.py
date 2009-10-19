@@ -3,7 +3,7 @@ from models import Simulator, Organization, UserProfile, StatsTopology, \
                    TopologyTemplate, Node, WebServer, WebServerHostname, Port, Link, \
                    Topology, TopologySourceIPFilter, TopologyUserFilter, \
                    IPAssignment, MACAssignment, IPBlock, IPBlockAllocation, \
-                   RecentIPBlockAllocation
+                   RecentIPBlockAllocation, SystemInfo
 
 def make_user_search_fields(prefix):
     return (prefix + '__username', prefix + '__first_name', prefix + '__last_name')
@@ -100,6 +100,11 @@ class StatsTopologyAdmin(admin.ModelAdmin):
     ordering = ('time_connected',)
     search_fields = ('template__name', 'username', 'client_ip')
 
+class SystemInfoAdmin(admin.ModelAdmin):
+    list_display = ('name', 'value')
+    ordering = ('name',)
+    search_fields = ('name', 'value')
+
 admin.site.register(Simulator, SimulatorAdmin)
 admin.site.register(Organization, OrganizationAdmin)
 admin.site.register(UserProfile, UserProfileAdmin)
@@ -118,3 +123,4 @@ admin.site.register(IPBlock, IPBlockAdmin)
 admin.site.register(IPBlockAllocation, IPBlockAllocationAdmin)
 admin.site.register(RecentIPBlockAllocation, RecentIPBlockAllocationAdmin)
 admin.site.register(StatsTopology, StatsTopologyAdmin)
+admin.site.register(SystemInfo, SystemInfoAdmin)

@@ -6,7 +6,7 @@ import string
 import struct
 
 from django.db.models import AutoField, BooleanField, CharField, DateField, \
-                             DateTimeField, FloatField, ForeignKey, Q, \
+                             DateTimeField, FloatField, ForeignKey, Q, TextField, \
                              IntegerField, IPAddressField, ManyToManyField, Model
 from django.contrib.auth.models import User
 
@@ -479,3 +479,7 @@ class StatsTopology(Model):
                (u'Active for %dsec; ' % self.total_time_connected_sec) + \
                (u'# Packets [Topo to=%d from=%d] ' % (self.num_pkts_to_topo, self.num_pkts_from_topo)) + \
                (u'[User to=%d from=%d]' % (self.num_pkts_to_client, self.num_pkts_from_client))
+
+class SystemInfo(Model):
+    name = CharField(max_length=128, unique=True)
+    value = TextField()
