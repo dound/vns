@@ -81,7 +81,7 @@ class VNSSimulator:
             sys.exit(-1)
 
         p.setfilter(PCAP_FILTER)
-        logging.info("Listening on %s: net=%s, mask=%s" % (dev, p.getnet(), p.getmask()))
+        logging.info("Listening on %s: net=%s, mask=%s, filter=%s" % (dev, p.getnet(), p.getmask(), PCAP_FILTER))
         p.loop(MAX_PKTS, ph)
 
     def __start_raw_socket(self, dev):
