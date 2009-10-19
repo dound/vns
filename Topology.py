@@ -10,6 +10,7 @@ import time
 from settings import ARP_CACHE_TIMEOUT, MAY_FORWARD_TO_PRIVATE_IPS
 from LoggingHelper import log_exception, addrstr, pktstr
 import ProtocolHelper
+from ProtocolHelper import is_http_port
 from VNSProtocol import VNSPacket, VNSInterface, VNSHardwareInfo
 import web.vnswww.models as db
 
@@ -242,7 +243,7 @@ class Topology():
         it takes care of this and returns True.  Otherwise False is returned."""
         if len(packet)>=24 and packet[12:14]=='\x08\x00' and packet[23]=='\x06': # TCP/IP?
             pkt = ProtocolHelper.Packet(packet)
-            if pkt.is_valid_tcp() and pkt.tcp_src_port == ProtocolHelper.HTTP_PORT: # from HTTP port?
+            if pkt.is_valid_tcp() and is_http_port(pkt.tcp_src_port): # from HTTP port?
                 ws = self.web_server_ip_addrs.get(pkt.ip_dst) # to one of our web servers?
                 if ws:
                     logging.debug('Gateway forwarding packet directly to %s for handling (from proxy): %s' % (ws.di(), pktstr(packet)))
@@ -766,10 +767,10 @@ class WebServer(BasicNode):
         forwarded as appropriate (this node acts as a proxy server)  Otherwise,
         the default superclass implementation is called."""
         if pkt.is_valid_tcp() and self.__has_web_server_ip():
-            if pkt.tcp_dst_port == ProtocolHelper.HTTP_PORT:
+            if is_http_port(pkt.tcp_dst_port):
                 self.handle_http_request(intf, pkt)
                 return
-            elif pkt.tcp_src_port == ProtocolHelper.HTTP_PORT:
+            elif is_http_port(pkt.tcp_src_port):
                 logging.warning('Did not expect to get an HTTP reply through this path anymore')
                 self.handle_http_reply(intf, pkt)
                 return

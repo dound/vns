@@ -3,6 +3,10 @@
 import struct
 
 HTTP_PORT = struct.pack('> H', 80) # normally 80
+HTTP_ALT_PORT = struct.pack('> H', 8080) # normally 8080
+
+def is_http_port(port):
+    return port==HTTP_PORT or port==HTTP_ALT_PORT
 
 def checksum(buf):
     """One's complement 16-bit checksum."""
