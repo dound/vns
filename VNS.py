@@ -239,9 +239,22 @@ class VNSSimulator:
         ret = topo.connect_client(conn, user, requested_name)
         if not ret.is_success():
             self.terminate_connection(conn, ret.fail_reason)
+        else:
+            self.send_motd_to_client(conn)
         if ret.prev_client:
             self.terminate_connection(ret.prev_client,
                                       'a new client (%s) has connected to the topology' % conn)
+
+    def send_motd_to_client(self, conn):
+        """Sends a message to a newly connected client, if such a a message is set."""
+        # see if there is any admin message to be sent to a client upon connecting
+        try:
+            msg_for_client = db.SystemInfo.objects.get(name='motd').value
+            logging.info('sending message to clients: %s' % msg_for_client)
+            for m in VNSBanner.get_banners(msg_for_client):
+                conn.send(m)
+        except db.SystemInfo.DoesNotExist:
+            pass
 
     def handle_open_template_msg(self, conn, ot):
         try:
