@@ -254,9 +254,9 @@ class Topology():
     def need_arp_translation_for_pkt(self, ethernet_frame):
         """Delays forwarding a packet to the node connected to the gateway until
         it replies to an ARP request."""
-        self.pending_incoming_packets.append(ethernet_frame)
-        if len(self.pending_incoming_packets) > 5:
-            self.pending_incoming_packets = self.pending_incoming_packets[1:]
+        if len(self.pending_incoming_packets) < 10:
+            self.pending_incoming_packets.append(ethernet_frame)
+        # otherwise: drop new packets if the psuedo-queue is full
 
         if not self.is_ok_to_send_arp_request():
             return # we already sent an ARP request recently, so be patient!
