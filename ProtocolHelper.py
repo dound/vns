@@ -29,11 +29,8 @@ def tcp_checksum(ip_hdr, tcp_hdr, tcp_data):
     total_len = struct.pack('> H', len(tcp_hdr) + len(tcp_data))
     pseudo_hdr = ip_hdr[12:20] + '\x00' + ip_hdr[9] + total_len
     tcp_hdr_with_zero_csum = tcp_hdr[0:16] + '\x00\x00' + tcp_hdr[18:]
-    combined = pseudo_hdr + tcp_hdr_with_zero_csum + tcp_data
-
-    if len(combined) & 1:
-        combined = combined + '\x00'
-
+    pad = '\x00' if len(tcp_data) & 1 else ''
+    combined = tcp_hdr_with_zero_csum + tcp_data + pad + pseudo_hdr
     return checksum(combined)
 
 class Packet:
@@ -77,6 +74,8 @@ class Packet:
 
         if ver==4 and ip_hlen>=20:
             self.ip = ip[:ip_hlen]
+            self.ip_hlen = ip_hlen
+            self.ip_tlen = struct.unpack('>H', ip[2:4])[0]
             self.ip_proto = ip[9]
             self.ip_src = ip[12:16]
             self.ip_dst = ip[16:20]
@@ -91,8 +90,10 @@ class Packet:
             self.tcp = tcp[:tcp_hlen]
             self.tcp_src_port = tcp[0:2]
             self.tcp_dst_port = tcp[2:4]
+            self.tcp_hlen = tcp_hlen
             self.tcp_control_bits = struct.unpack('>B', tcp[13])[0] & 0x3F
-            self.tcp_data = tcp[tcp_hlen:]
+            tcp_data_len = self.ip_tlen - tcp_hlen - self.ip_hlen
+            self.tcp_data = tcp[tcp_hlen:tcp_hlen+tcp_data_len]
 
     def get_reversed_eth(self):
         """Returns the Ethernet header with its source and destination fields reversed."""
