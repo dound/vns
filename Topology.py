@@ -558,9 +558,9 @@ class BasicNode(Node):
     def handle_non_icmp_ip_packet_to_self(self, intf, pkt):
         """Handles IP packets which are not ICMP packets by replying with a
         protocol unreachable ICMP message."""
-        proto_unreach = pkt.generate_complete_icmp_proto_unreach()
-        logging.debug('%s sending protocol unreachable in response to non-ICMP IP packet: %s' % (self.di(), pktstr(proto_unreach)))
-        self.send_packet(intf, proto_unreach)
+        dst_unreach = pkt.generate_complete_icmp_dst_unreach()
+        logging.debug('%s sending dst unreachable in response to non-ICMP IP packet: %s' % (self.di(), pktstr(dst_unreach)))
+        self.send_packet(intf, dst_unreach)
 
     def handle_ipv4_packet_to_other(self, intf, pkt):
         """Called when a IP packet for someone else is received on intf.  eth

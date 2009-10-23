@@ -190,20 +190,20 @@ class Packet:
         csum = tcp_checksum(ip_hdr, tcp_hdr, tcp_data)
         return tcp_hdr[0:16] + struct.pack('> H', csum) + tcp_hdr[18:]
 
-    def generate_icmp_proto_unreach(self):
-        """Generates an ICMP protocol unreachable message for this IP packet.
+    def generate_icmp_dst_unreach(self):
+        """Generates an ICMP destination unreachable message for this IP packet.
         The ICMP portion of the message is returned."""
-        icmp_hdr = '\x03\x02\xfc\xfd' # dest unreach: proto unreach w/cksum
+        icmp_hdr = '\x03\x03\x80\xec' # dest unreach: port unreach w/cksum
         # data is four "0" bytes followed by the IP header and 8B of its payload
         icmp_data = '\x00\x00\x00\x00' + self.ip + self.ip_payload[:8]
         return Packet.cksum_icmp_pkt(icmp_hdr + icmp_data)
 
-    def generate_complete_icmp_proto_unreach(self):
-        """Generates an ICMP protocol unreachable message for this IP packet.
+    def generate_complete_icmp_dst_unreach(self):
+        """Generates an ICMP destination unreachable message for this IP packet.
         The full Ethernet frame is constructed, assuming the packet will be sent
         back via the way it came."""
         new_eth = self.get_reversed_eth()
-        new_icmp = self.generate_icmp_proto_unreach()
+        new_icmp = self.generate_icmp_dst_unreach()
         tlen = len(self.ip) + len(new_icmp)
         new_ip = self.get_reversed_ip(new_ttl=64, new_proto=1, new_tlen=tlen)
         return new_eth + new_ip + new_icmp
