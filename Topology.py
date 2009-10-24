@@ -246,8 +246,11 @@ class Topology():
             if pkt.is_valid_tcp() and is_http_port(pkt.tcp_src_port): # from HTTP port?
                 ws = self.web_server_ip_addrs.get(pkt.ip_dst) # to one of our web servers?
                 if ws:
-                    logging.debug('Gateway forwarding packet directly to %s for handling (from proxy): %s' % (ws.di(), pktstr(packet)))
-                    ws.handle_http_reply(ws.interfaces[0], pkt)
+                    ws = WebServer.HTTP_SESSIONS.get(pkt.tcp_dst_port)
+                    if ws:
+                        logging.debug('Gateway forwarding packet directly to %s for handling (from proxy): %s' % (ws.di(), pktstr(packet)))
+                        ws.handle_http_reply(ws.interfaces[0], pkt)
+                    # else: ignore it (old traffic)
                     return True
         return False
 
@@ -784,6 +787,7 @@ class WebServer(BasicNode):
                                        struct.unpack('>H', myport)[0])
 
     NEXT_TCP_PORT = 10000
+    HTTP_SESSIONS = {}
 
     @staticmethod
     def get_and_advance_tcp_port():
@@ -853,6 +857,8 @@ class WebServer(BasicNode):
         if pkt.is_tcp_rst() or self.__is_full_close(pkt, side_from, other_side):
             del self.conns[side_from]
             del self.conns[other_side]
+            WebServer.HTTP_SESSIONS.pop(side_from, None)
+            WebServer.HTTP_SESSIONS.pop(other_side, None)
             self.fins.pop(other_side, None)
             logging.debug('%s HTTP connection state removed (RST or final FIN)' % self.di())
 
