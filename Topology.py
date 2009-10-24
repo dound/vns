@@ -716,7 +716,6 @@ class WebServer(BasicNode):
         # byte-strings in network byte order.
         self.conns = {}  # (requester IP, TCP port) <=> local TCP port
         self.fins = {} # keys = conns key which has sent a FIN
-        self.next_tcp_port = 10000  # next TCP port to forward from
 
     def __init_web_server_ip(self):
         """Resolves the target web server hostname to an IP address."""
@@ -784,6 +783,16 @@ class WebServer(BasicNode):
         return 'client=%s:%d me=%d' % (inet_ntoa(ip), struct.unpack('>H', port)[0],
                                        struct.unpack('>H', myport)[0])
 
+    NEXT_TCP_PORT = 10000
+
+    @staticmethod
+    def get_and_advance_tcp_port():
+        ret = WebServer.NEXT_TCP_PORT
+        WebServer.NEXT_TCP_PORT += 1
+        if WebServer.NEXT_TCP_PORT > 65535:
+            WebServer.NEXT_TCP_PORT = 10000
+        return ret
+
     def handle_http_request(self, intf, pkt):
         """Forward the received packet from an HTTP client to the web server."""
         # see if we are already working with this connection
@@ -791,10 +800,8 @@ class WebServer(BasicNode):
         my_port = self.conns.get(client_info)
         if my_port is None:
             # new connection: allocate a port for it
-            my_port = struct.pack('> H', self.next_tcp_port)
-            self.next_tcp_port += 1
-            if self.next_tcp_port > 65535:
-                self.next_tcp_port = 10000
+            my_port = struct.pack('> H', WebServer.get_and_advance_tcp_port())
+            WebServer.HTTP_SESSIONS[my_port] = self
             self.conns[client_info] = my_port
             self.conns[my_port] = client_info
             logging.debug('%s forwarding new HTTP request: %s' %
