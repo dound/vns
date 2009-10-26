@@ -95,9 +95,11 @@ class Packet:
             tcp_data_len = self.ip_tlen - tcp_hlen - self.ip_hlen
             self.tcp_data = tcp[tcp_hlen:tcp_hlen+tcp_data_len]
 
-    def get_reversed_eth(self):
+    def get_reversed_eth(self, new_mac_dst=None):
         """Returns the Ethernet header with its source and destination fields reversed."""
-        return self.mac_src + self.mac_dst + self.ether_type
+        if not new_mac_dst:
+            new_mac_dst = self.mac_dst
+        return self.mac_src + new_mac_dst + self.ether_type
 
     def get_reversed_ip(self, new_ttl=None, new_proto=None, new_tlen=None):
         """Returns the IP header with its source and destination fields reversed

@@ -525,7 +525,7 @@ class BasicNode(Node):
         # is the ARP request asking about THIS interface on broadcast dha?
         if pkt.dpa==intf.ip and pkt.mac_dst=='\xFF\xFF\xFF\xFF\xFF\xFF':
             # send it back to the requester (reverse src/dst, copy in our mac addr)
-            reply_eth = pkt.get_reversed_eth()
+            reply_eth = pkt.get_reversed_eth(new_mac_dst=intf.mac)
             reply_arp = pkt.arp[0:7] + '\x02' + intf.mac + intf.ip + pkt.sha + pkt.spa
             reply = reply_eth + reply_arp
             logging.debug('%s replying to ARP request: %s' % (self.di(), pktstr(reply)))
