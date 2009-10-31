@@ -442,7 +442,7 @@ class StatsTopology(Model):
     client_ip = IPAddressField(help_text='IP address of the first client to connect to the topology')
     username = CharField(max_length=100)
     time_connected = DateTimeField(auto_now_add=True)
-    time_last_changed = DateTimeField(auto_now_add=True, auto_now=True)
+    time_last_changed = DateTimeField(auto_now_add=True)
     total_time_connected_sec = IntegerField(default=0)
     num_pkts_to_topo = IntegerField(default=0, help_text='Counts packets arriving from the real world or through the topology interaction protocol.')
     num_pkts_from_topo = IntegerField(default=0, help_text='Counts packets sent from the topology out to the real world.')
@@ -460,7 +460,8 @@ class StatsTopology(Model):
     def finalize(self):
         self.active = False
         self.total_time_connected_sec = self.get_num_sec_connected()
-        self.save()
+        if not self.save_if_changed():
+            self.save()
 
     def get_num_sec_connected(self):
         """Returns how long this topology has been connected."""
@@ -496,6 +497,7 @@ class StatsTopology(Model):
         """Saves these stats and returns True if they have changed."""
         if self.changed:
             self.changed = False
+            self.time_last_changed = datetime.datetime.now()
             self.save()
             return True
         return False
