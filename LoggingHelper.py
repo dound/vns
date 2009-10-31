@@ -40,8 +40,6 @@ def pktstr(pkt):
 
     try:
         ret = '\n' + str(__decoder.decode(pkt))
-    except ImpactPacketException:
-        log_exception(logging.WARN, 'packet decoding failed')
-        ret = 'packet=??? (decoding failed)'
-
-    return ret.replace('\n', '\n    ')
+        return ret.replace('\n', '\n    ')
+    except ImpactPacketException as e:
+        return 'packet=%s (decoding failed: %s)' % (hexstr(pkt), str(e))
