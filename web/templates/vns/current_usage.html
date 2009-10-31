@@ -1,19 +1,34 @@
 {% extends "base.html" %}
+{% load custom_filters %}
 
 {% block title %}Current VNS Usage{% endblock %}
 
 {% block content %}
     <h2>Active Topologies</h2>
+    {% if stats_list %}
+    <table>
+        <tr>
+            <th>Topology Type</th>
+            <th colspan="2">Client</th>
+            <th>Time Connected</th>
+            <th>Duration</th>
+            <th>Total Traffic<br/>(# packets)</th>
+            <th>Idle Time</th>
+        </tr>
+    {% endif %}
     {% for ts in stats_list %}
-        <p>{{ ts.template.name }} Topology:
-            <ul>
-                <li>Client: {{ ts.username }} from {{ ts.client_ip }}</li>
-                <li>Connected at: {{ ts.time_connected }}</li>
-                <li>Total traffic (# packets): {{ ts.total_num_packets }}</li>
-            </ul>
-        </p>
-        </hr>
+        <tr>
+            <td>{{ ts.template.name }}</td>
+            <td>{{ ts.username }}</td><td>{{ ts.client_ip }}</td>
+            <td>{{ ts.time_connected|date:"D d-M \a\t H:n:s" }}</td>
+            <td>{{ ts.get_num_sec_connected|durationf }}</td>
+            <td>{{ ts.total_num_packets }}</td>
+            <td>{{ ts.get_idle_time_sec|durationf }}</td>
+        </tr>
     {% empty %}
     <p>There are no active topologies at this time.</p>
     {% endfor %}
+    {% if stats_list %}
+    </table>
+    {% endif %}
 {% endblock %}
