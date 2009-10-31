@@ -1,8 +1,7 @@
 import django.contrib
 import os
 
-DEBUG = True
-TEMPLATE_DEBUG = DEBUG
+DEBUG = TEMPLATE_DEBUG = False
 
 ADMINS = (
     ('David Underhill', 'dgu@cs.stanford.edu'),
