@@ -1,6 +1,5 @@
 """The VNS simulator."""
 
-import datetime
 import errno
 import hashlib
 import logging, logging.config
@@ -14,7 +13,7 @@ from twisted.internet import reactor
 from twisted.python.log import PythonLoggingObserver
 from twisted.python import log as tlog
 
-from settings import BORDER_DEV_NAME, PCAP_FILTER
+from settings import BORDER_DEV_NAME, PCAP_FILTER, MAX_TOPOLOGY_LIFE_SEC, MAX_INACTIVE_TOPOLOGY_LIFE_SEC
 import AddressAllocation
 from LoggingHelper import log_exception, addrstr, pktstr
 import ProtocolHelper
@@ -100,7 +99,11 @@ class VNSSimulator:
     def periodic_callback(self):
         # save statistics values
         for topo in self.topologies.values():
-            topo.save_stats()
+            stats = topo.get_stats()
+            if not stats.save_if_changed() and stats.get_idle_time_sec() > MAX_INACTIVE_TOPOLOGY_LIFE_SEC:
+                self.stop_topology(topo, 'topology exceeded maximum idle time (%dsec)' % MAX_INACTIVE_TOPOLOGY_LIFE_SEC)
+            elif stats.get_num_sec_connected() > MAX_TOPOLOGY_LIFE_SEC:
+                self.stop_topology(topo, 'topology exceeded maximum lifetime (%dsec)' % MAX_TOPOLOGY_LIFE_SEC)
 
         # see if there is any admin message to be sent to all clients
         try:
@@ -184,6 +187,12 @@ class VNSSimulator:
         self.topologies[tid] = topo
         return (topo, None)
 
+    def stop_topology(self, topo, why, notify_client=True, log_it=True, lvl=logging.INFO):
+        """Terminates all clients on a particular topology.  This will in turn
+        cause the topology to be deactivated."""
+        for client_conn in topo.get_clients():
+            self.terminate_connection(client_conn, why, notify_client, log_it, lvl)
+
     def terminate_connection(self, conn, why, notify_client=True, log_it=True, lvl=logging.INFO):
         """Terminates the client connection conn.  This event will be logged
         unless log_it is False.  If notify_client is True, then the client will
@@ -208,12 +217,7 @@ class VNSSimulator:
                 if topo.has_gateway():
                     self.resolver.unregister_topology(topo)
                 del self.topologies[tid]
-                topo_stats = topo.get_stats()
-                topo_stats.active = False
-                deltaT = datetime.datetime.now() - topo_stats.time_connected
-                deltaTsecs = deltaT.seconds + 60*60*24*deltaT.days
-                topo_stats.total_time_connected_sec = deltaTsecs
-                topo_stats.save()
+                topo.get_stats().finalize()
                 if topo.is_temporary():
                     AddressAllocation.free_topology(tid)
 

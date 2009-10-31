@@ -34,3 +34,9 @@ PCAP_FILTER = ' and '.join(['not ip dst %s and not ip src %s' % (a,a) for a in I
 # How long may a topology's gateway cache the ARP translation of the first hop
 # node on the topology (in seconds).
 ARP_CACHE_TIMEOUT = 30
+
+# Max time (in seconds) which a topology may be active.  (0 = no max)
+MAX_TOPOLOGY_LIFE_SEC = 3600
+
+# Max time (in seconds) to keep an idle topology. (0 = no max)
+MAX_INACTIVE_TOPOLOGY_LIFE_SEC = 900

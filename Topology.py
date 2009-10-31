@@ -158,6 +158,10 @@ class Topology():
         if n:
             n.disconnect(client_conn)
 
+    def get_clients(self):
+        """Returns a list of clients connected to this Topology."""
+        return self.clients.keys()
+
     def has_gateway(self):
         """Returns True if this topology has a gateway."""
         return self.gateway is not None
@@ -326,9 +330,6 @@ class Topology():
         """Returns True if a reasonable amount of time has passed since the
         last ARP request was sent."""
         return time.time() - self.last_arp_translation_request >= 5 # 5 seconds
-
-    def save_stats(self):
-        self.stats.save_if_changed()
 
     def __make_node(self, dn, raw_socket):
         """Converts the given database node into a simulator node object."""

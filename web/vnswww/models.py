@@ -1,3 +1,4 @@
+import datetime
 import hashlib
 import math
 import random
@@ -9,6 +10,11 @@ from django.db.models import AutoField, BooleanField, CharField, DateField, \
                              DateTimeField, FloatField, ForeignKey, Q, TextField, \
                              IntegerField, IPAddressField, ManyToManyField, Model
 from django.contrib.auth.models import User
+
+def get_delta_time_sec(t1, t2):
+    """Returns the number of seconds between two times."""
+    deltaT = t2 - t1
+    return deltaT.seconds + 60*60*24*deltaT.days
 
 def make_mask_field():
     return IntegerField(choices=tuple([(i, u'/%d'%i) for i in range(1,33)]),
@@ -436,6 +442,7 @@ class StatsTopology(Model):
     client_ip = IPAddressField(help_text='IP address of the first client to connect to the topology')
     username = CharField(max_length=100)
     time_connected = DateTimeField(auto_now_add=True)
+    time_last_changed = DateTimeField(auto_now_add=True, auto_now=True)
     total_time_connected_sec = IntegerField(default=0)
     num_pkts_to_topo = IntegerField(default=0, help_text='Counts packets arriving from the real world or through the topology interaction protocol.')
     num_pkts_from_topo = IntegerField(default=0, help_text='Counts packets sent from the topology out to the real world.')
@@ -447,7 +454,27 @@ class StatsTopology(Model):
         self.template = template
         self.client_ip = client_ip
         self.username = username
+        self.time_last_changed = datetime.datetime.now()
         self.changed = False
+
+    def finalize(self):
+        self.active = False
+        self.total_time_connected_sec = self.get_num_sec_connected()
+        self.save()
+
+    def get_num_sec_connected(self):
+        """Returns how long this topology has been connected."""
+        if self.active:
+            return get_delta_time_sec(self.time_connected, datetime.datetime.now())
+        else:
+            return self.total_time_connected_sec
+
+    def get_idle_time_sec(self):
+        """Returns the amount of time this topology has been idle in seconds."""
+        if not self.active or (self.__dict__.has_key('changed') and self.changed):
+            return 0
+        else:
+            return get_delta_time_sec(self.time_last_changed, datetime.datetime.now())
 
     def note_pkt_to_topo(self):
         self.num_pkts_to_topo += 1
@@ -466,9 +493,12 @@ class StatsTopology(Model):
         self.changed = True
 
     def save_if_changed(self):
+        """Saves these stats and returns True if they have changed."""
         if self.changed:
             self.changed = False
             self.save()
+            return True
+        return False
 
     def total_num_packets(self):
         return self.num_pkts_from_client + self.num_pkts_from_topo + self.num_pkts_to_client + self.num_pkts_to_topo
