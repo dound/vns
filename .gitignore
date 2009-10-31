@@ -1,5 +1,6 @@
 *.log
 *.pyc
+*.pyo
 .project
 .pydevproject
 twistd.pid
