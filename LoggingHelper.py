@@ -23,10 +23,18 @@ def addrstr(addr):
         logging.warning('unexpected address length: %d' % sz)
         return hexstr(addr)
 
-def hexstr(bs):
+def split_then_join(s, chunk_sz, join_str):
+    """Splits s into chunk_sz chunks and then joins those chunks using join_str."""
+    return join_str.join([s[i*chunk_sz:(i+1)*chunk_sz] for i in range((len(s)-1)/chunk_sz+1)])
+
+def hexstr(bs, add_spacing=True):
     """Returns a hexidecimal dump of the specified byte-string."""
     bytes = struct.unpack('> %uB' % len(bs), bs)
-    return ''.join(['%0.2X' % byte for byte in bytes])
+    hs = ''.join(['%0.2X' % byte for byte in bytes])
+    if not add_spacing:
+        return hs
+    pairs = split_then_join(hs, 2, ' ')
+    return split_then_join(pairs, 24, '   ')
 
 __last_pkt = None
 __decoder = EthDecoder()
