@@ -7,6 +7,7 @@ import os
 from os.path import dirname
 import socket
 import sys
+from time import time
 
 from pcapy import open_live, PcapError
 from twisted.internet import reactor
@@ -116,6 +117,15 @@ class VNSSimulator:
                     conn.send(m)
         except db.SystemInfo.DoesNotExist:
             pass
+
+        # note in the db that the reactor thread is still running
+        try:
+            latest = db.SystemInfo.objects.get(name='last_alive_time')
+        except db.SystemInfo.DoesNotExist:
+            latest = db.SystemInfo()
+            latest.name = 'last_alive_time'
+        latest.value = str(int(time()))
+        latest.save()
 
         reactor.callLater(30, self.periodic_callback)
 
