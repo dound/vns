@@ -105,6 +105,9 @@ class VNSSimulator:
                 self.stop_topology(topo, 'topology exceeded maximum idle time (%dsec)' % MAX_INACTIVE_TOPOLOGY_LIFE_SEC)
             elif stats.get_num_sec_connected() > MAX_TOPOLOGY_LIFE_SEC:
                 self.stop_topology(topo, 'topology exceeded maximum lifetime (%dsec)' % MAX_TOPOLOGY_LIFE_SEC)
+            elif stats.num_pkts_to_client / 250 > stats.get_num_sec_connected() / 60:
+                pkts_per_min = int(stats.num_pkts_to_client / stats.get_num_sec_connected() / 60)
+                self.stop_topology(topo, 'topology exceeded maximum packet xfer rate (rate=%dppm)' % pkts_per_min)
 
         # see if there is any admin message to be sent to all clients
         try:
