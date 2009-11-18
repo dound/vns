@@ -713,6 +713,8 @@ class WebServer(BasicNode):
             self.reply_re = None
             self.reply_sub_f = None
 
+        self.reply_re_sip = re.compile(r'SENDER__SRC__IP::PORT')
+
         # Each request is from a unique socket (TCP port and IP pair).  It is
         # then forwarded from a different local TCP port to the web server this
         # node is proxying.  The request to local port mapping as well as the
@@ -842,6 +844,15 @@ class WebServer(BasicNode):
         if self.reply_sub_f:
             sz = len(pkt.tcp_data)
             pkt.tcp_data = self.reply_re.sub(self.reply_sub_f, pkt.tcp_data)
+
+        if self.reply_re_sip:
+            src_ip = inet_ntoa(client_info[0])
+            src_port = struct.unpack('>H', client_info[1])[0]
+            sip_repl_txt = '%15s:%-5s' % (src_ip, src_port)
+            sz_before = len(pkt.tcp_data)
+            pkt.tcp_data = self.reply_re_sip.sub(sip_repl_txt, pkt.tcp_data)
+            sz_after = len(pkt.tcp_data)
+            logging.debug('size was %d then %d' % (sz_before, sz_after))
 
         # rewrite and forward the reply back to the client its associated with
         (client_ip, client_tcp_port) = client_info
