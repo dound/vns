@@ -292,20 +292,21 @@ class VNSSimulator:
         if err_msg:
             self.terminate_connection(conn, err_msg)
         else:
-            rtable_msg = VNSRtable(ot.vrhost, VNSSimulator.build_rtable(topo))
+            s2intfnum = '2' if ot.template_name == '1-router 2-server' else '1'
+            rtable_msg = VNSRtable(ot.vrhost, VNSSimulator.build_rtable(topo, s2intfnum))
             conn.send(rtable_msg)
             logging.debug('Sent client routing table message: %s' % rtable_msg)
             who = conn.vns_user_profile.user.username
             self.handle_connect_to_topo(conn, topo.id, who, ot.vrhost)
 
     @staticmethod
-    def build_rtable(topo):
+    def build_rtable(topo, s2intfnum):
         # TODO: write this function for real; just a quick hack for now
         s1 = db.IPAssignment.objects.get(topology=topo, port__node=db.Node.objects.get(template=topo.template, name='Server 1'))
         s2 = db.IPAssignment.objects.get(topology=topo, port__node=db.Node.objects.get(template=topo.template, name='Server 2'))
         return '\n'.join(['0.0.0.0  172.24.74.17  0.0.0.0  eth0',
                           '%s  %s  255.255.255.254  eth1' % (s1.ip, s1.ip),
-                          '%s  %s  255.255.255.254  eth2' % (s2.ip, s2.ip)])
+                          '%s  %s  255.255.255.254  eth%s' % (s2.ip, s2.ip, s2intfnum)])
 
     def handle_new_client_old(self, conn):
         logging.debug("Old style client %s connected: bypassing auth" % conn)
