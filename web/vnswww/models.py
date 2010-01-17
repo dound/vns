@@ -2,6 +2,7 @@ import datetime
 import hashlib
 import math
 import random
+import re
 from socket import inet_aton, inet_ntoa
 import string
 import struct
@@ -97,6 +98,11 @@ class TopologyTemplate(Model):
                      help_text='The organization this template belongs to.')
     visibility = IntegerField(choices=VISIBILITY_CHOICES,
                               help_text='Who may see and use this template.')
+    readme = TextField(help_text='Template of the readme which will explain ' + \
+                       'the topology to the user.  Template tags start with $ ' + \
+                       'and include the following: $topo.id, $sim.gatewayip, ' + \
+                       "and $node.port.ip where node is a node's name and " + \
+                       "port is a port's name (e.g., $Server1.eth0.ip).")
 
     def get_root_port(self):
         """Returns the "root" port of the topology.  This is the port connected
@@ -115,6 +121,25 @@ class TopologyTemplate(Model):
                 return Port.objects.filter(node__template=self).order_by('node__name', 'name')[0]
             except IndexError:
                 return None # no ports in this topology
+
+    README_REGEXP = re.compile(r'[$]\S+')
+    def render_readme(self, sim, topo):
+        # build the dictionary of all valid substitutions
+        values = {}
+        values['$topo.gatewayip'] = sim.gatewayIP
+        values['$topo.id'] = topo.id
+        for ipa in IPAssignment.objects.filter(port__node__template=self):
+            values['$%s.%s.ip' % (ipa.port.name, ipa.port.node.name)] = ipa.ip
+
+        # define a function for substituting the appropriate value for an exp
+        def repl(m):
+            try:
+                return values[m.groups(0)]
+            except KeyError:
+                return m.groups(0) # no change
+
+        # render the readme with all substitutions
+        TopologyTemplate.README_REGEXP.sub(repl, self.readme)
 
     def __unicode__(self):
         return u'%s' % self.name
