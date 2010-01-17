@@ -45,7 +45,7 @@ class WebServerHostnameAdmin(admin.ModelAdmin):
     search_fields = ('hostname',)
 
 class PortAdmin(admin.ModelAdmin):
-    list_display = ('node', 'name')
+    list_display = ('node', 'name', 'ip_offset')
     ordering = ('node', 'name')
     search_fields = ('node__template__name', 'node__name', 'name')
 

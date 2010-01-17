@@ -239,6 +239,11 @@ class Port(Model):
     """A port on a node in a topology template."""
     node = ForeignKey(Node)
     name = CharField(max_length=5)
+    ip_offset = IntegerField(default=-2,
+                             help_text="Guides automatic IP assignment.  This "  + \
+                             "value will be added to the root subnet IP to get " + \
+                             "this port's IP.  If -1, then this port will not "  + \
+                             "be assigned any IP.")
 
     def get_tree(self):
         """Returns the topology tree (from a depth-first search) rooted at this
