@@ -81,7 +81,7 @@ class MACAssignmentAdmin(admin.ModelAdmin):
     search_fields = ('mac', 'topology__template__name', 'topology__name', 'port__node__name')
 
 class IPBlockAdmin(admin.ModelAdmin):
-    list_display = ('simulator', 'parentIPBlock', 'org', 'subnet', 'mask')
+    list_display = ('simulator', 'parentIPBlock', 'org', 'subnet', 'mask', 'usable_by_child_orgs')
     ordering = ('subnet', 'mask')
     search_fields = ('simulator__name', 'org__name', 'subnet', 'mask')
 

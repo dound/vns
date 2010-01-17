@@ -433,6 +433,9 @@ class IPBlock(Model):
     org = ForeignKey(Organization)
     subnet = IPAddressField()
     mask = IntegerField('Subnet Mask (# of significant bits in the subnet)')
+    usable_by_child_orgs = BooleanField(default=True, help_text='Whether ' + \
+        'any organization whose parent is the organization who owns this ' + \
+        'IP block may allocate IPs from this IP block.')
 
     def __unicode__(self):
         return u'%s/%d' % (self.subnet, self.mask)
