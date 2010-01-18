@@ -25,10 +25,14 @@ def free_topology(tid):
         logging.warning('asked to free non-existent topology %d' % tid)
 
 def instantiate_template(owner, template, ip_block_from, src_filters, temporary,
-                         use_recent_alloc_logic=True):
+                         use_recent_alloc_logic=True, public=False,
+                         use_first_available=False):
     """Instantiates a new Topology object, allocates a block of addresses for
     it, and assigns addresses to each port in it.  The block will come from
     ip_block_from.  The topology will be assigned the specified source filters.
+    If use_first_available is True, then the first available block will be used.
+    Otherwise, a random available block will be used.  The latter is generally
+    better suited to temporary allocations (ones that only last a short time).
     A tuple is returned -- if the first element is not None, then an error has
     occurred and nothing was instantiated (the first element is an error
     message).  Otherwise, elements 2-4 are the Topology, IPBlockAllocation, and
@@ -44,7 +48,7 @@ def instantiate_template(owner, template, ip_block_from, src_filters, temporary,
     alloc = __realloc_if_available(owner, template, ip_block_from) if use_recent_alloc_logic else None
     if not alloc:
         # allocate a subblock of IPs for the new topology
-        allocs = allocate_ip_block(ip_block_from, 1, num_addrs, src_filters)
+        allocs = allocate_ip_block(ip_block_from, 1, num_addrs, src_filters, use_first_available)
         if not allocs:
             return ("insufficient free IP addresses",)
         alloc = allocs[0]
@@ -56,7 +60,7 @@ def instantiate_template(owner, template, ip_block_from, src_filters, temporary,
     t.owner = owner
     t.template = template
     t.enabled = True
-    t.public = False
+    t.public = public
     t.temporary = temporary
     t.save()
     alloc.topology = t
@@ -91,7 +95,7 @@ def instantiate_template(owner, template, ip_block_from, src_filters, temporary,
 
     return (None, t, alloc, tree)
 
-def allocate_ip_block(block_from, num_blocks_to_alloc, num_addrs_per_block, src_filters):
+def allocate_ip_block(block_from, num_blocks_to_alloc, num_addrs_per_block, src_filters, use_first_available):
     """Finds and allocates num_blocks_to_alloc block(s) each of size
     num_addrs_per_block.  A list of IPBlockAllocation records are returned.  The
     list will have the number of blocks which were able to be successfully
@@ -99,13 +103,13 @@ def allocate_ip_block(block_from, num_blocks_to_alloc, num_addrs_per_block, src_
     insufficient address space available to allocate that many blocks."""
     # round num_addrs_needed up to the closest power of 2
     min_block_mask_bits = 32 - int(math.ceil(math.log(num_addrs_per_block, 2)))
-    return __allocate_ip_block(block_from, num_blocks_to_alloc, min_block_mask_bits, src_filters)
+    return __allocate_ip_block(block_from, num_blocks_to_alloc, min_block_mask_bits, src_filters, use_first_available)
 
-def __allocate_ip_block(block_from, num_blocks_to_alloc, min_block_mask_bits, src_filters):
+def __allocate_ip_block(block_from, num_blocks_to_alloc, min_block_mask_bits, src_filters, use_first_available):
     # find the allocations we need to workaround to avoid collisions ("allocations of concern")
     db_allocs = db.IPBlockAllocation.objects.filter(block_from=block_from)
     allocations = [(__str_ip_to_int(a.start_addr), a.mask) for a in db_allocs]
-    ip_mask_list = [(__str_ip_to_int(sf.ip), sf.mask) for sf in src_filters]
+    ip_mask_list = [(__str_ip_to_int(sf_ip), sf_mask) for sf_ip, sf_mask in src_filters]
     aoc = filter(lambda alloc : __allocs_filter(alloc, ip_mask_list), allocations)
 
     # add fake start and end usages so we can allocate blocks on the edges too
@@ -140,9 +144,12 @@ def __allocate_ip_block(block_from, num_blocks_to_alloc, min_block_mask_bits, sr
         if num_addrs_avail >= num_addrs_needed:
             # if we're not too worried about fragmentation, then choose from
             # among the possible sub-blocks in this block
-            max_offset = num_addrs_avail / num_addrs_needed
-            offset = random.randint(1, max_offset)
-            aligned_aa = aligned_faa + (num_addrs_needed * offset)
+            if use_first_available:
+                aligned_aa = aligned_faa
+            else:
+                max_offset = num_addrs_avail / num_addrs_needed
+                offset = random.randint(0, max_offset-1)
+                aligned_aa = aligned_faa + (num_addrs_needed * offset)
 
             # create the allocation
             new_alloc = db.IPBlockAllocation()
