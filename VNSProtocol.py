@@ -276,9 +276,9 @@ class VNSOpenTemplate(LTMessage):
 
     def __set_src_filters(self, src_filters):
         if src_filters:
-            self.src_filters = VNSOpenTemplate.NO_SRC_FILTERS
-        else:
             self.src_filters = src_filters
+        else:
+            self.src_filters = VNSOpenTemplate.NO_SRC_FILTERS
 
     def pack(self):
         body = ''.join((inet_aton(ip) + struct.pack('>B', mask)) for ip,mask in self.src_filters)
