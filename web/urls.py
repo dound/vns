@@ -20,31 +20,16 @@ topologies_info = {
     'template_object_name': 'topos'
 }
 
-dict_topo_delete = {
-    'callee': topology_delete,
-    'owner_req': True
-}
-dict_topo_info = {
-    'callee': topology_info,
-}
-dict_topo_pua = {
-    'callee': topology_permitted_user_add,
-    'owner_req': True
-}
-dict_topo_pur = {
-    'callee': topology_permitted_user_remove,
-    'owner_req': True
-}
-dict_topo_readme = {
-    'callee': topology_readme
-}
-dict_topo_xml = {
-    'callee': topology_to_xml,
-}
-dict_topo_xml_clack = {
-    'callee': topology_to_xml,
-    'login_req': False    # TODO: temporary so Clack can access the xml
-}
+# dictionaries which specify access requirements for various topology views
+def make_topology_access_check_dict(callee, owner_req=False, pu_req=False, login_req=True):
+    return { 'callee':callee, 'login_req':login_req, 'owner_req':owner_req, 'pu_req':pu_req }
+dict_topo_delete    = make_topology_access_check_dict(topology_delete, True)
+dict_topo_info      = make_topology_access_check_dict(topology_info)
+dict_topo_pua       = make_topology_access_check_dict(topology_permitted_user_add, True)
+dict_topo_pur       = make_topology_access_check_dict(topology_permitted_user_remove, True)
+dict_topo_readme    = make_topology_access_check_dict(topology_readme)
+dict_topo_xml       = make_topology_access_check_dict(topology_to_xml)
+dict_topo_xml_clack = make_topology_access_check_dict(topology_to_xml, login_req=False) # TODO: temporary so Clack can access the xml
 
 urlpatterns = patterns('web.vnswww.views',
     (r'^admin/', include(admin.site.urls)),
