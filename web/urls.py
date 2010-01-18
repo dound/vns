@@ -29,4 +29,5 @@ urlpatterns = patterns('web.vnswww.views',
 )
 urlpatterns += patterns('',
     (r'^login/?$', 'django.contrib.auth.views.login', {'template_name': 'vns/login.html'}),
+    (r'^logout/?$', 'django.contrib.auth.views.logout', {'template_name': 'vns/logout.html'}),
 )
