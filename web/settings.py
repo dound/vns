@@ -1,4 +1,3 @@
-import django.contrib
 import os
 
 DEBUG = TEMPLATE_DEBUG = False
@@ -10,8 +9,12 @@ ADMINS = (
 MANAGERS = ADMINS
 PROJECT_PATH = os.path.abspath(os.path.dirname(__file__))
 
-DATABASE_ENGINE = 'sqlite3'
-DATABASE_NAME = os.path.join(PROJECT_PATH, 'vns.db')
+DATABASES = {
+    'default': {
+        'NAME': os.path.join(PROJECT_PATH, 'vns.db'),
+        'ENGINE': 'sqlite3',
+    }
+}
 
 TIME_ZONE = 'America/New_York'
 LANGUAGE_CODE = 'en-us'
@@ -34,6 +37,12 @@ MIDDLEWARE_CLASSES = (
     'django.middleware.common.CommonMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'django.contrib.messages.middleware.MessageMiddleware',
+)
+
+TEMPLATE_CONTEXT_PROCESSORS = (
+    'django.core.context_processors.auth',
+    'django.contrib.messages.context_processors.messages',
 )
 
 ROOT_URLCONF = 'web.urls'
@@ -46,9 +55,11 @@ INSTALLED_APPS = (
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
+    'django.contrib.messages',
     'django.contrib.sessions',
     'web.vnswww'
 )
 
 AUTH_PROFILE_MODULE = "vnswww.UserProfile"
 LOGIN_REDIRECT_URL = "topologies"
+MESSAGE_STORAGE = 'django.contrib.messages.storage.cookie.CookieStorage'

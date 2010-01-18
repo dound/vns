@@ -2,19 +2,14 @@ from socket import inet_ntoa
 import struct
 
 from django import forms
+from django.contrib import messages
 from django.core.exceptions import ValidationError
 from django.http import Http404, HttpResponse, HttpResponseRedirect
 from django.shortcuts import render_to_response
-from django.template import RequestContext
 
 import models as db
 from vns.Topology import Topology
 from vns.AddressAllocation import instantiate_template
-from vns.VNSProtocol import VNSOpenTemplate
-
-def render_to_response_with_msg(request, template_name, msg):
-    request.user.message_set.create(message=msg)
-    return render_to_response(template_name, context_instance=RequestContext(request))
 
 def make_ctform(user):
     user_org = user.get_profile().org
@@ -67,8 +62,10 @@ def create_topologies(request):
                                                     public=True,
                                                     use_first_available=True)
                 if err is not None:
-                    return render_to_response_with_msg(request, tn, "Successfully allocated %d '%s' topologies from %s.  Failed to make the other request topologies: %s." % (i, template.name, ipblock, err))
-            return render_to_response_with_msg(request, tn, "Successfully allocated %d '%s' topologies from %s." % (num_to_create, template.name, ipblock))
+                    messages.error(request, "Successfully allocated %d '%s' topologies from %s.  Failed to make the other request topologies: %s." % (i, template.name, ipblock, err))
+                    return render_to_response(tn)
+            messages.success(request, "Successfully allocated %d '%s' topologies from %s." % (num_to_create, template.name, ipblock))
+            return render_to_response(tn)
     else:
         form = CTForm()
 
