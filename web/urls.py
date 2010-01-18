@@ -20,11 +20,18 @@ topologies_info = {
     'template_object_name': 'topos'
 }
 
+topology_info = {
+    'queryset': db.Topology.objects.filter(enabled=True),
+    'template_name': 'vns/topology.html',
+    'template_object_name': 't'
+}
+
 urlpatterns = patterns('web.vnswww.views',
     (r'^admin/', include(admin.site.urls)),
     (r'^create_topologies/?$', create_topologies),
     (r'^summary/?$', list_detail.object_list, summary_info),
     (r'^topologies/?$', list_detail.object_list, topologies_info),
+    (r'^topology(?P<object_id>\d+)/?$', list_detail.object_detail, topology_info),
     (r'^topology(?P<tid>\d+)/delete$', 'topology_delete'),
     (r'^topology(?P<tid>\d+)/readme$', 'topology_readme'),
     (r'^topology(?P<tid>\d+)/xml$', 'topology_to_xml'),

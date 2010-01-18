@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% load custom_filters %}
+
+{% block title %}VNS Topology {{ t.id }}{% endblock %}
+
+{% block content %}
+    <h2>VNS Topology {{ t.id }}</h2>
+    <p><a href="/topology{{ t.id }}/readme">Topology README</a></p>
+
+    <table class="vert">
+        <tr>
+            <th>Owner</th>
+            <td>{{ t.owner.get_full_name }} ({{ t.owner.get_profile.org.name }})</td>
+        </tr><tr>
+            <th>Allowed Users</th>
+            <td>
+                {% for pu in t.get_permitted_users %}
+                    {{ pu.username }} ({{ pu.get_full_name }})
+                    {% if user.is_authenticated and user == t.owner %}
+                        - <a href="/topology{{ t.id }}/remove_permitted_user/{{ pu.username }}">remove</a>
+                    {% endif %}
+                    <br/>
+                {% empty %}
+                    Just the owner.
+                {% endfor %}
+            </td>
+        </tr><tr>
+            <th>Type</th>
+            <td>{{ t.template.name }}</td>
+        </tr><tr>
+            <th>IPs Allocated From</th>
+            <td>{{ t.get_where_ips_allocated.block_from }} ({{ t.get_where_ips_allocated.block_from.org.name }})</td>
+        </tr><tr>
+            <th>IPs Assigned</th>
+            <td>{{ t.get_where_ips_allocated.start_addr }}/{{ t.get_where_ips_allocated.mask }} ({{ t.get_where_ips_allocated.size }} addresses)</td>
+        {% if user.is_authenticated and user == t.owner %}
+        </tr><tr>
+            <th>Actions</th>
+            <td>
+                <a href="/topology{{ t.id }}/add_permitted_user/">Add permitted user</a><br/>
+                <a href="/topology{{ t.id }}/delete">Delete this topology</a>
+            </td>
+        {% endif %}
+        </tr>
+    </table>
+{% endblock %}

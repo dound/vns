@@ -362,6 +362,9 @@ class Topology(Model):
         except IPBlockAllocation.DoesNotExist:
             return 0
 
+    def get_permitted_users(self):
+        return [tuf.user for tuf in TopologyUserFilter.objects.filter(topology=self)]
+
     def __unicode__(self):
         str_enabled = '' if self.enabled else ' (disabled)'
         return u'Topology %d%s' % (self.id, str_enabled)

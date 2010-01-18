@@ -61,5 +61,6 @@ INSTALLED_APPS = (
 )
 
 AUTH_PROFILE_MODULE = "vnswww.UserProfile"
-LOGIN_REDIRECT_URL = "topologies"
+LOGIN_REDIRECT_URL = '/topologies/'
+LOGIN_URL = '/login/'
 MESSAGE_STORAGE = 'django.contrib.messages.storage.cookie.CookieStorage'

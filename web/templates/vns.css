@@ -14,6 +14,10 @@ th,td {
 th {
     background-color: #CCCCCC;
 }
+table.vert th {
+    text-align: right;
+    vertical-align: top;
+}
 #noborder table, #noborder th, #noborder td {
     border-width: 0 0 0 0;
 }
