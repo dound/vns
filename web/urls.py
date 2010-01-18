@@ -35,7 +35,7 @@ urlpatterns = patterns('web.vnswww.views',
     (r'^admin/', include(admin.site.urls)),
     (r'^summary/?$',                                    list_detail.object_list, summary_info),
 
-    (r'^topologies/?$',                                 list_detail.object_list, topologies_info),
+    (r'^topologies/?$',                                 limited_object_list, topologies_info),
     (r'^topology(?P<tid>\d+)/?$',                       topology_access_check, dict_topo_info),
     (r'^topology/create/?$',                            topology_create),
     (r'^topology(?P<tid>\d+)/allow_new_user/?$',        topology_access_check, dict_topo_pua),

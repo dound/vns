@@ -3,11 +3,17 @@ import struct
 
 from django import forms
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 from django.views.generic.simple import direct_to_template
 from django.http import HttpResponse, HttpResponseRedirect
+from django.views.generic import list_detail
 
 import models as db
 from vns.AddressAllocation import instantiate_template
+
+@login_required
+def limited_object_list(*args, **kwargs):
+    return list_detail.object_list(*args, **kwargs)
 
 def make_ctform(user):
     user_org = user.get_profile().org
