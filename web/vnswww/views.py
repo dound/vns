@@ -78,6 +78,20 @@ def invalid_topo_number_response(tid):
 </html>""" % tid
     return HttpResponse(body, mimetype='text/html')
 
+def topology_delete(request, tid):
+    tid = int(tid)
+    try:
+        topo = db.Topology.objects.get(pk=tid)
+        if topo.owner == request.user:
+            topo.delete()
+            messages.success(request, 'Topology %d has been deleted.' % tid)
+            return HttpResponseRedirect('/topologies/')
+        else:
+            messages.error(request, 'Topology %d is not yours to delete.' % tid)
+            return HttpResponseRedirect('/topologies/')
+    except db.Topology.DoesNotExist:
+        return invalid_topo_number_response(tid)
+
 def topology_readme(request, tid):
     tid = int(tid)
     try:

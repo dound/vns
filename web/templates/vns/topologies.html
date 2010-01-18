@@ -23,8 +23,13 @@
             <td>{{ t.template.name }}</td>
             <td>{{ t.id }}</td>
             <td>{{ t.get_where_ips_allocated.size }}</td>
-            <td>{{ t.get_where_ips_allocated.block_from }}</td>
-            <td><a href="/topology{{ t.id }}/readme">README</a></td>
+            <td>{{ t.get_where_ips_allocated.block_from }} ({{ t.get_where_ips_allocated.block_from.org.name }})</td>
+            <td>
+                <a href="/topology{{ t.id }}/readme">README</a>
+                {% if user.is_authenticated and user == t.owner %}
+                - <a href="/topology{{ t.id }}/delete">Delete</a>
+                {% endif %}
+            </td>
         </tr>
     {% empty %}
     <p>There are no topologies at this time.</p>

@@ -78,6 +78,9 @@ class UserProfile(Model):
         chars = string.ascii_letters + string.digits + string.punctuation
         self.set_sim_auth_key(''.join(random.choice(chars) for _ in range(UserProfile.SIM_KEY_SZ)))
 
+    def is_student(self):
+        return self.pos == 1
+
     def __unicode__(self):
         return u'%s' % self.user.__unicode__()
 
