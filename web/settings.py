@@ -51,3 +51,4 @@ INSTALLED_APPS = (
 )
 
 AUTH_PROFILE_MODULE = "vnswww.UserProfile"
+LOGIN_REDIRECT_URL = "topologies"

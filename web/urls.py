@@ -27,3 +27,6 @@ urlpatterns = patterns('web.vnswww.views',
     (r'^topology_readme=(?P<tid>\d+)$', 'topology_readme'),
     (r'^vns.css$', direct_to_template, {'mimetype':'text/css', 'template':'vns.css'}),
 )
+urlpatterns += patterns('',
+    (r'^login/?$', 'django.contrib.auth.views.login', {'template_name': 'vns/login.html'}),
+)
