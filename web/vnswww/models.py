@@ -341,6 +341,22 @@ class Topology(Model):
     public = BooleanField(help_text='Whether any user may connect to a node on this topology.')
     temporary = BooleanField(help_text='Whether this topology was only allocated temporarily.')
 
+    def get_readme(self):
+        """Returns the readme for this topology.  An error string will be returned
+        if this topology is not assigned any IPs."""
+        try:
+            sim = IPBlockAllocation.objects.get(topology=self).block_from.simulator
+            return self.template.render_readme(sim, self)
+        except IPBlockAllocation.DoesNotExist:
+            return 'The readme cannot be generated unless the topology is assigned IPs.'
+
+    def num_ips_allocated(self):
+        """Returns the size of the IP block allocated to this topology."""
+        try:
+            return IPBlockAllocation.objects.get(topology=self).size
+        except IPBlockAllocation.DoesNotExist:
+            return 0
+
     def __unicode__(self):
         str_enabled = '' if self.enabled else ' (disabled)'
         return u'Topology %d%s' % (self.id, str_enabled)

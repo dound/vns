@@ -17,5 +17,6 @@ urlpatterns = patterns('web.vnswww.views',
     (r'^admin/', include(admin.site.urls)),
     (r'^summary/?$', list_detail.object_list, summary_info),
     (r'^topology=(?P<tid>\d+)$', 'topology_to_xml'),
+    (r'^topology_readme=(?P<tid>\d+)$', 'topology_readme'),
     (r'^vns.css$', direct_to_template, {'mimetype':'text/css', 'template':'vns.css'}),
 )

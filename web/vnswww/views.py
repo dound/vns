@@ -13,6 +13,14 @@ def invalid_topo_number_response(tid):
 </html>""" % tid
     return HttpResponse(body, mimetype='text/html')
 
+def topology_readme(request, tid):
+    tid = int(tid)
+    try:
+        topo = Topology(tid, None, None, None, start_stats=False)
+        return HttpResponse(topo.get_readme(), mimetype='text/plain')
+    except db.Topology.DoesNotExist:
+        return invalid_topo_number_response(tid)
+
 def topology_to_xml(request, tid):
     tid = int(tid)
     try:
