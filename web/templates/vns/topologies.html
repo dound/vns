@@ -19,7 +19,7 @@
     {% for t in topos_list %}
         <tr>
             <td>{{ t.owner.userprofile.org.name }}</td>
-            <td>{{ t.owner.first_name }} {{ t.owner.last_name }}</td>
+            <td>{{ t.owner.get_full_name }}</td>
             <td>{{ t.template.name }}</td>
             <td>{{ t.id }}</td>
             <td>{{ t.num_ips_allocated }}</td>
