@@ -6,6 +6,13 @@ from django.http import Http404, HttpResponse
 import models as db
 from vns.Topology import Topology
 
+def invalid_topo_number_response(tid):
+    body = """<html>
+    <head><title>Topology not found</title></head>
+    <body>Error: topology %d does not exist.</body>
+</html>""" % tid
+    return HttpResponse(body, mimetype='text/html')
+
 def topology_to_xml(request, tid):
     tid = int(tid)
     try:
@@ -42,4 +49,4 @@ def topology_to_xml(request, tid):
         xml = '<topology id="%d">\n%s</topology>' % (topo.id, nodes_xml)
         return HttpResponse(xml, mimetype='text/xml')
     except db.Topology.DoesNotExist:
-        raise Http404()
+        return invalid_topo_number_response(tid)
