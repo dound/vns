@@ -1,10 +1,78 @@
 from socket import inet_ntoa
 import struct
 
-from django.http import Http404, HttpResponse
+from django import forms
+from django.core.exceptions import ValidationError
+from django.http import Http404, HttpResponse, HttpResponseRedirect
+from django.shortcuts import render_to_response
+from django.template import RequestContext
 
 import models as db
 from vns.Topology import Topology
+from vns.AddressAllocation import instantiate_template
+from vns.VNSProtocol import VNSOpenTemplate
+
+def render_to_response_with_msg(request, template_name, msg):
+    request.user.message_set.create(message=msg)
+    return render_to_response(template_name, context_instance=RequestContext(request))
+
+def make_ctform(user):
+    user_org = user.get_profile().org
+    parent_org = user_org.parentOrg
+    template_choices = [(t.id, t.name) for t in db.TopologyTemplate.objects.filter(visibility=2)]
+    ipblock_choices = [(t.id, str(t)) for t in db.IPBlock.objects.filter(org=user_org)] + \
+                      [(t.id, str(t)) for t in db.IPBlock.objects.filter(org=parent_org, usable_by_child_orgs=True)]
+    class CTForm(forms.Form):
+        template = forms.ChoiceField(label='Template', choices=template_choices)
+        ipblock = forms.ChoiceField(label='IP Block to Allocate From', choices=ipblock_choices)
+        num_to_create = forms.IntegerField(label='# to Create', initial='1')
+    return CTForm
+
+def create_topologies(request):
+    # make sure the user is logged in
+    if not request.user.is_authenticated():
+        return HttpResponseRedirect('/login/?next=/create_topologies/')
+
+    tn = 'vns/create_topologies.html'
+    CTForm = make_ctform(request.user)
+    if request.method == 'POST':
+        form = CTForm(request.POST)
+        if form.is_valid():
+            template_id = form.cleaned_data['template']
+            ipblock_id = form.cleaned_data['ipblock']
+            num_to_create = form.cleaned_data['num_to_create']
+
+            try:
+                template = db.TopologyTemplate.objects.get(pk=template_id)
+            except db.TopologyTemplate.DoesNotExist:
+                return render_to_response(tn, { 'form': form, 'more_error': 'invalid template' })
+
+            try:
+                ipblock = db.IPBlock.objects.get(pk=ipblock_id)
+            except db.IPBlock.DoesNotExist:
+                return render_to_response(tn, { 'form': form, 'more_error': 'invalid IP block' })
+
+            if num_to_create > 30:
+                return render_to_response(tn, { 'form': form, 'more_error': 'you cannot create >30 topologies at once' })
+
+            # TODO: should validate that request.user can use the requested
+            #       template and IP block
+
+            # try to create the topologies
+            src_filters = []
+            for i in range(num_to_create):
+                err, _, _, _ = instantiate_template(request.user, template, ipblock, src_filters,
+                                                    temporary=False,
+                                                    use_recent_alloc_logic=False,
+                                                    public=True,
+                                                    use_first_available=True)
+                if err is not None:
+                    return render_to_response_with_msg(request, tn, "Successfully allocated %d '%s' topologies from %s.  Failed to make the other request topologies: %s." % (i, template.name, ipblock, err))
+            return render_to_response_with_msg(request, tn, "Successfully allocated %d '%s' topologies from %s." % (num_to_create, template.name, ipblock))
+    else:
+        form = CTForm()
+
+    return render_to_response(tn, { 'form': form })
 
 def invalid_topo_number_response(tid):
     body = """<html>

@@ -4,6 +4,7 @@ from django.views.generic import list_detail
 from django.views.generic.simple import direct_to_template
 
 from vnswww import models as db
+from vnswww.views import create_topologies
 
 admin.autodiscover()
 
@@ -21,10 +22,12 @@ topologies_info = {
 
 urlpatterns = patterns('web.vnswww.views',
     (r'^admin/', include(admin.site.urls)),
+    (r'^create_topologies/?$', create_topologies),
     (r'^summary/?$', list_detail.object_list, summary_info),
     (r'^topologies/?$', list_detail.object_list, topologies_info),
-    (r'^topology=(?P<tid>\d+)$', 'topology_to_xml'),
-    (r'^topology_readme=(?P<tid>\d+)$', 'topology_readme'),
+    (r'^topology(?P<tid>\d+)/readme$', 'topology_readme'),
+    (r'^topology(?P<tid>\d+)/xml$', 'topology_to_xml'),
+    (r'^topology=(?P<tid>\d+)$', 'topology_to_xml'), # old URL for Clack
     (r'^vns.css$', direct_to_template, {'mimetype':'text/css', 'template':'vns.css'}),
 )
 urlpatterns += patterns('',
