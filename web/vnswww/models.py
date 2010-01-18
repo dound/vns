@@ -350,10 +350,10 @@ class Topology(Model):
         except IPBlockAllocation.DoesNotExist:
             return 'The readme cannot be generated unless the topology is assigned IPs.'
 
-    def num_ips_allocated(self):
-        """Returns the size of the IP block allocated to this topology."""
+    def get_where_ips_allocated(self):
+        """Returns the block from which the IPs for this topology were allocated."""
         try:
-            return IPBlockAllocation.objects.get(topology=self).size
+            return IPBlockAllocation.objects.get(topology=self)
         except IPBlockAllocation.DoesNotExist:
             return 0
 

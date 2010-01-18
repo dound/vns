@@ -13,17 +13,18 @@
             <th>ID</th>
             <th># IPs Used</th>
             <th>IPs Allocated From</th>
-            <th>README</th>
+            <th>More</th>
         </tr>
     {% endif %}
     {% for t in topos_list %}
         <tr>
-            <td>{{ t.owner.userprofile.org.name }}</td>
+            <td>{{ t.owner.get_profile.org.name }}</td>
             <td>{{ t.owner.get_full_name }}</td>
             <td>{{ t.template.name }}</td>
             <td>{{ t.id }}</td>
-            <td>{{ t.num_ips_allocated }}</td>
-            <td><a href="topology_readme={{ t.id }}">README</a></td>
+            <td>{{ t.get_where_ips_allocated.size }}</td>
+            <td>{{ t.get_where_ips_allocated.block_from }}</td>
+            <td><a href="/topology{{ t.id }}/readme">README</a></td>
         </tr>
     {% empty %}
     <p>There are no topologies at this time.</p>
