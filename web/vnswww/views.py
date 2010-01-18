@@ -16,7 +16,7 @@ def invalid_topo_number_response(tid):
 def topology_readme(request, tid):
     tid = int(tid)
     try:
-        topo = Topology(tid, None, None, None, start_stats=False)
+        topo = db.Topology.objects.get(pk=tid)
         return HttpResponse(topo.get_readme(), mimetype='text/plain')
     except db.Topology.DoesNotExist:
         return invalid_topo_number_response(tid)

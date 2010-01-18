@@ -122,24 +122,26 @@ class TopologyTemplate(Model):
             except IndexError:
                 return None # no ports in this topology
 
-    README_REGEXP = re.compile(r'[$]\S+')
+    README_REGEXP = re.compile(r'[$][a-zA-Z0-9.]+')
     def render_readme(self, sim, topo):
         # build the dictionary of all valid substitutions
         values = {}
         values['$topo.gatewayip'] = sim.gatewayIP
+        values['$topo.gatewayip15'] = ('%-15s' % sim.gatewayIP)
         values['$topo.id'] = topo.id
         for ipa in IPAssignment.objects.filter(port__node__template=self):
-            values['$%s.%s.ip' % (ipa.port.name, ipa.port.node.name)] = ipa.ip
+            values['$%s.%s.ip' % (ipa.port.node.name, ipa.port.name)] = ipa.ip
+            values['$%s.%s.ip15' % (ipa.port.node.name, ipa.port.name)] = ('%-15s' % ipa.ip)
 
         # define a function for substituting the appropriate value for an exp
         def repl(m):
             try:
-                return values[m.groups(0)]
+                return str(values[m.group(0)])
             except KeyError:
-                return m.groups(0) # no change
+                return m.group(0) # no change
 
         # render the readme with all substitutions
-        TopologyTemplate.README_REGEXP.sub(repl, self.readme)
+        return TopologyTemplate.README_REGEXP.sub(repl, self.readme)
 
     def __unicode__(self):
         return u'%s' % self.name
