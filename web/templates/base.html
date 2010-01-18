@@ -7,6 +7,13 @@
 </head>
 <body>
 {% block header %}{% endblock %}
+{% if messages %}
+<div id="messages"><ul>
+    {% for message in messages %}
+    <li>{{ message }}</li>
+    {% endfor %}
+</ul></div>
+{% endif %}
 {% block content %}{% endblock %}
 {% block footer %}{% endblock %}
 </body>
