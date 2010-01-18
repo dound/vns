@@ -129,7 +129,7 @@ class TopologyTemplate(Model):
         values['$topo.gatewayip'] = sim.gatewayIP
         values['$topo.gatewayip15'] = ('%-15s' % sim.gatewayIP)
         values['$topo.id'] = topo.id
-        for ipa in IPAssignment.objects.filter(port__node__template=self):
+        for ipa in IPAssignment.objects.filter(port__node__template=self, topology=topo):
             values['$%s.%s.ip' % (ipa.port.node.name, ipa.port.name)] = ipa.ip
             values['$%s.%s.ip15' % (ipa.port.node.name, ipa.port.name)] = ('%-15s' % ipa.ip)
 
