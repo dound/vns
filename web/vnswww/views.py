@@ -78,6 +78,59 @@ def invalid_topo_number_response(tid):
 </html>""" % tid
     return HttpResponse(body, mimetype='text/html')
 
+def make_apu_form(user, topo):
+    user_org = user.get_profile().org
+    existing_tufs = db.TopologyUserFilter.objects.filter(topology=topo)
+    user_choices = [(up.user.username,up.user.username) for up in db.UserProfile.objects.filter(org=user_org).exclude(user=user, user__in=existing_tufs)]
+
+    class APUForm(forms.Form):
+        usr = forms.ChoiceField(label='User', choices=user_choices)
+    return APUForm
+
+def topology_add_permitted_user(request, tid):
+    tid = int(tid)
+    try:
+        topo = db.Topology.objects.get(pk=tid)
+    except db.Topology.DoesNotExist:
+        messages.error(request, 'Topology %d does not exist.' % tid)
+        return HttpResponseRedirect('/topologies/')
+
+    # make sure the user is logged in
+    if not request.user.is_authenticated():
+        messages.warn(request, 'You must login before proceeding.')
+        return HttpResponseRedirect('/login/?next=/topology%d/add_permitted_user')
+
+    # make sure the user is the owner
+    if request.user != topo.owner:
+        messages.error(request, 'Only the owner (%s) can add permitted users.' % topo.owner.username)
+        return HttpResponseRedirect('/topology%d/' % tid)
+
+    tn = 'vns/topology_add_permitted_user.html'
+    APUForm = make_apu_form(request.user, topo)
+    if request.method == 'POST':
+        form = APUForm(request.POST)
+        if form.is_valid():
+            username = form.cleaned_data['usr']
+
+            try:
+                user = db.UserProfile.objects.get(user__username=username).user
+            except db.UserProfile.DoesNotExist:
+                return render_to_response(tn, {'form':form, 'more_error':'invalid username', 'tid':tid})
+
+            if topo.owner == user:
+                messages.error(request, 'This topology is already owned by %s.' % username)
+                return HttpResponseRedirect('/topology%d/' % tid)
+
+            tuf = db.TopologyUserFilter()
+            tuf.topology = topo
+            tuf.user = user
+            tuf.save()
+            messages.success(request, "%s (%s) has been added to the permitted users list." % (username, user.get_full_name()))
+            return HttpResponseRedirect('/topology%d/' % tid)
+    else:
+        form = APUForm()
+    return render_to_response(tn, {'form':form, 'tid':tid })
+
 def topology_delete(request, tid):
     tid = int(tid)
     try:

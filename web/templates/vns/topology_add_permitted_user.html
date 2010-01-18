@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% load custom_filters %}
+
+{% block title %}Add Permitted User to VNS Topology {{ tid }}{% endblock %}
+
+{% block content %}
+    <h2>Add Permitted User to VNS Topology {{ tid }}</h2>
+    {% if form %}
+        <form action="/topology{{ tid }}/add_permitted_user" method="post">
+        {{ form.as_p }}
+        <input type="submit" value="Add permitted user"/>
+        </form>
+    {% else %}
+        <a href="/topology{{ tid }}/">View topology {{ tid }}</a>
+    {% endif %}
+
+<p>Return to the <a href="/topology{{ tid }}/">Topology {{ tid }} detail page</a>.
+{% endblock %}

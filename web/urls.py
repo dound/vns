@@ -32,9 +32,10 @@ urlpatterns = patterns('web.vnswww.views',
     (r'^summary/?$', list_detail.object_list, summary_info),
     (r'^topologies/?$', list_detail.object_list, topologies_info),
     (r'^topology(?P<object_id>\d+)/?$', list_detail.object_detail, topology_info),
-    (r'^topology(?P<tid>\d+)/delete$', 'topology_delete'),
-    (r'^topology(?P<tid>\d+)/readme$', 'topology_readme'),
-    (r'^topology(?P<tid>\d+)/xml$', 'topology_to_xml'),
+    (r'^topology(?P<tid>\d+)/add_permitted_user/?$', 'topology_add_permitted_user'),
+    (r'^topology(?P<tid>\d+)/delete/?$', 'topology_delete'),
+    (r'^topology(?P<tid>\d+)/readme/?$', 'topology_readme'),
+    (r'^topology(?P<tid>\d+)/xml/?$', 'topology_to_xml'),
     (r'^topology=(?P<tid>\d+)$', 'topology_to_xml'), # old URL for Clack
     (r'^vns.css$', direct_to_template, {'mimetype':'text/css', 'template':'vns.css'}),
 )
