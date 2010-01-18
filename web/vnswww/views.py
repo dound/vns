@@ -144,7 +144,12 @@ def topology_permitted_user_add(request, tid, topo):
     return direct_to_template(request, tn, {'form':form, 'tid':tid })
 
 def topology_permitted_user_remove(request, tid, topo, un):
-    pass
+    try:
+        db.TopologyUserFilter.objects.get(topology=topo, user__username=un).delete()
+        messages.success(request, "%s is no longer a permitted user on this topology." % un)
+    except db.TopologyUserFilter.DoesNotExist:
+        messages.error(request, "%s isn't a permitted user on this topology anyway." % un)
+    return HttpResponseRedirect('/topology%d/' % tid)
 
 def topology_delete(request, tid, topo):
     topo.delete()
