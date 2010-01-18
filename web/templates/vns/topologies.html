@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% load custom_filters %}
+
+{% block title %}VNS Topologies{% endblock %}
+
+{% block content %}
+    <h2>Active Topologies</h2>
+    {% if topos_list %}
+    <table>
+        <tr>
+            <th colspan="2">Owner</th>
+            <th>Type</th>
+            <th>ID</th>
+            <th># IPs Used</th>
+            <th>IPs Allocated From</th>
+            <th>README</th>
+        </tr>
+    {% endif %}
+    {% for t in topos_list %}
+        <tr>
+            <td>{{ t.owner.userprofile.org.name }}</td>
+            <td>{{ t.owner.first_name }} {{ t.owner.last_name }}</td>
+            <td>{{ t.template.name }}</td>
+            <td>{{ t.id }}</td>
+            <td>{{ t.num_ips_allocated }}</td>
+            <td><a href="topology_readme={{ t.id }}">README</a></td>
+        </tr>
+    {% empty %}
+    <p>There are no topologies at this time.</p>
+    {% endfor %}
+    {% if topos_list %}
+    </table>
+    {% endif %}
+{% endblock %}
