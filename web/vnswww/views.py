@@ -69,7 +69,7 @@ def topology_create(request):
 
     return direct_to_template(request, tn, { 'form': form })
 
-def topology_access_check(request, tid, callee, login_req=True, owner_req=False, pu_req=False):
+def topology_access_check(request, tid, callee, login_req, owner_req, pu_req, **kwargs):
     """This wrapper function checks to make sure that a topology exists.  It
     also verifies the user is logged in, is the owner, or is a permitted user
     as dictated by the boolean arguments *_req.  If these tests pass, callee is
@@ -99,15 +99,18 @@ def topology_access_check(request, tid, callee, login_req=True, owner_req=False,
             messages.error(request, 'Only the owner (%s) or permitted users can do this.' % topo.owner.username)
             return HttpResponseRedirect('/topology%d/' % tid)
 
-    return callee(request, tid, topo)
+    kwargs['request'] = request
+    kwargs['tid'] = tid
+    kwargs['topo'] = topo
+    return callee(**kwargs)
 
 def topology_info(request, tid, topo):
     return direct_to_template(request, 'vns/topology.html', {'t':topo, 'tid':tid})
 
 def make_apu_form(user, topo):
     user_org = user.get_profile().org
-    existing_tufs = db.TopologyUserFilter.objects.filter(topology=topo)
-    user_choices = [(up.user.username,up.user.username) for up in db.UserProfile.objects.filter(org=user_org).exclude(user=user).exclude(user__in=existing_tufs)]
+    existing_tuf_users = [tuf.user for tuf in db.TopologyUserFilter.objects.filter(topology=topo)]
+    user_choices = [(up.user.username,up.user.username) for up in db.UserProfile.objects.filter(org=user_org).exclude(user=user).exclude(user__in=existing_tuf_users)]
 
     class APUForm(forms.Form):
         usr = forms.ChoiceField(label='User', choices=user_choices)
@@ -140,7 +143,7 @@ def topology_permitted_user_add(request, tid, topo):
         form = APUForm()
     return direct_to_template(request, tn, {'form':form, 'tid':tid })
 
-def topology_permitted_user_remove(request, tid, topo):
+def topology_permitted_user_remove(request, tid, topo, un):
     pass
 
 def topology_delete(request, tid, topo):

@@ -6,7 +6,7 @@
 {% block content %}
     <h2>Add Permitted User to VNS Topology {{ tid }}</h2>
     {% if form %}
-        <form action="/topology{{ tid }}/add_permitted_user" method="post">
+        <form action="/topology{{ tid }}/allow_new_user" method="post">
         {{ form.as_p }}
         <input type="submit" value="Add permitted user"/>
         </form>

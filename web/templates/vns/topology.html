@@ -17,7 +17,7 @@
                 {% for pu in t.get_permitted_users %}
                     {{ pu.username }} ({{ pu.get_full_name }})
                     {% if user.is_authenticated and user == t.owner %}
-                        - <a href="/topology{{ t.id }}/remove_permitted_user/{{ pu.username }}">remove</a>
+                        - <a href="/topology{{ t.id }}/disallow_user/{{ pu.username }}">remove</a>
                     {% endif %}
                     <br/>
                 {% empty %}
@@ -37,7 +37,7 @@
         </tr><tr>
             <th>Actions</th>
             <td>
-                <a href="/topology{{ t.id }}/add_permitted_user/">Add permitted user</a><br/>
+                <a href="/topology{{ t.id }}/allow_new_user/">Add permitted user</a><br/>
                 <a href="/topology{{ t.id }}/delete">Delete this topology</a>
             </td>
         {% endif %}
