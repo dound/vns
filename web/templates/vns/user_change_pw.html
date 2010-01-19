@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% load custom_filters %}
+
+{% block title %}Change Password{% endblock %}
+
+{% block content %}
+    <h2>Change Password</h2>
+    {% if form %}
+        <form action="/user/change_password/" method="post">
+        <table>
+        {{ form.as_table }}
+        <tr><td colspan="2" style="text-align:center"><input type="submit" value="Change password" /></td></tr>
+        </table>
+        </form>
+    {% endif %}
+{% endblock %}

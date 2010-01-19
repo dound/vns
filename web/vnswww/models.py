@@ -78,6 +78,12 @@ class UserProfile(Model):
         chars = string.ascii_letters + string.digits + string.punctuation
         self.set_sim_auth_key(''.join(random.choice(chars) for _ in range(UserProfile.SIM_KEY_SZ)))
 
+    def get_position_str(self):
+        for pos_id, pos_name in UserProfile.POSITION_CHOICES:
+            if pos_id == self.pos:
+                return pos_name
+        return 'Unknown'
+
     def is_staff(self):
         return self.pos != 1
 

@@ -1,5 +1,6 @@
 from django import forms
 from django.contrib import messages
+from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
 from django.views.generic.simple import direct_to_template
 from django.http import HttpResponseRedirect
@@ -59,7 +60,7 @@ class RegistrationForm(forms.Form):
     first_name = forms.CharField(label='First Name', max_length=30)
     last_name  = forms.CharField(label='Last Name', max_length=30)
     email      = forms.CharField(label='E-mail Address', max_length=75)
-    pw         = forms.CharField('Password', widget=forms.PasswordInput(render_value=False))
+    pw         = forms.CharField(label='Password', min_length=6, widget=forms.PasswordInput(render_value=False))
     pos        = forms.ChoiceField(label='Position', choices=[(1, u'Student'), (4, u'TA')])
 
 def user_create(request):
@@ -87,8 +88,43 @@ def user_create(request):
             up.save()
 
             messages.success(request, "Successfully created new user: %s" % username)
-            return direct_to_template(request, tn)
+            return HttpResponseRedirect('/user/%s/' % username)
     else:
         form = RegistrationForm()
+    return direct_to_template(request, tn, { 'form': form })
+
+class ChangePasswordForm(forms.Form):
+    old_pw   = forms.CharField(label='Current Password', widget=forms.PasswordInput(render_value=False))
+    new_pw1  = forms.CharField(label='New Password', min_length=6, widget=forms.PasswordInput(render_value=False))
+    new_pw2  = forms.CharField(label='New Password (again)', widget=forms.PasswordInput(render_value=False))
+
+def user_change_pw(request):
+    tn = 'vns/user_change_pw.html'
+    if request.method == 'POST':
+        form = ChangePasswordForm(request.POST)
+        if form.is_valid():
+            old_pw = form.cleaned_data['old_pw']
+            new_pw1 = form.cleaned_data['new_pw1']
+            new_pw2 = form.cleaned_data['new_pw2']
+
+            if new_pw1 != new_pw2:
+                messages.error(request, "Try again: the two versions of your new password do not match.")
+                return direct_to_template(request, tn, { 'form': form })
+
+            if not authenticate(username=request.user.username, password=old_pw):
+                messages.error(request, "Incorrect current password.")
+                return direct_to_template(request, tn, { 'form': form })
+
+            request.user.set_password(new_pw1)
+            request.user.save()
+
+            messages.success(request, "You have successfully updated your password.")
+            return HttpResponseRedirect('/user/%s/' % request.user.username)
+    else:
+        form = ChangePasswordForm()
 
     return direct_to_template(request, tn, { 'form': form })
+
+def user_profile(request, up):
+    tn = 'vns/user_profile.html'
+    return direct_to_template(request, tn, {'up':up})

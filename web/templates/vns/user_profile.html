@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% load custom_filters %}
+
+{% block title %}User Profile: {{ up.user.username }}{% endblock %}
+
+{% block content %}
+    <h2>{{ up.user.username }}</h2>
+
+    <table class="vert">
+        <tr>
+            <th>Name</th>
+            <td>{{ up.user.get_full_name }}</td>
+        </tr><tr>
+            <th>Organization</th>
+            <td>{{ up.org.name }}</td>
+        </tr><tr>
+            <th>Position</th>
+            <td>{{ up.get_position_str }}</td>
+        </tr><tr>
+            <th>E-mail Address</th>
+            <td>{{ up.user.email }}</td>
+        {% if user.is_authenticated and user == up.user %}
+        </tr><tr>
+            <th>Simulation Auth Key</th>
+            <td>{{ up.get_sim_auth_key }}</td>
+        {% endif %}
+        </tr>
+    </table>
+
+    {% if user.is_authenticated and user == up.user %}
+        <p><a href="/user/change_password/">Change Your Password</a></p>
+    {% endif %}
+{% endblock %}
