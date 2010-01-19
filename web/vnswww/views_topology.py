@@ -3,17 +3,11 @@ import struct
 
 from django import forms
 from django.contrib import messages
-from django.contrib.auth.decorators import login_required
 from django.views.generic.simple import direct_to_template
 from django.http import HttpResponse, HttpResponseRedirect
-from django.views.generic import list_detail
 
 import models as db
 from vns.AddressAllocation import instantiate_template
-
-@login_required
-def limited_object_list(*args, **kwargs):
-    return list_detail.object_list(*args, **kwargs)
 
 def make_ctform(user):
     user_org = user.get_profile().org
@@ -30,9 +24,9 @@ def make_ctform(user):
 def topology_create(request):
     # make sure the user is logged in
     if not request.user.is_authenticated():
-        return HttpResponseRedirect('/login/?next=/create_topologies/')
+        return HttpResponseRedirect('/login/?next=/topology/create/')
 
-    tn = 'vns/create_topologies.html'
+    tn = 'vns/topology_create.html'
     CTForm = make_ctform(request.user)
     if request.method == 'POST':
         form = CTForm(request.POST)

@@ -1,10 +1,12 @@
 from django.conf.urls.defaults import *
 from django.contrib import admin
+from django.contrib.auth.decorators import login_required
 from django.views.generic import list_detail
 from django.views.generic.simple import direct_to_template
 
 from vnswww import models as db
-from vnswww.views import *
+from vnswww.views import homepage
+from vnswww.views_topology import *
 
 admin.autodiscover()
 
@@ -31,9 +33,15 @@ dict_topo_readme    = make_topology_access_check_dict(topology_readme)
 dict_topo_xml       = make_topology_access_check_dict(topology_to_xml)
 dict_topo_xml_clack = make_topology_access_check_dict(topology_to_xml, login_req=False) # TODO: temporary so Clack can access the xml
 
+@login_required
+def limited_object_list(*args, **kwargs):
+    return list_detail.object_list(*args, **kwargs)
+
 urlpatterns = patterns('web.vnswww.views',
     (r'^admin/', include(admin.site.urls)),
+    (r'^(home|index([.]...?.?.?)?)?/?$',                homepage),
     (r'^summary/?$',                                    list_detail.object_list, summary_info),
+    (r'^vns.css$',                                      direct_to_template, {'mimetype':'text/css', 'template':'vns.css'}),
 
     (r'^topologies/?$',                                 limited_object_list, topologies_info),
     (r'^topology(?P<tid>\d+)/?$',                       topology_access_check, dict_topo_info),
@@ -45,7 +53,6 @@ urlpatterns = patterns('web.vnswww.views',
     (r'^topology(?P<tid>\d+)/xml/?$',                   topology_access_check, dict_topo_xml),
     (r'^topology=(?P<tid>\d+)$',                        topology_access_check, dict_topo_xml_clack), # old URL for Clack
 
-    (r'^vns.css$', direct_to_template, {'mimetype':'text/css', 'template':'vns.css'}),
 )
 urlpatterns += patterns('',
     (r'^login/?$', 'django.contrib.auth.views.login', {'template_name': 'vns/login.html'}),
