@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% load custom_filters %}
+
+{% block title %}Create User{% endblock %}
+
+{% block content %}
+    <h2>Create User</h2>
+    {% if form %}
+        <form action="/user/create/" method="post">
+        <table>
+        {{ form.as_table }}
+        <tr><td colspan="2" style="text-align:center"><input type="submit" value="Create user" /></td></tr>
+        </table>
+        </form>
+    {% else %}
+        <a href="/organization/{{ user.org.name }}">View your organization's people</a>
+    {% endif %}
+{% endblock %}

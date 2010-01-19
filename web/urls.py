@@ -7,6 +7,7 @@ from django.views.generic.simple import direct_to_template
 from vnswww import models as db
 from vnswww.views import homepage
 from vnswww.views_topology import *
+from vnswww.views_user import *
 
 admin.autodiscover()
 
@@ -33,6 +34,11 @@ dict_topo_readme    = make_topology_access_check_dict(topology_readme)
 dict_topo_xml       = make_topology_access_check_dict(topology_to_xml)
 dict_topo_xml_clack = make_topology_access_check_dict(topology_to_xml, login_req=False) # TODO: temporary so Clack can access the xml
 
+# dictionaries which specify access requirements for various user/org views
+def make_user_access_check_dict(callee, requester_is_staff_req=False, requester_in_same_org_req=False, self_req=False):
+    return { 'callee':callee, 'requester_is_staff_req':requester_is_staff_req, 'requester_in_same_org_req':requester_in_same_org_req, 'self_req':self_req }
+dict_user_create = make_user_access_check_dict(user_create, True)
+
 @login_required
 def limited_object_list(*args, **kwargs):
     return list_detail.object_list(*args, **kwargs)
@@ -43,6 +49,7 @@ urlpatterns = patterns('web.vnswww.views',
     (r'^summary/?$',                                    list_detail.object_list, summary_info),
     (r'^vns.css$',                                      direct_to_template, {'mimetype':'text/css', 'template':'vns.css'}),
 
+    # topology URLs
     (r'^topologies/?$',                                 limited_object_list, topologies_info),
     (r'^topology(?P<tid>\d+)/?$',                       topology_access_check, dict_topo_info),
     (r'^topology/create/?$',                            topology_create),
@@ -53,6 +60,8 @@ urlpatterns = patterns('web.vnswww.views',
     (r'^topology(?P<tid>\d+)/xml/?$',                   topology_access_check, dict_topo_xml),
     (r'^topology=(?P<tid>\d+)$',                        topology_access_check, dict_topo_xml_clack), # old URL for Clack
 
+    # user / organization URLs
+    (r'^user/create/?$',                                user_access_check, dict_user_create)
 )
 urlpatterns += patterns('',
     (r'^login/?$', 'django.contrib.auth.views.login', {'template_name': 'vns/login.html'}),
