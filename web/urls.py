@@ -59,7 +59,7 @@ def limited_object_list(*args, **kwargs):
 
 urlpatterns = patterns('web.vnswww.views',
     (r'^admin/', include(admin.site.urls)),
-    (r'^/$',                                            homepage),
+    (r'^$',                                             homepage),
     (r'^summary/?$',                                    list_detail.object_list, summary_info),
     (r'^vns.css$',                                      direct_to_template, {'mimetype':'text/css', 'template':'vns.css'}),
 
