@@ -13,10 +13,12 @@ def user_access_check(request, callee, requester_is_staff_req, requester_in_same
     requester_is_staff_req requires that the request.user be a staff member.
     requester_in_same_org_req requires that the requester be in the same
     organization as the user specified by kwargs['un'].
-    self_req requires that the requester match the user specified with kwargs.
+    self_req requires that the requester match the user specified with kwargs or
+    be on staff in the user's organization.
     If these tests pass, callee is called with (request, **kwargs)."""
     # make sure the user is logged in
-    if not request.user.is_authenticated():
+    requester = request.user
+    if not requester.is_authenticated():
         messages.warn(request, 'You must login before proceeding.')
         return HttpResponseRedirect('/login/?next=%s' % request.path)
 
@@ -46,23 +48,27 @@ def user_access_check(request, callee, requester_is_staff_req, requester_in_same
         pass
 
     # make sure the requester is the boss of their own organization if required
-    if requester_is_staff_req and not request.user.get_profile().is_staff():
+    if requester_is_staff_req and not requester.get_profile().is_staff():
             messages.error(request, "Only staff members may do that.")
             return HttpResponseRedirect('/')
 
+    # make sure we have up if it is needed
+    if (requester_in_same_org_req or self_req) and not up:
+        messages.error(request, "No user was specified (internal error?).")
+        return HttpResponseRedirect('/')
+
     # make sure the requester is in the same organization as the user in question if required
     if requester_in_same_org_req:
-        if not up:
-            messages.error(request, "No user was specified (internal error?).")
-            return HttpResponseRedirect('/')
-        elif not request.user.is_superuser() and not request.user.org==up.org:
-            messages.error(request, "Only staff in %s may do that." % up.org.name)
+        if not requester.is_superuser and not requester.org==up.org:
+            grp_txt = 'staff' if requester_is_staff_req else 'users'
+            messages.error(request, "Only %s in %s may do that." % (grp_txt, up.org.name))
             return HttpResponseRedirect('/')
 
     # make sure the requester is up him/herself if required
     if self_req and request.user != up.user:
-        messages.error(request, 'Only %s may do that.' % un)
-        return HttpResponseRedirect('/')
+        if not requester.is_superuser and not requester.get_profile().is_staff() and not requester.org==up.org:
+            messages.error(request, 'Only %s or staff in his/her organization may do that.' % un)
+            return HttpResponseRedirect('/')
 
     kwargs['request'] = request
     return callee(**kwargs)
