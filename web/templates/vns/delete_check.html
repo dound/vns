@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% load custom_filters %}
+
+{% block title %}Delete {{ kind }}{% endblock %}
+
+{% block content %}
+    <h2>Delete {{ kind }}</h2>
+    Are you sure you want delete {{ what }}?
+    <form action="" method="post">
+        <input type="submit" value="Delete {{ kind }}"/>
+    </form>
+{% endblock %}

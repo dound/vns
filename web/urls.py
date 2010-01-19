@@ -5,7 +5,7 @@ from django.views.generic import list_detail
 from django.views.generic.simple import direct_to_template
 
 from vnswww import models as db
-from vnswww.views import homepage
+from vnswww.views import checked_delete, homepage
 from vnswww.views_topology import *
 from vnswww.views_user import *
 
@@ -40,8 +40,13 @@ def make_user_access_check_dict(callee, requester_is_staff_req=False, requester_
 dict_user_org       = make_user_access_check_dict(user_org)
 dict_user_create    = make_user_access_check_dict(user_create, True)
 dict_user_change_pw = make_user_access_check_dict(user_change_pw, self_req=True)
-dict_user_delete    = make_user_access_check_dict(user_delete, True, True)
+dict_user_delete    = make_user_access_check_dict(checked_delete, True, True)
+dict_user_delete['delete_hook'] = user_delete
+dict_user_delete['kind'] = 'User'
+dict_user_delete['var_un'] = 'what'
+dict_user_delete['del_un'] = False
 dict_user_profile   = make_user_access_check_dict(user_profile)
+
 
 @login_required
 def limited_object_list(*args, **kwargs):
@@ -68,7 +73,7 @@ urlpatterns = patterns('web.vnswww.views',
     (r'^org/(?P<on>[^/]+)/?$',                          user_access_check, dict_user_org),
     (r'^user/create/?$',                                user_access_check, dict_user_create),
     (r'^user/change_password/?$',                       user_access_check, dict_user_change_pw),
-    (r'^user/(?P<un>\w+)/delete/?$',                    user_access_check, dict_user_delete),
+    (r'^user/(?P<what>\w+)/delete/?$',                  user_access_check, dict_user_delete),
     (r'^user/(?P<un>\w+)/?$',                           user_access_check, dict_user_profile),
 )
 urlpatterns += patterns('',

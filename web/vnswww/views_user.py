@@ -7,7 +7,8 @@ from django.http import HttpResponseRedirect
 
 import models as db
 
-def user_access_check(request, callee, requester_is_staff_req, requester_in_same_org_req, self_req, **kwargs):
+def user_access_check(request, callee, requester_is_staff_req, requester_in_same_org_req, self_req,
+                      var_un='un', del_un=True, **kwargs):
     """This wrapper function checks to make sure that a user exists if 'un' is
     one of the kwargs keys.  It also verifies the requester is logged in, etc.
     requester_is_staff_req requires that the request.user be a staff member.
@@ -24,11 +25,12 @@ def user_access_check(request, callee, requester_is_staff_req, requester_in_same
 
     up = None
     try:
-        un = kwargs['un']
+        un = kwargs[var_un]
         try:
             up = db.UserProfile.objects.get(user__username=un)
             kwargs['up'] = up
-            del kwargs['un']
+            if del_un:
+                del kwargs[var_un]
         except db.UserProfile.DoesNotExist:
             messages.error(request, "There is no user '%s'." % un)
             return HttpResponseRedirect('/')
@@ -149,7 +151,7 @@ def user_change_pw(request):
 
     return direct_to_template(request, tn, { 'form': form })
 
-def user_delete(request, up):
+def user_delete(request, up, **kwargs):
     user = up.user
     un = user.username
     on = up.org.name
