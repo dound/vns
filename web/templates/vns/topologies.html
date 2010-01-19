@@ -18,8 +18,8 @@
     {% endif %}
     {% for t in topos_list %}
         <tr>
-            <td>{{ t.owner.get_profile.org.name }}</td>
-            <td>{{ t.owner.get_full_name }}</td>
+            <td>{{ t.owner.get_profile.org|orglink }}</td>
+            <td>{{ t.owner|fnamelink }}</td>
             <td>{{ t.template.name }}</td>
             <td>{{ t.id }}</td>
             <td>{{ t.get_where_ips_allocated.size }}</td>

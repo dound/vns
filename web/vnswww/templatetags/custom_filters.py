@@ -23,7 +23,9 @@ def durationf_ifnonzero(num_secs, format='%s'):
         return format % durationf(num_secs)
 
 @register.filter(name='orglink')
-def orglink(value):
-    return mark_safe('<a href="/org/%s">%s</a>' % (value, value))
-orglink.is_safe = True
-register.filter('orglink', orglink)
+def orglink(org):
+    return mark_safe('<a href="/org/%s/">%s</a>' % (org.name, org.name))
+
+@register.filter(name='fnamelink')
+def fnamelink(user):
+    return mark_safe('<a href="/user/%s/">%s</a>' % (user.username, user.get_full_name()))

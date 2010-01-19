@@ -48,7 +48,7 @@ def limited_object_list(*args, **kwargs):
 
 urlpatterns = patterns('web.vnswww.views',
     (r'^admin/', include(admin.site.urls)),
-    (r'^(home|index([.]...?.?.?)?)?/?$',                homepage),
+    (r'^/$',                                            homepage),
     (r'^summary/?$',                                    list_detail.object_list, summary_info),
     (r'^vns.css$',                                      direct_to_template, {'mimetype':'text/css', 'template':'vns.css'}),
 
@@ -64,7 +64,7 @@ urlpatterns = patterns('web.vnswww.views',
     (r'^topology=(?P<tid>\d+)$',                        topology_access_check, dict_topo_xml_clack), # old URL for Clack
 
     # user / organization URLs
-    (r'^org/(?P<on>.+)/?$',                             user_access_check, dict_user_org),
+    (r'^org/(?P<on>[^/]+)/?$',                             user_access_check, dict_user_org),
     (r'^user/create/?$',                                user_access_check, dict_user_create),
     (r'^user/change_password/?$',                       user_access_check, dict_user_change_pw),
     (r'^user/(?P<un>\w+)/?$',                           user_access_check, dict_user_profile),
