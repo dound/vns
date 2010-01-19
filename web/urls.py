@@ -23,6 +23,12 @@ topologies_info = {
     'template_object_name': 'topos'
 }
 
+organizations_info = {
+    'queryset': db.Organization.objects.exclude(name='Public').order_by('name'),
+    'template_name': 'vns/organizations.html',
+    'template_object_name': 'orgs'
+}
+
 # dictionaries which specify access requirements for various topology views
 def make_topology_access_check_dict(callee, owner_req=False, pu_req=False, login_req=True):
     return { 'callee':callee, 'login_req':login_req, 'owner_req':owner_req, 'pu_req':pu_req }
@@ -52,7 +58,6 @@ dict_user_delete['var_un'] = 'what'
 dict_user_delete['del_un'] = False
 dict_user_profile   = make_user_access_check_dict(user_profile)
 
-
 @login_required
 def limited_object_list(*args, **kwargs):
     return list_detail.object_list(*args, **kwargs)
@@ -77,6 +82,7 @@ urlpatterns = patterns('web.vnswww.views',
     (r'^topology=(?P<tid>\d+)$',                        topology_access_check, dict_topo_xml_clack), # old URL for Clack
 
     # user / organization URLs
+    (r'^organizations/?$',                              list_detail.object_list, organizations_info),
     (r'^org/(?P<on>[^/]+)/?$',                          user_access_check, dict_user_org),
     (r'^user/create/?$',                                user_access_check, dict_user_create),
     (r'^user/change_password/?$',                       user_access_check, dict_user_change_pw),

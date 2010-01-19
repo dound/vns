@@ -41,6 +41,12 @@ class Organization(Model):
                       help_text='User with complete control of this organization.')
     admins = ManyToManyField(User, null=True, blank=True)
 
+    def get_num_students(self):
+        return len(User.objects.filter(userprofile__org=self))
+
+    def get_num_topologies(self):
+        return len(Topology.objects.filter(owner__userprofile__org=self))
+
     def __unicode__(self):
         return u'%s' % self.name
 

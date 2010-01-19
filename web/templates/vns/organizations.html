@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% load custom_filters %}
+
+{% block title %}Organizations{% endblock %}
+
+{% block content %}
+    <h2>Active Organizations</h2>
+    {% if orgs_list %}
+    <table>
+        <tr>
+            <th>Name</th>
+            <th># Students</th>
+            <th># of Topologies</th>
+        </tr>
+    {% endif %}
+    {% for org in orgs_list %}
+        <tr>
+            <td>{{ org|orglink }}</td>
+            <td>{{ org.get_num_students }}</td>
+            <td>{{ org.get_num_topologies }}</td>
+        </tr>
+    {% empty %}
+    <p>There are no organizations at this time.</p>
+    {% endfor %}
+    {% if orgs_list %}
+    </table>
+    {% endif %}
+{% endblock %}
