@@ -1,4 +1,5 @@
 from django import template
+from django.utils.safestring import mark_safe
 register = template.Library()
 
 @register.filter(name='durationf')
@@ -20,3 +21,9 @@ def durationf_ifnonzero(num_secs, format='%s'):
         return ''
     else:
         return format % durationf(num_secs)
+
+@register.filter(name='orglink')
+def orglink(value):
+    return mark_safe('<a href="/org/%s">%s</a>' % (value, value))
+orglink.is_safe = True
+register.filter('orglink', orglink)

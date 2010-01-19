@@ -37,6 +37,7 @@ dict_topo_xml_clack = make_topology_access_check_dict(topology_to_xml, login_req
 # dictionaries which specify access requirements for various user/org views
 def make_user_access_check_dict(callee, requester_is_staff_req=False, requester_in_same_org_req=False, self_req=False):
     return { 'callee':callee, 'requester_is_staff_req':requester_is_staff_req, 'requester_in_same_org_req':requester_in_same_org_req, 'self_req':self_req }
+dict_user_org       = make_user_access_check_dict(user_org)
 dict_user_create    = make_user_access_check_dict(user_create, True)
 dict_user_change_pw = make_user_access_check_dict(user_change_pw)
 dict_user_profile   = make_user_access_check_dict(user_profile)
@@ -63,6 +64,7 @@ urlpatterns = patterns('web.vnswww.views',
     (r'^topology=(?P<tid>\d+)$',                        topology_access_check, dict_topo_xml_clack), # old URL for Clack
 
     # user / organization URLs
+    (r'^org/(?P<on>.+)/?$',                             user_access_check, dict_user_org),
     (r'^user/create/?$',                                user_access_check, dict_user_create),
     (r'^user/change_password/?$',                       user_access_check, dict_user_change_pw),
     (r'^user/(?P<un>\w+)/?$',                           user_access_check, dict_user_profile),

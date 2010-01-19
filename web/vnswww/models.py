@@ -62,6 +62,14 @@ class UserProfile(Model):
                         help_text="The ASCII string (system-generated) "+
                                   "which the user uses to authenticate with the simulator.")
 
+    @staticmethod
+    def cmp_pos_order(a, b):
+        """Sorts by position in this order: Admin, Instructor, TA, Student."""
+        if a.pos == b.pos: return cmp(a.user.last_name, b.user.last_name)
+        if a.pos == 1: return 1  # students last
+        if b.pos == 1: return -1
+        return a.pos - b.pos # otherwise pos is defined in "sort" order
+
     def get_sim_auth_key_bytes(self):
         """Returns a byte-string representation of the simulator auth key."""
         return ''.join(struct.pack('>B', ord(c)) for c in self.sim_key)

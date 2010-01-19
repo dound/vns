@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% load custom_filters %}
+
+{% block title %}{{ org.name }}{% endblock %}
+
+{% block content %}
+    <h2>{{ org.name }} Roster ({{ users|length }})</h2>
+    {% if users %}
+    <table>
+        <tr>
+            <th>Position</th>
+            <th>Username</th>
+            <th>Name</th>
+            <th>E-mail</th>
+        </tr>
+    {% endif %}
+    {% for u in users %}
+        <tr>
+            <td>{{ u.get_position_str }}</td>
+            <td><a href="/user/{{ u.user.username }}">{{ u.user.username }}</a></td>
+            <td>{{ u.user.get_full_name }}</td>
+            <td>{{ u.user.email }}</td>
+        </tr>
+    {% empty %}
+    <p>There are no users in this organization.</p>
+    {% endfor %}
+    {% if users %}
+    </table>
+    {% endif %}
+{% endblock %}

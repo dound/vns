@@ -33,6 +33,18 @@ def user_access_check(request, callee, requester_is_staff_req, requester_in_same
     except KeyError:
         pass
 
+    try:
+        on = kwargs['on']
+        try:
+            org = db.Organization.objects.get(name=on)
+            kwargs['org'] = org
+            del kwargs['on']
+        except db.Organization.DoesNotExist:
+            messages.error(request, "There is no organization '%s'." % on)
+            return HttpResponseRedirect('/')
+    except KeyError:
+        pass
+
     # make sure the requester is the boss of their own organization if required
     if requester_is_staff_req and not request.user.get_profile().is_staff():
             messages.error(request, "Only staff members may do that.")
@@ -54,6 +66,12 @@ def user_access_check(request, callee, requester_is_staff_req, requester_in_same
 
     kwargs['request'] = request
     return callee(**kwargs)
+
+def user_org(request, org):
+    tn = 'vns/user_org.html'
+    users = [u for u in db.UserProfile.objects.filter(org=org)]
+    users.sort(db.UserProfile.cmp_pos_order)
+    return direct_to_template(request, tn, {'org':org, 'users':users})
 
 class RegistrationForm(forms.Form):
     username   = forms.CharField(label='Username', max_length=30)

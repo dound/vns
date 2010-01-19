@@ -12,7 +12,7 @@
             <td>{{ up.user.get_full_name }}</td>
         </tr><tr>
             <th>Organization</th>
-            <td>{{ up.org.name }}</td>
+            <td>{{ up.org.name|orglink }}</td>
         </tr><tr>
             <th>Position</th>
             <td>{{ up.get_position_str }}</td>
