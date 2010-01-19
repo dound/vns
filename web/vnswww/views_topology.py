@@ -69,12 +69,13 @@ def topology_create(request):
 
     return direct_to_template(request, tn, { 'form': form })
 
-def topology_access_check(request, tid, callee, login_req, owner_req, pu_req, **kwargs):
+def topology_access_check(request, callee, login_req, owner_req, pu_req,
+                          var_tid='tid', **kwargs):
     """This wrapper function checks to make sure that a topology exists.  It
     also verifies the user is logged in, is the owner, or is a permitted user
     as dictated by the boolean arguments *_req.  If these tests pass, callee is
     called with (request, tid, topo)."""
-    tid = int(tid)
+    tid = int(kwargs[var_tid])
     try:
         topo = db.Topology.objects.get(pk=tid)
     except db.Topology.DoesNotExist:
@@ -151,7 +152,7 @@ def topology_permitted_user_remove(request, tid, topo, un):
         messages.error(request, "%s isn't a permitted user on this topology anyway." % un)
     return HttpResponseRedirect('/topology%d/' % tid)
 
-def topology_delete(request, tid, topo):
+def topology_delete(request, tid, topo, **kwargs):
     topo.delete()
     messages.success(request, 'Topology %d has been deleted.' % tid)
     return HttpResponseRedirect('/topologies/')

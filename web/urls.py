@@ -26,7 +26,10 @@ topologies_info = {
 # dictionaries which specify access requirements for various topology views
 def make_topology_access_check_dict(callee, owner_req=False, pu_req=False, login_req=True):
     return { 'callee':callee, 'login_req':login_req, 'owner_req':owner_req, 'pu_req':pu_req }
-dict_topo_delete    = make_topology_access_check_dict(topology_delete, True)
+dict_topo_delete    = make_topology_access_check_dict(checked_delete, True)
+dict_topo_delete['delete_hook'] = topology_delete
+dict_topo_delete['kind'] = 'Topology'
+dict_topo_delete['var_tid'] = 'what'
 dict_topo_info      = make_topology_access_check_dict(topology_info)
 dict_topo_pua       = make_topology_access_check_dict(topology_permitted_user_add, True)
 dict_topo_pur       = make_topology_access_check_dict(topology_permitted_user_remove, True)
@@ -64,7 +67,7 @@ urlpatterns = patterns('web.vnswww.views',
     (r'^topology/create/?$',                            topology_create),
     (r'^topology(?P<tid>\d+)/allow_new_user/?$',        topology_access_check, dict_topo_pua),
     (r'^topology(?P<tid>\d+)/disallow_user/(?P<un>\w+)$', topology_access_check, dict_topo_pur),
-    (r'^topology(?P<tid>\d+)/delete/?$',                topology_access_check, dict_topo_delete),
+    (r'^topology(?P<what>\d+)/delete/?$',               topology_access_check, dict_topo_delete),
     (r'^topology(?P<tid>\d+)/readme/?$',                topology_access_check, dict_topo_readme),
     (r'^topology(?P<tid>\d+)/xml/?$',                   topology_access_check, dict_topo_xml),
     (r'^topology=(?P<tid>\d+)$',                        topology_access_check, dict_topo_xml_clack), # old URL for Clack
