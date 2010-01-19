@@ -25,6 +25,19 @@
                 {% endfor %}
             </td>
         </tr><tr>
+            <th>Allowed Source IPs (for traffic)</th>
+            <td>
+                {% for ps in t.get_permitted_source_ips %}
+                    {{ ps }}
+                    {% if user.is_authenticated and user == t.owner %}
+                        - <a href="/topology{{ t.id }}/disallow_srcip/{{ ps }}/">remove</a>
+                    {% endif %}
+                    <br/>
+                {% empty %}
+                    All
+                {% endfor %}
+            </td>
+        </tr><tr>
             <th>Type</th>
             <td>{{ t.template.name }}</td>
         </tr><tr>
@@ -38,6 +51,7 @@
             <th>Actions</th>
             <td>
                 <a href="/topology{{ t.id }}/allow_new_user/">Add permitted user</a><br/>
+                <a href="/topology{{ t.id }}/allow_new_srcip/">Add permitted source IP for traffic</a><br/>
                 <a href="/topology{{ t.id }}/delete/">Delete this topology</a>
             </td>
         {% endif %}

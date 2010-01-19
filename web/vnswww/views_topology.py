@@ -5,6 +5,7 @@ from django import forms
 from django.contrib import messages
 from django.views.generic.simple import direct_to_template
 from django.http import HttpResponse, HttpResponseRedirect
+from SubnetTree import SubnetTree
 
 import models as db
 from vns.AddressAllocation import instantiate_template
@@ -150,6 +151,58 @@ def topology_permitted_user_remove(request, tid, topo, un):
         messages.success(request, "%s is no longer a permitted user on this topology." % un)
     except db.TopologyUserFilter.DoesNotExist:
         messages.error(request, "%s isn't a permitted user on this topology anyway." % un)
+    return HttpResponseRedirect('/topology%d/' % tid)
+
+class APSIPForm(forms.Form):
+    ip = forms.IPAddressField(label='IP Subnet')
+    mask = forms.ChoiceField(label='Mask', choices=map(lambda x : (x,'/%d'%x), range(1,33)))
+
+def topology_permitted_sip_add(request, tid, topo):
+    tn = 'vns/topology_add_permitted_sip.html'
+    if request.method == 'POST':
+        form = APSIPForm(request.POST)
+        if form.is_valid():
+            ip = str(form.cleaned_data['ip'])
+            mask = int(form.cleaned_data['mask'])
+
+            # build a tree of existing filters
+            st = SubnetTree()
+            st['0/0'] = False # default value
+            for x in db.TopologySourceIPFilter.objects.filter(topology=topo):
+                sn = str('%s/%d' % (x.ip, x.mask))
+                st[sn] = sn
+
+            # check that the new filter isn't covered by one of the existing ones
+            new_sn = '%s/%d' % (ip, mask)
+            sn_within = st[ip]
+            if sn_within:
+                messages.error(request, 'The range %s is already covered by the existing filter %s.' % (new_sn, sn_within))
+                return HttpResponseRedirect('/topology%d/' % tid)
+            else:
+                new_sip = db.TopologySourceIPFilter()
+                new_sip.topology = topo
+                new_sip.ip = ip
+                new_sip.mask = mask
+                new_sip.save()
+                messages.success(request, "%s (%s) has been added to the permitted source IP range list." % (new_sip.subnet_mask_str(), new_sn))
+                return HttpResponseRedirect('/topology%d/' % tid)
+    else:
+        form = APSIPForm()
+    return direct_to_template(request, tn, {'form':form, 'tid':tid })
+
+def topology_permitted_sip_remove(request, tid, topo, sn):
+    success = False
+    try:
+        for x in db.TopologySourceIPFilter.objects.filter(topology=topo):
+            if sn == x.subnet_mask_str():
+                x.delete()
+                messages.success(request, "%s is no longer a permitted source IP range on this topology." % sn)
+                success = True
+                break
+    except db.TopologySourceIPFilter.DoesNotExist:
+        pass
+    if not success:
+        messages.error(request, "%s isn't a permitted source IP range on this topology anyway." % sn)
     return HttpResponseRedirect('/topology%d/' % tid)
 
 def topology_delete(request, tid, topo, **kwargs):

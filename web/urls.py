@@ -33,6 +33,8 @@ dict_topo_delete['var_tid'] = 'what'
 dict_topo_info      = make_topology_access_check_dict(topology_info)
 dict_topo_pua       = make_topology_access_check_dict(topology_permitted_user_add, True)
 dict_topo_pur       = make_topology_access_check_dict(topology_permitted_user_remove, True)
+dict_topo_psipa     = make_topology_access_check_dict(topology_permitted_sip_add, True)
+dict_topo_psipr     = make_topology_access_check_dict(topology_permitted_sip_remove, True)
 dict_topo_readme    = make_topology_access_check_dict(topology_readme)
 dict_topo_xml       = make_topology_access_check_dict(topology_to_xml)
 dict_topo_xml_clack = make_topology_access_check_dict(topology_to_xml, login_req=False) # TODO: temporary so Clack can access the xml
@@ -66,7 +68,9 @@ urlpatterns = patterns('web.vnswww.views',
     (r'^topology(?P<tid>\d+)/?$',                       topology_access_check, dict_topo_info),
     (r'^topology/create/?$',                            topology_create),
     (r'^topology(?P<tid>\d+)/allow_new_user/?$',        topology_access_check, dict_topo_pua),
-    (r'^topology(?P<tid>\d+)/disallow_user/(?P<un>\w+)$', topology_access_check, dict_topo_pur),
+    (r'^topology(?P<tid>\d+)/disallow_user/(?P<un>\w+)/?$',    topology_access_check, dict_topo_pur),
+    (r'^topology(?P<tid>\d+)/allow_new_srcip/?$',              topology_access_check, dict_topo_psipa),
+    (r'^topology(?P<tid>\d+)/disallow_srcip/(?P<sn>[^/]+/\d+)/?$', topology_access_check, dict_topo_psipr),
     (r'^topology(?P<what>\d+)/delete/?$',               topology_access_check, dict_topo_delete),
     (r'^topology(?P<tid>\d+)/readme/?$',                topology_access_check, dict_topo_readme),
     (r'^topology(?P<tid>\d+)/xml/?$',                   topology_access_check, dict_topo_xml),

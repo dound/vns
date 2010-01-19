@@ -382,6 +382,9 @@ class Topology(Model):
     def get_permitted_users(self):
         return [tuf.user for tuf in TopologyUserFilter.objects.filter(topology=self)]
 
+    def get_permitted_source_ips(self):
+        return [x.subnet_mask_str() for x in TopologySourceIPFilter.objects.filter(topology=self)]
+
     def __unicode__(self):
         str_enabled = '' if self.enabled else ' (disabled)'
         return u'Topology %d%s' % (self.id, str_enabled)
@@ -409,6 +412,9 @@ class TopologySourceIPFilter(Model):
         #       db entries as they are created to be in this form
         raw_subnet_str = '%s/%d' % (self.ip, self.mask)
         return base_subnet(raw_subnet_str)
+
+    def subnet_mask_str(self):
+        return '%s/%d' % (self.subnet_str(), self.mask)
 
     def md5(self):
         """Returns the MD5 sum of the string IP/mask."""
