@@ -6,7 +6,7 @@
 {% block content %}
     <h2>Instantiate Topologies</h2>
     {% if form %}
-        <form action="/create_topologies/" method="post">
+        <form action="/topology/create/" method="post">
         {{ form.as_p }}
         <input type="submit" value="Create topologies" />
         </form>
