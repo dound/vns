@@ -5,7 +5,7 @@
 
 {% block content %}
     <h2>VNS Topology {{ t.id }}</h2>
-    <p><a href="/topology{{ t.id }}/readme">Topology README</a></p>
+    <p><a href="/topology{{ t.id }}/readme/">Topology README</a></p>
 
     <table class="vert">
         <tr>
@@ -17,7 +17,7 @@
                 {% for pu in t.get_permitted_users %}
                     {{ pu.username }} ({{ pu.get_full_name }})
                     {% if user.is_authenticated and user == t.owner %}
-                        - <a href="/topology{{ t.id }}/disallow_user/{{ pu.username }}">remove</a>
+                        - <a href="/topology{{ t.id }}/disallow_user/{{ pu.username }}/">remove</a>
                     {% endif %}
                     <br/>
                 {% empty %}
@@ -38,7 +38,7 @@
             <th>Actions</th>
             <td>
                 <a href="/topology{{ t.id }}/allow_new_user/">Add permitted user</a><br/>
-                <a href="/topology{{ t.id }}/delete">Delete this topology</a>
+                <a href="/topology{{ t.id }}/delete/">Delete this topology</a>
             </td>
         {% endif %}
         </tr>
