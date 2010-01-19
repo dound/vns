@@ -12,14 +12,20 @@
             <th>Username</th>
             <th>Name</th>
             <th>E-mail</th>
+            {% if user.is_authenticated and user.get_profile.is_staff and user.get_profile.org == org %}
+            <th>Actions</th>
+            {% endif %}
         </tr>
     {% endif %}
     {% for u in users %}
         <tr>
             <td>{{ u.get_position_str }}</td>
-            <td><a href="/user/{{ u.user.username }}">{{ u.user.username }}</a></td>
+            <td><a href="/user/{{ u.user.username }}/">{{ u.user.username }}</a></td>
             <td>{{ u.user.get_full_name }}</td>
             <td>{{ u.user.email }}</td>
+            {% if user.is_authenticated and user.get_profile.is_staff and user.get_profile.org == org %}
+            <td><a href="/user/{{ u.user.username }}/delete/">Delete</a></td>
+            {% endif %}
         </tr>
     {% empty %}
     <p>There are no users in this organization.</p>

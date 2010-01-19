@@ -143,6 +143,14 @@ def user_change_pw(request):
 
     return direct_to_template(request, tn, { 'form': form })
 
+def user_delete(request, up):
+    user = up.user
+    un = user.username
+    on = up.org.name
+    user.delete()
+    messages.success(request, "You have successfully deleted %s." % un)
+    return HttpResponseRedirect('/org/%s/' % on)
+
 def user_profile(request, up):
     tn = 'vns/user_profile.html'
     return direct_to_template(request, tn, {'up':up})
