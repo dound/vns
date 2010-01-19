@@ -1,10 +1,10 @@
 {% extends "base.html" %}
 {% load custom_filters %}
 
-{% block title %}Create VNS Topologies{% endblock %}
+{% block title %}Instantiate Topologies{% endblock %}
 
 {% block content %}
-    <h2>Create Topologies</h2>
+    <h2>Instantiate Topologies</h2>
     {% if form %}
         <form action="/create_topologies/" method="post">
         {{ form.as_p }}
