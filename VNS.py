@@ -40,10 +40,6 @@ class VNSSimulator:
         self.topologies = {} # maps active topology ID to its Topology object
         self.resolver = TopologyResolver() # maps MAC/IP addresses to a Topology
         self.clients = {}    # maps active conn to the topology ID it is conn to
-        self.server_old = create_vns_server(12345,
-                                        self.handle_recv_msg,
-                                        self.handle_new_client_old,
-                                        self.handle_client_disconnected)
         self.server = create_vns_server(VNS_DEFAULT_PORT,
                                         self.handle_recv_msg,
                                         self.handle_new_client,
@@ -305,17 +301,11 @@ class VNSSimulator:
     @staticmethod
     def build_rtable(topo, s2intfnum):
         # TODO: write this function for real; just a quick hack for now
-        s1 = db.IPAssignment.objects.get(topology=topo, port__node=db.Node.objects.get(template=topo.template, name='Server 1'))
-        s2 = db.IPAssignment.objects.get(topology=topo, port__node=db.Node.objects.get(template=topo.template, name='Server 2'))
+        s1 = db.IPAssignment.objects.get(topology=topo, port__node=db.Node.objects.get(template=topo.template, name='Server1'))
+        s2 = db.IPAssignment.objects.get(topology=topo, port__node=db.Node.objects.get(template=topo.template, name='Server2'))
         return '\n'.join(['0.0.0.0  172.24.74.17  0.0.0.0  eth0',
                           '%s  %s  255.255.255.254  eth1' % (s1.ip, s1.ip),
                           '%s  %s  255.255.255.254  eth%s' % (s2.ip, s2.ip, s2intfnum)])
-
-    def handle_new_client_old(self, conn):
-        logging.debug("Old style client %s connected: bypassing auth" % conn)
-        conn.vns_auth_salt = None
-        conn.vns_authorized = True
-        conn.vns_user_profile = None
 
     def handle_new_client(self, conn):
         """Sends an authentication request to the new user."""
