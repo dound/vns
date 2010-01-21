@@ -55,7 +55,7 @@ def user_access_check(request, callee, requester_is_staff_req, requester_in_same
             return HttpResponseRedirect('/')
 
     # make sure we have up if it is needed
-    if (requester_in_same_org_req or self_req) and not up:
+    if requester_in_same_org_req:
         messages.error(request, "No user was specified (internal error?).")
         return HttpResponseRedirect('/')
 
@@ -67,7 +67,7 @@ def user_access_check(request, callee, requester_is_staff_req, requester_in_same
             return HttpResponseRedirect('/')
 
     # make sure the requester is up him/herself if required
-    if self_req and request.user != up.user:
+    if self_req and up and request.user != up.user:
         if not requester.is_superuser and not requester.get_profile().is_staff() and not requester.org==up.org:
             messages.error(request, 'Only %s or staff in his/her organization may do that.' % un)
             return HttpResponseRedirect('/')
