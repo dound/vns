@@ -30,6 +30,9 @@
               <tr>
                  <td><a href="/user/{{ user.username }}/">Your Profile</a></td>
               </tr>
+              <tr>
+                 <td><a href="/logout/">Logoff</a></td>
+              </tr>
               {% if user.get_profile.is_staff %}
               <tr>
                   <td>&nbsp;<br/><h2>Staff Actions</h2></td>
@@ -40,6 +43,10 @@
                   <td><a href="/user/create/">Create User</a></td>
               </tr>
               {% endif %}
+              {% else %}
+              <tr>
+                 <td><a href="/login/">User Login</a></td>
+              </tr>
               {% endif %}
             </tbody></table>
         </div>
