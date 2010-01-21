@@ -58,7 +58,7 @@ def topology_create(request):
                 err, _, _, _ = instantiate_template(request.user, template, ipblock, src_filters,
                                                     temporary=False,
                                                     use_recent_alloc_logic=False,
-                                                    public=True,
+                                                    public=False,
                                                     use_first_available=True)
                 if err is not None:
                     messages.error(request, "Successfully allocated %d '%s' topologies from %s.  Failed to make the other request topologies: %s." % (i, template.name, ipblock, err))
