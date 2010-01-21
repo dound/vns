@@ -27,8 +27,23 @@
                  <td><a href="/topologies/">Topologies</a></td>
               </tr>
               <tr>
-                 <td><a href="/summary/">Summary</a></td>
+                 <td><a href="/summary/">Current Usage</a></td>
               </tr>
+              {% if user.is_authenticated %}
+              <tr>
+                 <td><a href="/user/{{ user.username }}/">Your Profile</a></td>
+              </tr>
+              {% if user.get_profile.is_staff %}
+              <tr>
+                  <td>&nbsp;<br/><h2>Staff Actions</h2></td>
+              </tr>
+              <tr>
+                  <td><a href="/topology/create/">Create Topology</a></td>
+              </tr>
+                  <td><a href="/user/create/">Create User</a></td>
+              </tr>
+              {% endif %}
+              {% endif %}
             </tbody></table>
         </div>
 

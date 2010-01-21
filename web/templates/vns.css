@@ -111,6 +111,13 @@ table.vert th {
 #sidebar a:hover {
     color: #FFFF88;
 }
+#sidebar h2 {
+    color:#4FF;
+    font-style: italic;
+    margin:0px;
+    padding:0px;
+    text-align:left;
+}
 #sidebar table {
     position:relative;
     left:-10px;
