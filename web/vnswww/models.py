@@ -431,22 +431,23 @@ class TopologySourceIPFilter(Model):
     ip = IPAddressField()
     mask = make_mask_field()
 
-    def subnet_str(self):
-        """Returns the string IP/mask."""
+    def __subnet_str(self):
+        """Returns the string IP."""
         # TODO: rather than processing with base_subnet now, we should validate
         #       db entries as they are created to be in this form
         raw_subnet_str = '%s/%d' % (self.ip, self.mask)
         return base_subnet(raw_subnet_str)
 
     def subnet_mask_str(self):
-        return '%s/%d' % (self.subnet_str(), self.mask)
+        """Returns the string IP/mask."""
+        return '%s/%d' % (self.__subnet_str(), self.mask)
 
     def md5(self):
         """Returns the MD5 sum of the string IP/mask."""
-        return hashlib.md5(self.subnet_str()).digest()
+        return hashlib.md5(self.__subnet_str()).digest()
 
     def __unicode__(self):
-        return u'%s may interact with %s' % (self.subnet_str(), self.topology.__unicode__())
+        return u'%s may interact with %s' % (self.__subnet_str(), self.topology.__unicode__())
 
 class TopologyUserFilter(Model):
     """Lists the users which may interact with a topology by connecting to a
