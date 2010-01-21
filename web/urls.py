@@ -2,7 +2,7 @@ from django.conf.urls.defaults import *
 from django.contrib import admin
 from django.contrib.auth.decorators import login_required
 from django.views.generic import list_detail
-from django.views.generic.simple import direct_to_template
+from django.views.generic.simple import direct_to_template, redirect_to
 
 from vnswww import models as db
 from vnswww.views import checked_delete, homepage
@@ -90,6 +90,7 @@ urlpatterns = patterns('web.vnswww.views',
     (r'^user/(?P<un>\w+)/?$',                           user_access_check, dict_user_profile),
 )
 urlpatterns += patterns('',
+    (r'^favicon.ico$', redirect_to, {'url':'/media/favicon.ico'}),
     (r'^login/?$', 'django.contrib.auth.views.login', {'template_name': 'vns/login.html'}),
     (r'^logout/?$', 'django.contrib.auth.views.logout', {'template_name': 'vns/logout.html'}),
 )
