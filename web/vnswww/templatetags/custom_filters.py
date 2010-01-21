@@ -29,3 +29,7 @@ def orglink(org):
 @register.filter(name='fnamelink')
 def fnamelink(user):
     return mark_safe('<a href="/user/%s/">%s</a>' % (user.username, user.get_full_name()))
+
+@register.filter(name='unamelink')
+def unamelink(user):
+    return mark_safe('<a href="/user/%s/">%s</a>' % (user.username, user.username))
