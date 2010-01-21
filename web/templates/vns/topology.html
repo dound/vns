@@ -10,12 +10,15 @@
     <table class="vert">
         <tr>
             <th>Owner</th>
-            <td>{{ t.owner.get_full_name }} ({{ t.owner.get_profile.org.name }})</td>
+            <td>{{ t.owner|fnamelink }} ({{ t.owner.get_profile.org|orglink }})</td>
         </tr><tr>
             <th>Allowed Users</th>
             <td>
+                {% if t.public %}
+                    Anyone (public).
+                {% else %}
                 {% for pu in t.get_permitted_users %}
-                    {{ pu.username }} ({{ pu.get_full_name }})
+                    {{ pu|unamelink }} ({{ pu|fnamelink }})
                     {% if user.is_authenticated and user == t.owner %}
                         - <a href="/topology{{ t.id }}/disallow_user/{{ pu.username }}/">remove</a>
                     {% endif %}
@@ -23,6 +26,7 @@
                 {% empty %}
                     Just the owner.
                 {% endfor %}
+                {% endif %}
             </td>
         </tr><tr>
             <th>Allowed Source IPs (for traffic)</th>
