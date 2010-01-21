@@ -18,10 +18,12 @@
         </tr><tr>
             <th>E-mail Address</th>
             <td>{{ up.user.email }}</td>
-        {% if user.is_authenticated and user == up.user %}
+        {% if user.is_authenticated %}
+        {% if user == up.user or user.get_profile.is_staff %}
         </tr><tr>
             <th>Simulation Auth Key</th>
             <td>{{ up.get_sim_auth_key }}</td>
+        {% endif %}
         {% endif %}
         </tr>
     </table>
