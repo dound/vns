@@ -67,7 +67,7 @@ class Topology():
         # determine what IPs may interact with this topology
         tus = db.TopologySourceIPFilter.objects.filter(topology=t)
         if len(tus) > 0:
-            self.permitted_source_prefixes = [tu.subnet_str() for tu in tus]
+            self.permitted_source_prefixes = [tu.subnet_mask_str() for tu in tus]
         else:
             self.permitted_source_prefixes = ['0.0.0.0/0'] # unrestricted
 
