@@ -5,7 +5,13 @@
 {% block title %}Topology {{ t.id }}{% endblock %}
 
 {% block content %}
-    <p><a href="/topology{{ t.id }}/readme/">Topology README</a></p>
+    <p style="margin-top:0">
+        <a href="/topology{{ t.id }}/readme/">Topology README</a>
+        {% if t.has_rtable %}
+        <br/>
+        <a href="/topology{{ t.id }}/rtable/">Topology Routing Table</a>
+        {% endif %}
+    </p>
 
     <table class="vert">
         <tr>

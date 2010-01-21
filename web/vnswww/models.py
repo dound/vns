@@ -129,6 +129,7 @@ class TopologyTemplate(Model):
                        'and include the following: $topo.id, $sim.gatewayip, ' + \
                        "and $node.port.ip where node is a node's name and " + \
                        "port is a port's name (e.g., $Server1.eth0.ip).")
+    rtable = TextField(help_text='Template of the rtable for the topology, if any.')
 
     def get_root_port(self):
         """Returns the "root" port of the topology.  This is the port connected
@@ -148,8 +149,8 @@ class TopologyTemplate(Model):
             except IndexError:
                 return None # no ports in this topology
 
-    README_REGEXP = re.compile(r'[$][a-zA-Z0-9.]+')
-    def render_readme(self, sim, topo):
+    TEMPLATE_TEXT_REGEXP = re.compile(r'[$][a-zA-Z0-9.]+')
+    def render_template_text(self, sim, topo, txt):
         # build the dictionary of all valid substitutions
         values = {}
         values['$topo.gatewayip'] = sim.gatewayIP
@@ -167,7 +168,13 @@ class TopologyTemplate(Model):
                 return m.group(0) # no change
 
         # render the readme with all substitutions
-        return TopologyTemplate.README_REGEXP.sub(repl, self.readme)
+        return TopologyTemplate.TEMPLATE_TEXT_REGEXP.sub(repl, txt)
+
+    def render_readme(self, sim, topo):
+        return self.render_template_text(sim, topo, self.readme)
+
+    def render_rtable(self, sim, topo):
+        return self.render_template_text(sim, topo, self.rtable)
 
     def __unicode__(self):
         return u'%s' % self.name
@@ -377,6 +384,18 @@ class Topology(Model):
             return self.template.render_readme(sim, self)
         except IPBlockAllocation.DoesNotExist:
             return 'The readme cannot be generated unless the topology is assigned IPs.'
+
+    def get_rtable(self):
+        """Returns the rtable for this topology.  An error string will be returned
+        if this topology is not assigned any IPs."""
+        try:
+            sim = IPBlockAllocation.objects.get(topology=self).block_from.simulator
+            return self.template.render_rtable(sim, self)
+        except IPBlockAllocation.DoesNotExist:
+            return 'The rtable cannot be generated unless the topology is assigned IPs.'
+
+    def has_rtable(self):
+        return len(self.template.rtable) > 0
 
     def get_where_ips_allocated(self):
         """Returns the block from which the IPs for this topology were allocated."""

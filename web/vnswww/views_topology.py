@@ -213,6 +213,9 @@ def topology_delete(request, tid, topo, **kwargs):
 def topology_readme(request, tid, topo):
     return HttpResponse(topo.get_readme(), mimetype='text/plain')
 
+def topology_rtable(request, tid, topo):
+    return HttpResponse(topo.get_rtable(), mimetype='text/plain')
+
 def topology_to_xml(request, tid, topo):
     # populate xml IDs
     id = 1
