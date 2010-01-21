@@ -563,8 +563,8 @@ class StatsTopology(Model):
         self.changed = False
 
     def finalize(self):
-        self.active = False
         self.total_time_connected_sec = self.get_num_sec_connected()
+        self.active = False
         if not self.save_if_changed():
             self.save()
 
