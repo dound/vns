@@ -61,7 +61,7 @@ class Topology():
             self.permitted_clients = None
         else:
             tufs = db.TopologyUserFilter.objects.filter(topology=t)
-            self.permitted_clients = [tuf.username for tuf in tufs]
+            self.permitted_clients = [tuf.user for tuf in tufs]
             self.permitted_clients.append(t.owner)
 
         # determine what IPs may interact with this topology
