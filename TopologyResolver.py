@@ -28,6 +28,10 @@ class IterableSubnetTree(SubnetTree):
         """Returns True if the specified key has been inserted in the tree."""
         return self.keys.has_key(key)
 
+    def __len__(self):
+        """Returns the number of prefixes with values."""
+        return len(self.keys)
+
     def values(self):
         return self.keys.values()
 
@@ -111,6 +115,10 @@ class TopologyResolver:
                         logging.error('%s: missing topology in source filter %s for %s' % (topo, ps, addrstr(ip)))
                 except KeyError:
                     logging.error('%s: missing source filter %s for %s' % (topo, ps, addrstr(ip)))
+
+            # if no topologies are still mapped to this IP, then delete this empty tree
+            if len(st) == 0:
+                del self.i2t[ip]
 
     def resolve_ip(self, dst_ip, src_ip=None):
         """Resolves a src and dst IP address pair to a list of topologies to
