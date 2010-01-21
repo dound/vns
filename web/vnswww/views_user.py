@@ -20,7 +20,7 @@ def user_access_check(request, callee, requester_is_staff_req, requester_in_same
     # make sure the user is logged in
     requester = request.user
     if not requester.is_authenticated():
-        messages.warn(request, 'You must login before proceeding.')
+        messages.warning(request, 'You must login before proceeding.')
         return HttpResponseRedirect('/login/?next=%s' % request.path)
 
     up = None

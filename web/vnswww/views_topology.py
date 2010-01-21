@@ -85,7 +85,7 @@ def topology_access_check(request, callee, login_req, owner_req, pu_req,
 
     # make sure the user is logged in if required
     if login_req and not request.user.is_authenticated():
-        messages.warn(request, 'You must login before proceeding.')
+        messages.warning(request, 'You must login before proceeding.')
         return HttpResponseRedirect('/login/?next=%s' % request.path)
 
     # make sure the user is the owner if required
