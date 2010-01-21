@@ -1,5 +1,21 @@
-body { background-color:#FDFDFD }
+body {
+    margin: 0px;
+    font-family: Verdana, Arial, sans-serif;
+    font-size: 14px;
+    background-color: #565a5d;
+}
+
+a {
+    text-decoration:none;
+}
+
 h1, h2, h3, h4 { color: #000088 }
+h1 {
+    font-size:18pt;
+    font-weight: bold;
+    text-decoration: none;
+}
+
 table, th, td {
     border-color: black;
     border-style: solid;
@@ -23,4 +39,141 @@ table.vert th {
 }
 .noborder table, .noborder th, .noborder td {
     border-width: 0 0 0 0;
+}
+
+#content {
+    float:right;
+    margin: 0;
+    min-height:500px;
+    padding-top: 1px;
+    padding-left: 10px;
+    width: 845px;
+    color: #000000;
+    border-left: thin solid black;
+    background-color: #FFFFFF;
+    display: table-cell;
+}
+#content h1 {
+    padding: 0 0 0 0;
+    margin: 0 0 0 0;
+}
+
+#footer {
+    color:#656565;
+    font-size:10px;
+    height:40px;
+    margin-left:auto;
+    margin-right:auto;
+    text-align:center;
+    width:915px;
+}
+
+#header {
+    width: 1020px;
+    margin-left: auto;
+    margin-right: auto;
+    background-color: #990000;
+    border: thin solid black;
+}
+#header h1 {
+    font-size: 18pt;
+    color: #FFFFFF;
+    margin: 0;
+    padding: 15px 0 15px 0;
+    font-weight: bold;
+    text-decoration: none;
+    border-bottom: solid black;
+}
+
+#main {
+    width: 1020px;
+    margin-left: auto;
+    margin-right: auto;
+    background-color: #990000;
+}
+#main a {
+    color: #0000BB;
+}
+
+#sidebar {
+    float: left;
+    margin: 0 0 15px 10px;
+    width: 130px;
+    color: #000000;
+    display: table-cell;
+}
+#sidebar a {
+    color: #FFFFFF;
+    font-size: 18px;
+    font-weight: bold;
+    text-decoration: none;
+}
+#sidebar a:hover {
+    color: #FFFF88;
+}
+#sidebar table {
+    position:relative;
+    left:-10px;
+    width:165px
+}
+#sidebar td {
+    border-color: black;
+    border-style: solid;
+    border-width: 0 0 1px 0;
+    margin: 0;
+    padding: 8px 0 8px 8px;
+}
+
+#wrap {
+    text-align: center;
+}
+#wrap a {
+    text-decoration:none;
+    color: #0000BB;
+    font-size: 16px;
+}
+#wrap a:hover {
+    color: #000B60;
+}
+
+#wrap_main {
+    width: 1020px;
+    margin-left: auto;
+    margin-right: auto;
+    display: table;
+    background-color: #990000;
+    border: thin solid black;
+}
+
+#title {
+    padding-bottom: 15px;
+    padding-top: 10px;
+}
+
+#messages .debug,
+#messages .error,
+#messages .info,
+#messages .success,
+#messages .warning {
+    border: 1px dashed black;
+    font-size:14pt;
+    font-weight: bold;
+    margin-bottom: 10px;
+    margin-right: 10px;
+    padding: 7px;
+}
+#messages .debug {
+    background-color: #CCF;
+}
+#messages .error {
+    background-color: #F88;
+}
+#messages .info {
+    background-color: #FF8;
+}
+#messages .success {
+    background-color: #AFA;
+}
+#messages .warning {
+    background-color: #FF8;
 }

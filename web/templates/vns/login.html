@@ -1,11 +1,10 @@
 {% extends "base.html" %}
 {% load custom_filters %}
 
+{% block titlebar %}User Login{% endblock %}
 {% block title %}User Login{% endblock %}
 
 {% block content %}
-    <h2>Login</h2>
-
     {% if form.errors %}
     <p>Your username and password didn't match. Please try again.</p>
     {% endif %}

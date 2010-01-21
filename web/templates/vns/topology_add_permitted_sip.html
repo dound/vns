@@ -1,10 +1,10 @@
 {% extends "base.html" %}
 {% load custom_filters %}
 
+{% block titlebar %}Add Permitted Source IP range to Topology {{ tid }}{% endblock %}
 {% block title %}Add Permitted Source IP range to Topology {{ tid }}{% endblock %}
 
 {% block content %}
-    <h2>Add Permitted Source IP range to VNS Topology {{ tid }}</h2>
     {% if form %}
         <form action="/topology{{ tid }}/allow_new_srcip/" method="post">
         <table>

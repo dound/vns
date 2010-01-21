@@ -1,10 +1,10 @@
 {% extends "base.html" %}
 {% load custom_filters %}
 
+{% block titlebar %}Change Password{% endblock %}
 {% block title %}Change Password{% endblock %}
 
 {% block content %}
-    <h2>Change Password</h2>
     {% if form %}
         <form action="/user/change_password/" method="post">
         <table>

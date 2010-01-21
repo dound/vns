@@ -2,19 +2,64 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head profile="http://gmpg.org/xfn/11">
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-    <title>VNS: {% block title %}{% endblock %}</title>
+    <title>VNS: {% block titlebar %}{% endblock %}</title>
     <link rel="stylesheet" type="text/css" href="/vns.css" media="all"/>
 </head>
 <body>
-{% block header %}{% endblock %}
-{% if messages %}
-<ul id="messages">
-    {% for message in messages %}
-    <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
-    {% endfor %}
-</ul>
-{% endif %}
-{% block content %}{% endblock %}
-{% block footer %}{% endblock %}
+
+<div id="wrap">
+    <div id="header">
+        <h1>VNS: Virtual Network System</h1>
+    </div>
+</div>
+
+<div id="wrap_main">
+    <div id="main">
+        <div id="sidebar">
+            <table><tbody>
+              <tr>
+                 <td><a href="/">Home</a></td>
+              </tr>
+              <tr>
+                 <td><a href="/organizations/">Participants</a></td>
+              </tr>
+              <tr>
+                 <td><a href="/topologies/">Topologies</a></td>
+              </tr>
+              <tr>
+                 <td><a href="/summary/">Summary</a></td>
+              </tr>
+            </tbody></table>
+        </div>
+
+        <div id="content">
+            <div>
+                <div id="title">
+                    <h1>{% block title %}{% endblock %}</h1>
+                </div>
+
+                {% if messages %}
+                    <div id="messages">
+                        {% for message in messages %}
+                        <div {% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</div>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+
+                {% block content %}{% endblock %}
+            </div>
+
+            <p style="text-align: center; margin-top: 0pt;">
+                <a href="http://yuba.stanford.edu/">
+                    <img height="55" width="112" style="border: medium none ;" alt="Stanford High-Performance Networking Group" src="http://yuba.stanford.edu/cs344/images/hpng.jpg"/>
+                </a>
+
+                <a href="http://www.stanford.edu/">
+                    <img height="59" width="149" style="border: medium none ;" alt="Stanford University" src="http://yuba.stanford.edu/cs344/images/su.gif"/>
+                </a>
+            </p>
+        </div>
+    </div>
+</div>
 </body>
 </html>

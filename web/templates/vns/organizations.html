@@ -1,10 +1,10 @@
 {% extends "base.html" %}
 {% load custom_filters %}
 
-{% block title %}Organizations{% endblock %}
+{% block titlebar %}Organizations{% endblock %}
+{% block title %}Active Organizations{% endblock %}
 
 {% block content %}
-    <h2>Active Organizations</h2>
     {% if orgs_list %}
     <table>
         <tr>

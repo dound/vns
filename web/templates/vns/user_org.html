@@ -1,10 +1,10 @@
 {% extends "base.html" %}
 {% load custom_filters %}
 
-{% block title %}{{ org.name }}{% endblock %}
+{% block titlebar %}{{ org.name }}{% endblock %}
+{% block title %}{{ org.name }} Roster ({{ users|length }}){% endblock %}
 
 {% block content %}
-    <h2>{{ org.name }} Roster ({{ users|length }})</h2>
     {% if users %}
     <table>
         <tr>

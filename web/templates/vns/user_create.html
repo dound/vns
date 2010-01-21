@@ -1,10 +1,10 @@
 {% extends "base.html" %}
 {% load custom_filters %}
 
+{% block titlebar %}Create User{% endblock %}
 {% block title %}Create User{% endblock %}
 
 {% block content %}
-    <h2>Create User</h2>
     {% if form %}
         <form action="/user/create/" method="post">
         <table>

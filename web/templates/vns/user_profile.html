@@ -1,11 +1,10 @@
 {% extends "base.html" %}
 {% load custom_filters %}
 
-{% block title %}User Profile: {{ up.user.username }}{% endblock %}
+{% block titlebar %}User Profile: {{ up.user.username }}{% endblock %}
+{% block title %}{{ up.user.username }}{% endblock %}
 
 {% block content %}
-    <h2>{{ up.user.username }}</h2>
-
     <table class="vert">
         <tr>
             <th>Name</th>

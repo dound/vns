@@ -1,10 +1,10 @@
 {% extends "base.html" %}
 {% load custom_filters %}
 
+{% block titlebar %}Instantiate Topologies{% endblock %}
 {% block title %}Instantiate Topologies{% endblock %}
 
 {% block content %}
-    <h2>Instantiate Topologies</h2>
     {% if form %}
         <form action="/topology/create/" method="post">
         {{ form.as_p }}
