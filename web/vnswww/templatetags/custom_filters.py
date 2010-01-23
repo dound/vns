@@ -33,3 +33,7 @@ def fnamelink(user):
 @register.filter(name='unamelink')
 def unamelink(user):
     return mark_safe('<a href="/user/%s/">%s</a>' % (user.username, user.username))
+
+@register.filter(name='topolink')
+def topolink(topo):
+    return mark_safe('<a href="/topology%d/">Topology %d</a>' % (topo.id, topo.id))

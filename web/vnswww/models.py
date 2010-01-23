@@ -98,6 +98,15 @@ class UserProfile(Model):
                 return pos_name
         return 'Unknown'
 
+    def get_owned_topologies(self):
+        """Returns the topologies which this user owns."""
+        return Topology.objects.filter(owner=self.user)
+
+    def get_usable_topologies(self):
+        """Returns the topologies which this user is permitted to use beyond
+        those owned by the user."""
+        return [tuf.topology for tuf in TopologyUserFilter.objects.filter(user=self.user)]
+
     def is_staff(self):
         return self.pos != 1
 

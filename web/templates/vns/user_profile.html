@@ -25,6 +25,24 @@
             <td>{{ up.get_sim_auth_key }}</td>
         {% endif %}
         {% endif %}
+        </tr><tr>
+            <th>Topologies Owned</th>
+            <td>
+                {% for t in up.get_owned_topologies %}
+                    {{ t|topolink }} ({{ t.template.name }})<br/>
+                {% empty %}
+                    None
+                {% endfor %}
+            </td>
+        </tr><tr>
+            <th>Topologies Assigned To</th>
+            <td>
+                {% for t in up.get_usable_topologies %}
+                    {{ t|topolink }} ({{ t.template.name }})<br/>
+                {% empty %}
+                    None
+                {% endfor %}
+            </td>
         </tr>
     </table>
 
