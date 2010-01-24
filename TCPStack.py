@@ -211,6 +211,7 @@ class TCPConnection():
         self.last_activity = time.time()
 
     def reset_resend_timer(self):
+        """Resets the retransmission timer."""
         self.next_resend = time.time() + 2*self.rtt
         reactor.callLater(2*self.rtt, self.has_data_to_send_callback)
 
