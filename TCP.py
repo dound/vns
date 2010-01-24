@@ -24,6 +24,15 @@ def make_tcp_packet(src_port, dst_port, seq=0, ack=0, window=5096, data='',
     return (src_port + dst_port + struct.pack('> 2I', seq, ack) + '\x50' + \
            struct.pack('>B H', flags, window) + '\x00\x00\x00\x00', data)
 
+def add_fin_to_tcp_packet(p):
+    """Add the FIN flag to a TCP packet (as returned by make_tcp_packet)."""
+    header = p[0]
+    flags = struct.unpack('>B', header[13])[0]
+    flags |= 0x01
+    flags_byte = struct.pack('>B', flags)
+    new_header = header[:13] + flags_byte + header[14:]
+    return (new_header, p[1])
+
 class TCPSegment():
     """Describes a contiguous chunk of data in a TCP stream."""
     def __init__(self, seq, data):
@@ -299,12 +308,17 @@ class TCPConnection():
         # send a FIN if we're closed, our FIN hasn't been ACKed, and we've sent
         # all the data we were asked to already (or there isn't any)
         if self.closed and not self.my_fin_acked and (self.all_data_sent or not self.data_to_send):
-            logging.debug('Adding my FIN packet to the outgoing queue')
-            ret.append(make_tcp_packet(self.my_port, self.other_port,
-                                       seq=base_offset + sz,
-                                       ack=self.__get_ack_num(),
-                                       data='',
-                                       is_fin=True))
+            if not self.my_fin_sent or retransmit:
+                if ret:
+                    logging.debug('Making the last packet a FIN packet')
+                    ret[-1] = add_fin_to_tcp_packet(ret[-1])
+                else:
+                    logging.debug('Adding my FIN packet to the outgoing queue')
+                    ret.append(make_tcp_packet(self.my_port, self.other_port,
+                                               seq=base_offset + sz,
+                                               ack=self.__get_ack_num(),
+                                               data='',
+                                               is_fin=True))
             if not self.my_fin_sent:
                 self.my_fin_sent = True
                 self.last_seq_sent += 1
