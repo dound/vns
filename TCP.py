@@ -90,6 +90,7 @@ class TCPConnection():
         self.window = 0
         self.data_to_send = ''
         self.first_unacked_seq = random.randint(0, 0x8FFFFFFF)
+        self.last_seq_sent = self.first_unacked_seq
         self.my_syn_acked = False
         self.my_fin_acked = False
         self.next_resend = 0
@@ -234,10 +235,19 @@ class TCPConnection():
         sz = len(self.data_to_send)
         base_offset = self.first_unacked_seq + (0 if self.my_syn_acked else 1)
         if self.data_to_send:
+            # figure out how many chunks we can send now
             data_chunk_size = self.mtu - 40  # 20B IP and 20B TCP header: rest for data
-            for i in range(1+(sz-1)/data_chunk_size):
+            num_chunks_left = sz / data_chunk_size
+            outstanding_bytes = self.last_seq_sent - self.first_unacked_seq + 1
+            max_chunks_to_send_now = (self.window-outstanding_bytes) / data_chunk_size
+            num_chunks_to_send_now = min(num_chunks_left, max_chunks_to_send_now)
+            logging.debug('Will send %d chunks now (%d chunks total remain): chunk size=%dB, window=%dB, outstanding=%dB' % \
+                          (num_chunks_to_send_now, num_chunks_left, data_chunk_size, self.window, outstanding_bytes))
+            # create the individual TCP packets to send
+            for i in range(1+num_chunks_to_send_now):
                 start = base_offset + i*data_chunk_size
                 end = min(sz, (i+1)*data_chunk_size)
+                self.last_seq_sent = max(self.last_seq_sent, end)
                 logging.debug('Adding data bytes from %d to %d to the outgoing queue' % (start, end-1))
                 ret.append(make_tcp_packet(self.my_port, self.other_port,
                                            seq=start,
