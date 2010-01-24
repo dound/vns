@@ -208,35 +208,47 @@ class TCPConnection():
             return ''
 
 class TCPServer():
-    def __init__(self, port):
-        """Port should be a 2 byte short in NBO as a packed byte-string."""
-        self.connections = {}
-        self.port = port
+    """Implements a basic TCP Server which handles raw TCP packets passed to it."""
+    # Pass this value to the constructor and the TCPServer will accept connections on any port.
+    ANY_PORT = 0
 
-    def close(self, close):
-        pass
+    def __init__(self, port):
+        """port is the port the TCPServer should listen for SYN packets on."""
+        assert(port>=0 and port<65536, "Port must be between 0 and 65536 (exclusive) or TCPServer.ANY_PORT")
+        self.connections = {}
+        self.listening_port_nbo = struct.pack('>H', port)
+
+    def get_port_nbo(self):
+        """Returns the 2-byte NBO representation of the port being listened on."""
+        return self.listening_port_nbo
 
     def handle_tcp(self, pkt):
+        """Processes pkt as if it was just received.  pkt should be a valid TCP
+        packet.  Returns the TCPConnection pkt is associated with, if any."""
+        assert(pkt.is_tcp() and pkt.is_valid_tcp(), "TCPServer.handle_tcp expects a valid TCP packet as input")
+
         # ignore TCP packets not to us
-        if pkt.tcp_dst_port != self.port:
+        if self.listening_port_nbo != '\x00\x00' and pkt.tcp_dst_port != self.listening_port_nbo:
             logging.debug('ignoring TCP packet to a port we are not listening on')
-            return
+            return None
 
         # extract some basic info
         seq, ack, _, window = struct.unpack('>2I 2H', pkt.tcp[4:16])
 
         # get the connection associated with the client's socket, if any
-        client_socket = (pkt.ip_src, pkt.tcp_src_port)
-        conn = self.connections.get(client_socket)
+        socket_client = (pkt.ip_src, pkt.tcp_src_port)
+        socket_server = (pkt.ip_dst, pkt.tcp_dst_port)
+        socket_pair = (socket_client, socket_server)
+        conn = self.connections.get(socket_pair)
         if not conn:
-            logging.debug('received TCP packet from a new socket: %s' % str(client_socket))
-            # that socket is not live -- is this a SYN?
+            logging.debug('received TCP packet from a new socket pair: %s' % str(socket_pair))
+            # there is no connection for this socket pair -- did we get a SYN?
             if pkt.is_tcp_syn():
-                conn = self.make_new_conn(seq, pkt.ip_dst, pkt.tcp_dst_port, pkt.ip_src, pkt.tcp_src_port)
-                self.connections[client_socket] = conn
+                conn = TCPConnection(seq, pkt.ip_dst, pkt.tcp_dst_port, pkt.ip_src, pkt.tcp_src_port)
+                self.connections[socket_pair] = conn
                 logging.debug('received TCP SYN packet -- new connection created: %s' % conn)
             else:
-                logging.debug('ignoring TCP packet without SYN when SYN required')
+                logging.debug('ignoring TCP packet without SYN for socket pair with no existing connection')
                 return None # this tcp fragment is not part of an active session: ignore it
 
         # pull out the data
@@ -252,9 +264,6 @@ class TCPServer():
         if pkt.is_tcp_ack():
             conn.set_ack(ack)
         return conn
-
-    def make_new_conn(self, seq, ip_dst, tcp_dst_port, ip_src, tcp_src_port):
-        return TCPConnection(seq, ip_dst, tcp_dst_port, ip_src, tcp_src_port)
 
 class HTTPServer(TCPServer):
     def __init__(self, port, serve_from):
