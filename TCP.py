@@ -9,7 +9,6 @@ import time
 
 ASSUMED_RTT_SEC = 2.000
 CHUNK_SIZE = 1460
-DEFAULT_PAGE = 'index.html'
 MAX_DATA_ALLOWED = 10000
 
 def make_tcp_packet(src_port, dst_port, seq=0, ack=0, window=5096, data='',
@@ -266,9 +265,13 @@ class TCPServer():
         return conn
 
 class HTTPServer(TCPServer):
-    def __init__(self, port, serve_from):
+    """Implements a basic HTTP Server which handles raw TCP packets passed to it."""
+    def __init__(self, port, serve_from, default_page='index.html'):
+        """Constructs an HTTP server listening on the specified port and serving
+        files from the specified folder 'serve_from'."""
         TCPServer.__init__(self, port)
         self.serve_from = serve_from
+        self.default_page = default_page
 
     RE_GET = re.compile('GET (.*) HTTP/1.1\r\n((.|\n)+\r\n)?\r\n')
     def extract_http_get_request(self, conn):
@@ -281,58 +284,59 @@ class HTTPServer(TCPServer):
                 return m.group(1)
             else:
                 logging.debug('data does not match GET request (%s...)' % data[0:20])
-        else:
-            logging.debug('no data has been received yet')
         return None
 
     def handle_tcp(self, pkt):
-        """Returns the connection."""
+        # take care of the usual TCP stuff
         conn = TCPServer.handle_tcp(self, pkt)
         if not conn or conn.closed:
             return conn
 
+        # check to see if we've received a complete HTTP request
         url_requested = self.extract_http_get_request(conn)
         if url_requested:
-            logging.debug('we need to serve the requested page: ' + url_requested)
-            conn.add_data_to_send(self.make_response(url_requested))
+            logging.debug('A URL has been requested: ' + url_requested)
+            conn.add_data_to_send(self.__make_response(url_requested))
+            logging.debug('The requested URL has been sent; closing the connection')
             conn.close()
-        else:
-            logging.debug('HTTPServer not able to extract URL from received data yet')
         return conn
 
     @staticmethod
-    def __make_response_header(ok, is_html=True):
+    def __make_response_header(ok, is_html=True, gen_body_if_404=True):
+        """Generates the header of an HTTP response.  This includes the status
+        line and content-type.  If a 404 status line is generated, then a
+        basic 404 page body will also be generated."""
         code='200 OK' if ok else '404 Not Found'
         type='text/html' if is_html else 'application/octet-stream'
         header = 'HTTP/1.0 %s\r\nContent-Type: %s;\r\n\r\n' % (code, type)
-        if not ok:
+        if not ok and gen_body_if_404:
             return header + '<html><body><h1>404: Page Not Found</h1></body></html>'
 
-    RE_OK_URL = re.compile('^[-A-Za-z0-9_/]*[.]html?$')
-    RE_HTML = re.compile('[.]html?([?].*)?$')
-    def make_response(self, url):
-        """Tries to retrieve the contents of url and return an HTTP response."""
+    ALLOWED_CHARS = r'[-A-Za-z0-9_/]*'
+    RE_OK_URL = re.compile(r'^%s([.]%s)?$' % (ALLOWED_CHARS, ALLOWED_CHARS))
+    RE_HTML = re.compile('^[.]html?([?].*)?$')
+    def __make_response(self, url):
+        """Verifies that the URL requested is legitimate (alphanumeric, dash,
+        underscore, and forward slash characters are permitted only).  A single
+        period is also permitted (to separate a file name from an extension)."""
         if url == '/':
-            url = DEFAULT_PAGE
+            url = self.default_page
 
-        if not HTTPServer.RE_OK_URL.match(url):
-            body = None
-        else:
+        match = HTTPServer.RE_OK_URL.match(url)
+        if match:
             try:
                 f = open(self.serve_from + '/' + url)
                 body = f.read()
                 f.close()
-                logging.debug('read page: %s...' % body[:20])
-            except IOError as e:
-                logging.warn('unable to find requested file "%s": %s' % (url, e))
-                body = None
 
-        if body:
-            header = HTTPServer.__make_response_header(True, HTTPServer.RE_HTML.search(url))
-            header = 'HTTP/1.0 200 OK\r\nContent-Type: %s;\r\n\r\n' % type
-            return header + body
-        else:
-            return HTTPServer.__make_response_header(False)
+                ext_and_trailer = match.group(1)
+                is_html = HTTPServer.RE_HTML.search(ext_and_trailer)
+                header = HTTPServer.__make_response_header(True, is_html)
+                header = 'HTTP/1.0 200 OK\r\nContent-Type: %s;\r\n\r\n' % type
+                return header + body
+            except IOError as e:
+                logging.debug('unable to find requested file "%s": %s' % (url, e))
+        return HTTPServer.__make_response_header(False)
 
 def test():
     from twisted.internet import reactor
