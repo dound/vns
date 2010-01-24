@@ -220,6 +220,7 @@ class TCPConnection():
             logging.debug('received ack %d (last unacked was %d) => %dB less to send (%dB left)' % \
                           (ack, self.first_unacked_seq, diff, len(self.data_to_send)))
             self.first_unacked_seq = ack
+            self.__need_to_send_now() # we can send more data now
 
     def get_packets_to_send(self):
         """Returns a list of packets which should be sent now."""
