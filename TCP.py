@@ -450,7 +450,7 @@ def test(dev, path_to_serve):
         PROMISCUOUS  = 1       # promiscuous mode?
         READ_TIMEOUT = 100     # in milliseconds
         MAX_PKTS     = -1      # number of packets to capture; -1 => no limit
-        PCAP_FILTER  = 'tcp port 80'
+        PCAP_FILTER  = 'tcp dst port 80'
 
         # the method which will be called when a packet is captured
         def ph(_, data):
