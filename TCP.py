@@ -484,7 +484,9 @@ if __name__ == '__main__':
     reactor.addSystemEventTrigger("before", "shutdown", bye)
     logging.basicConfig(level=logging.DEBUG, format='%(levelname)-8s %(module)s:%(funcName)s:%(lineno)d  %(message)s')
 
+    dev = sys.argv[1] if len(sys.argv) > 1 else 'eth0'
+    serve_from = sys.argv[2] if len(sys.argv) > 2 else './htdocs'
     try:
-        test('eth0', './htdocs')
+        test(dev, serve_from)
     except KeyboardInterrupt:
         sys.exit(0)
