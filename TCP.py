@@ -36,7 +36,7 @@ class TCPSegment():
     def combine(self, s2):
         """Combine this segment with a s2 which comes no earlier than this
         segment starts.  If they do not overlap or meet, False is returned."""
-        assert(self.__cmp__(s2) <= 0) # s2 must not start earlier
+        assert self.__cmp__(s2) <= 0 , "segement 2 must not start earlier"
 
         if self.next < s2.seq:
             return False # no overlap: s2 is later than us
@@ -248,7 +248,7 @@ class TCPServer():
 
     def __init__(self, port, max_active_conns=25):
         """port is the port the TCPServer should listen for SYN packets on."""
-        assert(port>=0 and port<65536, "Port must be between 0 and 65536 (exclusive) or TCPServer.ANY_PORT")
+        assert port>=0 and port<65536, "Port must be between 0 and 65536 (exclusive) or TCPServer.ANY_PORT"
         self.connections = {}
         self.listening_port_nbo = struct.pack('>H', port)
         self.max_active_conns = max_active_conns
@@ -272,7 +272,7 @@ class TCPServer():
     def handle_tcp(self, pkt):
         """Processes pkt as if it was just received.  pkt should be a valid TCP
         packet.  Returns the TCPConnection pkt is associated with, if any."""
-        assert(pkt.is_tcp() and pkt.is_valid_tcp(), "TCPServer.handle_tcp expects a valid TCP packet as input")
+        assert pkt.is_tcp() and pkt.is_valid_tcp(), "TCPServer.handle_tcp expects a valid TCP packet as input"
 
         # ignore TCP packets not to us
         if self.listening_port_nbo != '\x00\x00' and pkt.tcp_dst_port != self.listening_port_nbo:
