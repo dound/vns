@@ -57,13 +57,10 @@ class TCPSegment():
 
 class TCPConnection():
     """Manages the state of one half of a TCP connection."""
-    # Time from when a FIN is sent until calling connection_over_callback.
-    WAIT_TIME_SEC = 5
-
     def __init__(self, syn_seq, my_ip, my_port, other_ip, other_port,
                  connection_over_callback, has_data_to_send_callback,
+                 assumed_rtt=0.5, mtu=1500, max_data=2048, max_wait_time_sec=5):
         # socket pair
-                 assumed_rtt=0.5, mtu=1500, max_data=2048):
         self.my_ip = my_ip
         self.my_port = my_port
         self.other_ip = other_ip
@@ -73,6 +70,9 @@ class TCPConnection():
         self.rtt = assumed_rtt
         self.mtu = mtu
         self.max_data = max_data
+        self.max_wait_time_sec = max_wait_time_sec
+        self.last_activity = time.time()
+        reactor.callLater(self.max_wait_time_sec, self.__check_wait_time)
 
         # callbacks
         self.connection_over_callback = lambda : connection_over_callback(self)
@@ -84,6 +84,7 @@ class TCPConnection():
         self.need_to_send_ack = False
         self.received_fin = False
         self.closed = False
+        self.dead = False
 
         # information about outgoing data and relevant ACKs
         self.window = 0
@@ -102,6 +103,7 @@ class TCPConnection():
 
         self.__add_segment(segment)
         if len(self.segments) > 0 and self.segments[0].next > self.next_seq_needed:
+            self.__note_activity()
             self.next_seq_needed = self.segments[0].next
             self.__need_to_send_now() # ACK the new data
 
@@ -135,6 +137,16 @@ class TCPConnection():
             self.__need_to_send_now() # send the data
         else:
             raise socket.error('cannot send data on a closed socket')
+
+    def __check_wait_time(self):
+        """Checks to see if this connection has been idle for longer than
+        allowed.  If so, it is marked as dead and the connection_over_callback
+        is called."""
+        if time.time() - self.last_activity > self.max_wait_time_sec:
+            self.connection_over_callback()
+            self.dead = True
+        else:
+            reactor.callLater(self.max_wait_time_sec, self.__check_wait_time)
 
     def close(self):
         """Closes this end of the connection.  Will cause a FIN to be sent if
@@ -179,10 +191,15 @@ class TCPConnection():
         if self.has_data_to_send_callback:
             self.has_data_to_send_callback()
 
+    def __note_activity(self):
+        """Marks the current time as the last active time."""
+        self.last_activity = time.time()
+
     def set_ack(self, ack):
         """Handles receipt of an ACK."""
         diff = ack - self.first_unacked_seq
         if diff > 0:
+            self.__note_activity()
             if not self.my_syn_acked:
                 diff = diff - 1
                 self.my_syn_acked = True
@@ -196,6 +213,8 @@ class TCPConnection():
     def get_packets_to_send(self):
         """Returns a list of packets which should be sent now."""
         ret = []
+        if self.dead:
+            return ret
 
         # is it time to send data?
         now = time.time()
@@ -232,9 +251,6 @@ class TCPConnection():
                                        ack=self.__get_ack_num(),
                                        data='',
                                        is_fin=True))
-            if self.connection_over_callback:
-                logging.debug('will teardown in %d sec' % TCPConnection.WAIT_TIME_SEC)
-                reactor.callLater(TCPConnection.WAIT_TIME_SEC, self.connection_over_callback)
 
         if not ret and self.need_to_send_ack:
             logging.debug('Adding a pure ACK to the outgoing queue (nothing to piggyback on)')
