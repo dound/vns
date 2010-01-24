@@ -92,6 +92,7 @@ class TCPConnection():
         self.first_unacked_seq = random.randint(0, 0x8FFFFFFF)
         self.last_seq_sent = self.first_unacked_seq
         self.my_syn_acked = False
+        self.my_fin_sent = False
         self.my_fin_acked = False
         self.next_resend = 0
 
@@ -267,6 +268,9 @@ class TCPConnection():
                                        ack=self.__get_ack_num(),
                                        data='',
                                        is_fin=True))
+            if not self.my_fin_sent:
+                self.my_fin_sent = True
+                self.last_seq_sent += 1
 
         if not ret and self.need_to_send_ack:
             logging.debug('Adding a pure ACK to the outgoing queue (nothing to piggyback on)')
