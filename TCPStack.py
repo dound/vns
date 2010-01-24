@@ -225,6 +225,7 @@ class TCPConnection():
         diff = ack - self.first_unacked_seq
         if diff > 0:
             self.__note_activity()
+            self.reset_resend_timer()
             if not self.my_syn_acked:
                 diff = diff - 1
                 self.my_syn_acked = True
