@@ -264,10 +264,10 @@ class TCPConnection():
             data_chunk_size = self.mtu - 40  # 20B IP and 20B TCP header: rest for data
             num_chunks_left = sz / data_chunk_size
             outstanding_bytes = self.last_seq_sent - self.first_unacked_seq + 1
-            max_chunks_to_send_now = (self.window-outstanding_bytes) / data_chunk_size
-            num_chunks_to_send_now = min(num_chunks_left, max_chunks_to_send_now)
-            logging.debug('Will send %d chunks now (%d chunks total remain): chunk size=%dB, window=%dB, outstanding=%dB' % \
-                          (num_chunks_to_send_now, num_chunks_left, data_chunk_size, self.window, outstanding_bytes))
+            max_outstanding_chunks = self.window / data_chunk_size
+            num_chunks_to_send_now = min(num_chunks_left, max_outstanding_chunks)
+            logging.debug('Will make sure %d chunks are out now (%d chunks total remain): chunk size=%dB, window=%dB=>%d chunks may be out, outstanding=%dB' % \
+                          (num_chunks_to_send_now, num_chunks_left, data_chunk_size, self.window, max_outstanding_chunks, outstanding_bytes))
             # create the individual TCP packets to send
             for i in range(1+num_chunks_to_send_now):
                 # determine what bytes and sequence numbers this chunk includes
