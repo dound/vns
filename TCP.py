@@ -430,7 +430,7 @@ class HTTPServer(TCPServer):
                 logging.debug('unable to find requested file "%s": %s' % (url, e))
         return HTTPServer.__make_response_header(False)
 
-def test(dev, path_to_serve):
+def test():
     """Sniffs TCP packets arriving on port 80 and manually handles them with an
     HTTPServer object which is serving the given path.  For this test to work,
     your OS will need to silently drop or ignore TCP packets to port 80 (e.g.,
@@ -441,6 +441,9 @@ def test(dev, path_to_serve):
     from ProtocolHelper import Packet
     from LoggingHelper import pktstr
     import errno
+
+    dev = sys.argv[1] if len(sys.argv) > 1 else 'eth0'
+    path_to_serve = sys.argv[2] if len(sys.argv) > 2 else './htdocs'
 
     def start_raw_socket(dev):
         """Starts a socket for sending raw Ethernet frames."""
@@ -519,9 +522,7 @@ if __name__ == '__main__':
     reactor.addSystemEventTrigger("before", "shutdown", bye)
     logging.basicConfig(level=logging.DEBUG, format='%(levelname)-8s %(module)s:%(funcName)s:%(lineno)d  %(message)s')
 
-    dev = sys.argv[1] if len(sys.argv) > 1 else 'eth0'
-    serve_from = sys.argv[2] if len(sys.argv) > 2 else './htdocs'
     try:
-        test(dev, serve_from)
+        test()
     except KeyboardInterrupt:
         sys.exit(0)
