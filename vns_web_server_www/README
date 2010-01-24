@@ -1,0 +1,7 @@
+By default, this folder can be served by virtual web server nodes in VNS
+topologies.  They cannot serve directories above this one -- unless a symlink or
+shortcut is located in this folder or one of its subfolders.
+
+It is suggested that you place each website you want a virtual web server to
+serve in its own subfolder within this folder.  The VNS web interface allows you
+to then designate which subfolder (if any) to serve from within this folder.
