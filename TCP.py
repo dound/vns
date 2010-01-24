@@ -135,6 +135,7 @@ class TCPConnection():
         """Adds data to be sent to the other side of the connection.  Raises
         socket.error if the socket is closed."""
         if not self.closed:
+            logging.debug('Adding %dB to send (%dB already waiting)' % (len(data), len(self.data_to_send)))
             self.data_to_send += data
             self.__need_to_send_now() # send the data
         else:
@@ -214,6 +215,8 @@ class TCPConnection():
                 self.my_fin_acked = True
 
             self.data_to_send = self.data_to_send[diff:]
+            logging.debug('received ack %d (last unacked was %d) => %dB less to send (%dB left)' % \
+                          (ack, self.first_unacked_seq, diff, len(self.data_to_send)))
             self.first_unacked_seq = ack
 
     def get_packets_to_send(self):
@@ -475,6 +478,8 @@ def test():
     raw_socket = start_raw_socket(dev)
 
     def handle_packet_from_outside(data):
+        logging.debug('--------------------------------------------------')
+        logging.debug('--------------------------------------------------')
         logging.debug('got packet: %s' % pktstr(data))
         pkt = Packet(data)
 
