@@ -57,7 +57,7 @@ class TCPSegment():
 
 class TCPConnection():
     """Manages the state of one half of a TCP connection."""
-    # Time from the connection is closed until calling connection_over_callback
+    # Time from when a FIN is sent until calling connection_over_callback.
     WAIT_TIME_SEC = 5
 
     def __init__(self, syn_seq, my_ip, my_port, other_ip, other_port,
@@ -136,9 +136,6 @@ class TCPConnection():
         if not self.closed:
             self.closed = True
             self.__need_to_send_now() # send the FIN
-            if self.connection_over_callback:
-                logging.debug('will teardown in %d sec' % TCPConnection.WAIT_TIME_SEC)
-                reactor.callLater(TCPConnection.WAIT_TIME_SEC, self.connection_over_callback)
 
     def fin_received(self, seq):
         """Indicates that a FIN has been received from the other side."""
@@ -228,6 +225,9 @@ class TCPConnection():
                                        ack=self.__get_ack_num(),
                                        data='',
                                        is_fin=True))
+            if self.connection_over_callback:
+                logging.debug('will teardown in %d sec' % TCPConnection.WAIT_TIME_SEC)
+                reactor.callLater(TCPConnection.WAIT_TIME_SEC, self.connection_over_callback)
 
         if not ret and self.need_to_send_ack:
             logging.debug('Adding a pure ACK to the outgoing queue (nothing to piggyback on)')
