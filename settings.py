@@ -40,3 +40,6 @@ MAX_TOPOLOGY_LIFE_SEC = 3600
 
 # Max time (in seconds) to keep an idle topology. (0 = no max)
 MAX_INACTIVE_TOPOLOGY_LIFE_SEC = 900
+
+# For VNS web server nodes: root folder which they will serve from
+WEB_SERVER_ROOT_WWW = './vns_web_server_www/'

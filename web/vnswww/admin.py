@@ -1,6 +1,6 @@
 from django.contrib import admin
 from models import Simulator, Organization, UserProfile, StatsTopology, \
-                   TopologyTemplate, Node, WebServer, WebServerHostname, Port, Link, \
+                   TopologyTemplate, Node, WebServer, WebServerPath, Port, Link, \
                    Topology, TopologySourceIPFilter, TopologyUserFilter, \
                    IPAssignment, MACAssignment, IPBlock, IPBlockAllocation, \
                    RecentIPBlockAllocation, SystemInfo
@@ -35,14 +35,14 @@ class NodeAdmin(admin.ModelAdmin):
     search_fields = ('template__name', 'name', 'type__name')
 
 class WebServerAdmin(admin.ModelAdmin):
-    list_display = ('template', 'name', 'type', 'web_server_addr', 'replace_hostname_in_http_replies')
+    list_display = ('template', 'name', 'type', 'path_to_serve')
     ordering = ('template', 'name')
-    search_fields = ('template__name', 'name', 'type__name', 'web_server_addr')
+    search_fields = ('template__name', 'name', 'type__name', 'path_to_serve')
 
-class WebServerHostnameAdmin(admin.ModelAdmin):
-    list_display = ('hostname',)
-    ordering = ('hostname',)
-    search_fields = ('hostname',)
+class WebServerPathAdmin(admin.ModelAdmin):
+    list_display = ('path',)
+    ordering = ('path',)
+    search_fields = ('path',)
 
 class PortAdmin(admin.ModelAdmin):
     list_display = ('node', 'name', 'ip_offset')
@@ -111,7 +111,7 @@ admin.site.register(UserProfile, UserProfileAdmin)
 admin.site.register(TopologyTemplate, TopologyTemplateAdmin)
 admin.site.register(Node, NodeAdmin)
 admin.site.register(WebServer, WebServerAdmin)
-admin.site.register(WebServerHostname, WebServerHostnameAdmin)
+admin.site.register(WebServerPath, WebServerPathAdmin)
 admin.site.register(Port, PortAdmin)
 admin.site.register(Link, LinkAdmin)
 admin.site.register(Topology, TopologyAdmin)

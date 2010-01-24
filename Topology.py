@@ -7,10 +7,12 @@ from socket import inet_aton, inet_ntoa
 import struct
 import time
 
-from settings import ARP_CACHE_TIMEOUT, MAY_FORWARD_TO_PRIVATE_IPS
+from settings import ARP_CACHE_TIMEOUT, MAY_FORWARD_TO_PRIVATE_IPS, WEB_SERVER_ROOT_WWW
+from HTTPServer import HTTPServer
 from LoggingHelper import log_exception, addrstr, pktstr
 import ProtocolHelper
-from ProtocolHelper import is_http_port
+from ProtocolHelper import is_http_port, Packet
+from TCPStack import TCPServer
 from VNSProtocol import VNSPacket, VNSInterface, VNSHardwareInfo
 import web.vnswww.models as db
 
@@ -79,7 +81,6 @@ class Topology():
         # read in this topology's nodes
         db_nodes = db.Node.objects.filter(template=t.template)
         self.gateway = None
-        self.web_server_ip_addrs = {} # maps IP address to web server node
         self.nodes = [self.__make_node(dn, raw_socket) for dn in db_nodes]
 
         # remember the DB to simulator object mapping
@@ -228,9 +229,6 @@ class Topology():
         first simulated node attached to the gateway."""
         gw_intf = self.gw_intf_to_first_hop
         if gw_intf:
-            if self.__is_packet_from_proxy_to_web_server(packet):
-                return # already handled
-
             self.stats.note_pkt_to_topo()
             if rewrite_dst_mac:
                 if self.is_arp_cache_valid():
@@ -240,23 +238,6 @@ class Topology():
                     self.need_arp_translation_for_pkt(packet)
             else:
                 gw_intf.link.send_to_other(gw_intf, packet)
-
-    def __is_packet_from_proxy_to_web_server(self, packet):
-        """Checks to see if this packet is from a proxy to its web server and
-        should be forwarded directly to it (not through the topology).  If so,
-        it takes care of this and returns True.  Otherwise False is returned."""
-        if len(packet)>=24 and packet[12:14]=='\x08\x00' and packet[23]=='\x06': # TCP/IP?
-            pkt = ProtocolHelper.Packet(packet)
-            if pkt.is_valid_tcp() and is_http_port(pkt.tcp_src_port): # from HTTP port?
-                ws = self.web_server_ip_addrs.get(pkt.ip_dst) # to one of our web servers?
-                if ws:
-                    ws = WebServer.HTTP_SESSIONS.get(pkt.tcp_dst_port)
-                    if ws:
-                        logging.debug('Gateway forwarding packet directly to %s for handling (from proxy): %s' % (ws.di(), pktstr(packet)))
-                        ws.handle_http_reply(ws.interfaces[0], pkt)
-                    # else: ignore it (old traffic)
-                    return True
-        return False
 
     def need_arp_translation_for_pkt(self, ethernet_frame):
         """Delays forwarding a packet to the node connected to the gateway until
@@ -345,8 +326,8 @@ class Topology():
         elif dn.type == db.Node.HUB_ID:
             return Hub(topo, dn.name)
         elif dn.type == db.Node.WEB_SERVER_ID:
-            hostname = dn.webserver.web_server_addr.get_ascii_hostname()
-            return WebServer(topo, dn.name, hostname, dn.webserver.replace_hostname_in_http_replies)
+            path = WEB_SERVER_ROOT_WWW + dn.webserver.path_to_serve.get_ascii_path()
+            return WebServer(topo, dn.name, path)
         elif dn.type == db.Node.GATEWAY_ID:
             if self.gateway is not None:
                 err = 'only one gateway per topology is allowed'
@@ -700,191 +681,36 @@ class WebServer(BasicNode):
     web_server_to_proxy_hostname parameter) on TCP port 80.  Like
     Host, it also replies to echo and ARP requests.  It serves the specified
     website by acting as a proxy for that website."""
-    def __init__(self, topo, name, web_server_to_proxy_hostname, repl_hn_in_replies):
+    def __init__(self, topo, name, path_to_serve):
         BasicNode.__init__(self, topo, name)
-        self.web_server_to_proxy_hostname = web_server_to_proxy_hostname
-        self.__init_web_server_ip()
-        if repl_hn_in_replies:
-            # match 'a' tags which have a 'href' field containing the hostname
-            # of the server we're proxying
-            self.reply_re = re.compile(r'(<a.*?)(href="[^"]*)(%s)([^"]*")' % web_server_to_proxy_hostname)
-            self.reply_sub_f = None # will be set when add_interface() is first called
-        else:
-            self.reply_re = None
-            self.reply_sub_f = None
-
-        self.reply_re_sip = re.compile(r'SENDER__SRC__IP::PORT')
-
-        # Each request is from a unique socket (TCP port and IP pair).  It is
-        # then forwarded from a different local TCP port to the web server this
-        # node is proxying.  The request to local port mapping as well as the
-        # reverse mapping is stored in conns.  Keys and values are all raw
-        # byte-strings in network byte order.
-        self.conns = {}  # (requester IP, TCP port) <=> local TCP port
-        self.fins = {} # keys = conns key which has sent a FIN
-
-    def __init_web_server_ip(self):
-        """Resolves the target web server hostname to an IP address."""
-        try:
-            self.web_server_to_proxy_ip = inet_aton(self.web_server_to_proxy_hostname) # just a plain IP address
-            return
-        except socket.error:
-            pass # must be a hostname; try to resolve it
-        try:
-            str_ip = socket.gethostbyname(self.web_server_to_proxy_hostname)
-            self.web_server_to_proxy_ip = inet_aton(str_ip)
-        except socket.gaierror:
-            self.web_server_to_proxy_ip = None
-            log_exception(logging.WARN,
-                          'unable to resolve web server hostname: ' + self.web_server_to_proxy_hostname)
-
-    def add_interface(self, name, mac, ip, mask):
-        if self.reply_re and not self.reply_sub_f:
-            str_ip = inet_ntoa(ip)
-            len_diff = len(self.web_server_to_proxy_hostname) - len(str_ip)
-            if len_diff < 0:
-                logging.error('impossible hostname substitution request - ' + \
-                              'DB should not permit this: hostname=%s (len=%d) < ip=%s (len=%d)' %
-                              (self.web_server_to_proxy_hostname, len(self.web_server_to_proxy_hostname),
-                               str_ip, len(str_ip)))
-                self.reply_re = None # can't do it
-            else:
-                # swap out the hostname for our IP; length MUST be the same to
-                # make TCP happy, so add spaces before the 'href' field as needed
-                extra_padding = ' ' * len_diff
-                self.reply_sub_f = lambda m : m.groups()[0] + extra_padding + m.groups()[1] + str_ip + m.groups()[3]
-
-        # tell the topology about this web server's IP
-        self.topo.web_server_ip_addrs[ip] = self
-
-        return BasicNode.add_interface(self, name, mac, ip, mask)
+        self.http_server = HTTPServer(TCPServer.ANY_PORT, path_to_serve)
 
     @staticmethod
     def get_type_str():
         return 'Web Server'
 
-    def __has_web_server_ip(self):
-        """Returns True if the hostname was successfully resolved to an IP."""
-        return self.web_server_to_proxy_ip is not None
-
     def handle_non_icmp_ip_packet_to_self(self, intf, pkt):
-        """If pkt is part of an HTTP exchange on HTTP_PORT, then the packet is
-        forwarded as appropriate (this node acts as a proxy server)  Otherwise,
-        the default superclass implementation is called."""
-        if pkt.is_valid_tcp() and self.__has_web_server_ip():
+        """If pkt is to an HTTP_PORT, then the packet is handed off to the HTTP
+        server.  Otherwise, the default superclass implementation is called."""
+        if pkt.is_valid_tcp():
             if is_http_port(pkt.tcp_dst_port):
                 self.handle_http_request(intf, pkt)
                 return
-            elif is_http_port(pkt.tcp_src_port):
-                logging.warning('Did not expect to get an HTTP reply through this path anymore')
-                self.handle_http_reply(intf, pkt)
-                return
-
         BasicNode.handle_non_icmp_ip_packet_to_self(self, intf, pkt)
-
-    @staticmethod
-    def __cim(ci, myport):
-        """Stringifies a client info 2-tuple and port number belonging to me."""
-        ip, port = ci
-        return 'client=%s:%d me=%d' % (inet_ntoa(ip), struct.unpack('>H', port)[0],
-                                       struct.unpack('>H', myport)[0])
-
-    NEXT_TCP_PORT = 10000
-    HTTP_SESSIONS = {}
-
-    @staticmethod
-    def get_and_advance_tcp_port():
-        ret = WebServer.NEXT_TCP_PORT
-        WebServer.NEXT_TCP_PORT += 1
-        if WebServer.NEXT_TCP_PORT > 65535:
-            WebServer.NEXT_TCP_PORT = 10000
-        return ret
 
     def handle_http_request(self, intf, pkt):
         """Forward the received packet from an HTTP client to the web server."""
-        # see if we are already working with this connection
-        client_info = (pkt.ip_src, pkt.tcp_src_port)
-        my_port = self.conns.get(client_info)
-        if my_port is None:
-            # new connection: allocate a port for it
-            my_port = struct.pack('> H', WebServer.get_and_advance_tcp_port())
-            WebServer.HTTP_SESSIONS[my_port] = self
-            self.conns[client_info] = my_port
-            self.conns[my_port] = client_info
-            logging.debug('%s forwarding new HTTP request: %s' %
-                          (self.di(), self.__cim(client_info, my_port)))
-        else:
-            logging.debug('%s forwarding ongoing HTTP request: %s' %
-                          (self.di(), self.__cim(client_info, my_port)))
-
-        # rewrite and forward the request to the web server we're proxying
-        new_dst = self.web_server_to_proxy_ip
-        new_packet = pkt.modify_tcp_packet(intf.ip, my_port,
-                                           new_dst, pkt.tcp_dst_port,
-                                           reverse_eth=True)
-
-        # send it directly - the router on the topology shouldn't even know
-        logging.debug('%s sending packet out to the real world directly (to proxy): %s' % (self.di(), pktstr(new_packet)))
-        self.topo.send_packet_to_gateway(new_packet)
-
-        self.__check_for_teardown(pkt, client_info, my_port)
-
-    def handle_http_reply(self, intf, pkt):
-        """Forward the received packet from the web server to the HTTP client."""
-        if pkt.ip_src != self.web_server_to_proxy_ip:
-            logging.debug('%s ignoring HTTP reply from unexpected source %s' % (self.di(), addrstr(pkt.ip_dst)))
-            return # ignore HTTP replies unless they're from our web server
-
-        client_info = self.conns.get(pkt.tcp_dst_port)
-        if client_info is None:
-            logging.debug('%s ignoring unexpected HTTP reply to my port %s' % (self.di(), struct.unpack('>H',pkt.tcp_dst_port)[0]))
-            return # ignore unexpected replies
-        logging.debug('%s forwarding HTTP reply to client from me %s' % (self.di(), self.__cim(client_info, pkt.tcp_dst_port)))
-
-        if self.reply_sub_f:
-            sz = len(pkt.tcp_data)
-            pkt.tcp_data = self.reply_re.sub(self.reply_sub_f, pkt.tcp_data)
-
-        if self.reply_re_sip:
-            src_ip = inet_ntoa(client_info[0])
-            src_port = struct.unpack('>H', client_info[1])[0]
-            sip_repl_txt = '%15s:%-5s' % (src_ip, src_port)
-            sz_before = len(pkt.tcp_data)
-            pkt.tcp_data = self.reply_re_sip.sub(sip_repl_txt, pkt.tcp_data)
-            sz_after = len(pkt.tcp_data)
-            logging.debug('size was %d then %d' % (sz_before, sz_after))
-
-        # rewrite and forward the reply back to the client its associated with
-        (client_ip, client_tcp_port) = client_info
-        new_packet = pkt.modify_tcp_packet(intf.ip, pkt.tcp_src_port,
-                                           client_ip, client_tcp_port,
-                                           reverse_eth=True)
-        intf.link.send_to_other(intf, new_packet)
-
-        self.__check_for_teardown(pkt, pkt.tcp_dst_port, client_info)
-
-    def __check_for_teardown(self, pkt, side_from, other_side):
-        """Checks to see if a TCP RST or the final FIN has been received from
-        side_from and handles them appropriately if so."""
-        if pkt.is_tcp_rst() or self.__is_full_close(pkt, side_from, other_side):
-            del self.conns[side_from]
-            del self.conns[other_side]
-            WebServer.HTTP_SESSIONS.pop(side_from, None)
-            WebServer.HTTP_SESSIONS.pop(other_side, None)
-            self.fins.pop(other_side, None)
-            logging.debug('%s HTTP connection state removed (RST or final FIN)' % self.di())
-
-    def __is_full_close(self, pkt, side_from, other_side):
-        """Checks to see if pkt from side_from is a FIN.  Returns True if
-        other_side has already sent a FIN.  Otherwise returns False."""
-        if not pkt.is_tcp_fin():
-            return False
-        elif self.fins.has_key(other_side):
-            return True
-        else:
-            self.fins[side_from] = True # cleaned up by __check_for_teardown
-            return False
+        tcp_conn = self.http_server.handle_tcp(pkt)
+        if tcp_conn:
+            tcp_pts = tcp_conn.get_packets_to_send()
+            if tcp_pts:
+                for tcp, data in tcp_pts:
+                    eth = pkt.get_reversed_eth()
+                    ip = pkt.get_reversed_ip(new_ttl=64, new_tlen=pkt.ip_hlen+len(tcp)+len(data))
+                    pkt_out = eth + ip + Packet.cksum_tcp_hdr(ip, tcp, data) + data
+                    logging.debug('%s sending packet from HTTP server: %s' % (self, pktstr(pkt_out)))
+                    intf.link.send_to_other(intf, pkt_out)
 
     def __str__(self):
-        ps = ' proxying={%s->%s}' % (self.web_server_to_proxy_hostname, addrstr(self.web_server_to_proxy_ip))
+        ps = ' serving:%s' % self.http_server.get_path_being_served()
         return BasicNode.__str__(self) + ps

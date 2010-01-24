@@ -211,31 +211,36 @@ class Node(Model):
     def __unicode__(self):
         return u'%s: %s' % (self.template.name, self.name)
 
-class WebServerHostname(Model):
-    """A web server hostname which can be proxied by a simulated web server."""
-    hostname = CharField(max_length=256)
+class WebServerPath(Model):
+    """A path which a web server can serve."""
+    path = CharField(max_length=512,
+                     help_text='This path will be relative to APP_SERVER_ROOT_WWW ' + \
+                               'folder in the VNS root folder.')
 
-    def get_ascii_hostname(self):
-        return self.hostname.encode('ascii')
+    RE_TWO_PERIODS = re.compile(r'[.][.]')
+    RE_OK_PATH = re.compile(r'^[-A-Za-z0-9_.][-A-Za-z0-9_./]*$')
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        if WebServerPath.RE_TWO_PERIODS.search(self.path):
+            raise ValidationError('path may not contain two periods next to one another')
+        elif not WebServerPath.RE_OK_PATH.match(self.path):
+            raise ValidationError('path must only contain letters, numbers, dashes, underscores, periods, and slashes and must not start with a slash.')
+
+    def get_ascii_path(self):
+        return self.path.encode('ascii')
 
     def __unicode__(self):
-        return self.hostname
+        return self.path
 
 class WebServer(Node):
     """A web server node.  It specifies which web server it will proxy (i.e.,
     if you connect to it, what website will it appear to serve).  This is
     limited to choices in the WebServerHostname table to prevent users from
     using the system to retrieve content from questionable sources."""
-    web_server_addr = ForeignKey(WebServerHostname)
-    replace_hostname_in_http_replies = \
-        BooleanField(default=True,
-                     help_text='If true, then HTTP replies will have any ' + \
-                               'occurrence of the hostname within the "href"' + \
-                               'field of the "a" tag replaced with this ' + \
-                               'node\'s IP address.')
+    path_to_serve = ForeignKey(WebServerPath)
 
     def __unicode__(self):
-        return Node.__unicode__(self) + ' -> %s' % self.web_server_addr.__unicode__()
+        return Node.__unicode__(self) + ' -> %s' % self.path_to_serve.__unicode__()
 
 class PortTreeNode():
     """A node in a tree of ports."""
