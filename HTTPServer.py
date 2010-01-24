@@ -30,6 +30,10 @@ class HTTPServer(TCPServer):
                 logging.debug('data does not match GET request (%s...)' % data[0:20])
         return None
 
+    def get_path_being_served(self):
+        """Returns the path this server is serving files from."""
+        return self.serve_from
+
     def handle_tcp(self, pkt):
         # take care of the usual TCP stuff
         conn = TCPServer.handle_tcp(self, pkt)
