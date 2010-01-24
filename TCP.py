@@ -192,13 +192,16 @@ class TCPConnection():
         """The next call to get_packets_to_send will ensure an ACK is sent as
         well as any unacknowledged data."""
         self.need_to_send_ack = True
-        self.next_resend = 0  # send now
         if self.has_data_to_send_callback:
             self.has_data_to_send_callback()
 
     def __note_activity(self):
         """Marks the current time as the last active time."""
         self.last_activity = time.time()
+
+    def reset_resend_timer(self):
+        self.next_resend = time.time() + 2*self.rtt
+        reactor.callLater(2*self.rtt, self.has_data_to_send_callback)
 
     def set_ack(self, ack):
         """Handles receipt of an ACK."""
@@ -229,10 +232,14 @@ class TCPConnection():
             return ret
 
         # is it time to send data?
+        retransmit = False
         now = time.time()
         if now < self.next_resend:
-            logging.debug('not time to send any packets yet (now=%d next=%d)' % (now, self.next_resend))
-            return ret
+            if not self.need_to_send_ack:
+                logging.debug('not time to send any packets yet (now=%d next=%d)' % (now, self.next_resend))
+                return ret
+        else:
+            retransmit = True
 
         # do we have something to send?
         if not self.my_syn_acked:
@@ -256,12 +263,25 @@ class TCPConnection():
                           (num_chunks_to_send_now, num_chunks_left, data_chunk_size, self.window, outstanding_bytes))
             # create the individual TCP packets to send
             for i in range(1+num_chunks_to_send_now):
+                # determine what bytes and sequence numbers this chunk includes
                 start_index = i * data_chunk_size
                 end_index_plus1 = min(sz, (i+1)*data_chunk_size) # exclusive
                 if end_index_plus1 == sz:
                     self.all_data_sent = True
                 start_seq = base_offset + start_index
                 end_seq = start_seq + end_index_plus1 - start_index - 1 # inclusive
+
+                # manage retransmissions ...
+                if not retransmit:
+                    if end_seq <= self.last_seq_sent:
+                        continue # we've sent this segment before; don't retransmit it yet
+                    diff = self.last_seq_sent - start_seq + 1
+                    if diff > 0:
+                        # we've sent part of this segment before: only send the new stuff
+                        start_seq += diff
+                        start_index += 1
+
+                # track the latest byte we've sent and formulate this chunk into a packet
                 self.last_seq_sent = max(self.last_seq_sent, end_seq)
                 logging.debug('Adding data bytes from %d to %d (inclusive) to the outgoing queue' % (start_seq, end_seq))
                 ret.append(make_tcp_packet(self.my_port, self.other_port,
@@ -288,9 +308,8 @@ class TCPConnection():
                                        data=''))
 
         if ret:
-            self.next_resend = now + 2*self.rtt
+            self.reset_resend_timer()
             self.need_to_send_ack = False
-            reactor.callLater(2*self.rtt, self.has_data_to_send_callback)
         return ret
 
 class TCPServer():
