@@ -231,8 +231,8 @@ class TCPConnection():
         if not ret and self.need_to_send_ack:
             logging.debug('Adding a pure ACK to the outgoing queue (nothing to piggyback on)')
             ret.append(make_tcp_packet(self.my_port, self.other_port,
-                                       seq=self.__get_ack_num(),
-                                       ack=self.next_seq_needed,
+                                       seq=self.first_unacked_seq,
+                                       ack=self.__get_ack_num(),
                                        data=''))
 
         if ret:
@@ -326,7 +326,7 @@ class HTTPServer(TCPServer):
     def __init__(self, port, serve_from, max_active_conns=25, default_page='index.html'):
         """Constructs an HTTP server listening on the specified port and serving
         files from the specified folder 'serve_from'."""
-        TCPServer.__init__(self, port)
+        TCPServer.__init__(self, port, max_active_conns)
         self.serve_from = serve_from
         self.default_page = default_page
 
@@ -364,10 +364,11 @@ class HTTPServer(TCPServer):
         line and content-type.  If a 404 status line is generated, then a
         basic 404 page body will also be generated."""
         code='200 OK' if ok else '404 Not Found'
-        type='text/html' if is_html else 'application/octet-stream'
-        header = 'HTTP/1.0 %s\r\nContent-Type: %s;\r\n\r\n' % (code, type)
+        ctype='text/html' if is_html else 'application/octet-stream'
+        header = 'HTTP/1.0 %s\r\nContent-Type: %s;\r\n\r\n' % (code, ctype)
         if not ok and gen_body_if_404:
-            return header + '<html><body><h1>404: Page Not Found</h1></body></html>'
+            header += '<html><body><h1>404: Page Not Found</h1></body></html>'
+        return header
 
     ALLOWED_CHARS = r'[-A-Za-z0-9_/]*'
     RE_OK_URL = re.compile(r'^%s([.]%s)?$' % (ALLOWED_CHARS, ALLOWED_CHARS))
@@ -389,7 +390,6 @@ class HTTPServer(TCPServer):
                 ext_and_trailer = match.group(1)
                 is_html = HTTPServer.RE_HTML.search(ext_and_trailer)
                 header = HTTPServer.__make_response_header(True, is_html)
-                header = 'HTTP/1.0 200 OK\r\nContent-Type: %s;\r\n\r\n' % type
                 return header + body
             except IOError as e:
                 logging.debug('unable to find requested file "%s": %s' % (url, e))
@@ -449,7 +449,7 @@ def test(dev, path_to_serve):
                 else:
                     logging.debug('no packets to send back')
 
-    def run_pcap(dev):
+    def run_pcap():
         """Start listening for packets coming in from the outside world."""
         MAX_LEN      = 1514    # max size of packet to capture
         PROMISCUOUS  = 1       # promiscuous mode?
@@ -473,7 +473,7 @@ def test(dev, path_to_serve):
         logging.debug("Listening on %s: net=%s, mask=%s, filter=%s" % (dev, p.getnet(), p.getmask(), PCAP_FILTER))
         p.loop(MAX_PKTS, ph)
 
-    reactor.callInThread(run_pcap, DEV)
+    reactor.callInThread(run_pcap)
     reactor.run()
 
 if __name__ == '__main__':
