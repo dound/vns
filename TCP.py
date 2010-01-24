@@ -289,12 +289,20 @@ class HTTPServer(TCPServer):
             logging.debug('HTTPServer not able to extract URL from received data yet')
         return conn
 
+    @staticmethod
+    def __make_response_header(ok, is_html=True):
+        code='200 OK' if ok else '404 Not Found'
+        type='text/html' if is_html else 'application/octet-stream'
+        header = 'HTTP/1.0 %s\r\nContent-Type: %s;\r\n\r\n' % (code, type)
+        if not ok:
+            return header + '<html><body><h1>404: Page Not Found</h1></body></html>'
+
     RE_OK_URL = re.compile('^[-A-Za-z0-9_/]*[.]html?$')
     RE_HTML = re.compile('[.]html?([?].*)?$')
     def make_response(self, url):
         """Tries to retrieve the contents of url and return an HTTP response."""
         if url == '/':
-                url = DEFAULT_PAGE
+            url = DEFAULT_PAGE
 
         if not HTTPServer.RE_OK_URL.match(url):
             body = None
@@ -309,11 +317,11 @@ class HTTPServer(TCPServer):
                 body = None
 
         if body:
-            type='text/html' if HTTPServer.RE_HTML.search(url) else 'application/octet-stream'
+            header = HTTPServer.__make_response_header(True, HTTPServer.RE_HTML.search(url))
             header = 'HTTP/1.0 200 OK\r\nContent-Type: %s;\r\n\r\n' % type
             return header + body
         else:
-            return 'HTTP/1.0 404 Not Found\r\n\r\n'
+            return HTTPServer.__make_response_header(False)
 
 def test():
     from twisted.internet import reactor
