@@ -26,24 +26,26 @@ def make_tcp_packet(src_port, dst_port, seq=0, ack=0, window=5096, data='',
            struct.pack('>B H', flags, window) + '\x00\x00\x00\x00', data)
 
 class TCPSegment():
+    """Describes a contiguous chunk of data in a TCP stream."""
     def __init__(self, seq, data):
-        self.seq = seq
-        self.data = data
-        self.next = seq + len(data)
+        self.seq = seq               # sequence # of the first byte in this segment
+        self.data = data             # data in this segment
+        self.next = seq + len(data)  # first sequence # of the next data byte
         if not data:
             raise Exception('segments must contain at least 1B of data')
 
     def combine(self, s2):
         """Combine this segment with a s2 which comes no earlier than this
-        segment starts.  If they do not overlap, False is returned."""
+        segment starts.  If they do not overlap or meet, False is returned."""
         assert(self.__cmp__(s2) <= 0) # s2 must not start earlier
 
         if self.next < s2.seq:
-            return True # no overlap: s2 is later than us
+            return False # no overlap: s2 is later than us
 
         if self.next >= s2.next:
             return True # self completely subsumes s2
 
+        # combine the two segments
         offset = self.next - s2.seq
         new_data = self.data + s2.data[offset:] # union of the two
 
