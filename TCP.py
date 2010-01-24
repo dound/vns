@@ -391,6 +391,12 @@ class HTTPServer(TCPServer):
         return HTTPServer.__make_response_header(False)
 
 def test(dev, path_to_serve):
+    """Sniffs TCP packets arriving on port 80 and manually handles them with an
+    HTTPServer object which is serving the given path.  For this test to work,
+    your OS will need to silently drop or ignore TCP packets to port 80 (e.g.,
+    temporarily add a DENY rule for TCP port 80 to your firewall).  If you do
+    not do this, then your OS will probably respond with TCP resets at the same
+    time as the manual TCP stack is trying to reply with its own response."""
     from pcapy import open_live, PcapError
     from ProtocolHelper import Packet
     from LoggingHelper import pktstr
