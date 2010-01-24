@@ -92,6 +92,7 @@ class TCPConnection():
         self.first_unacked_seq = random.randint(0, 0x8FFFFFFF)
         self.last_seq_sent = self.first_unacked_seq
         self.my_syn_acked = False
+        self.all_data_sent = False
         self.my_fin_sent = False
         self.my_fin_acked = False
         self.next_resend = 0
@@ -137,6 +138,7 @@ class TCPConnection():
         if not self.closed:
             logging.debug('Adding %dB to send (%dB already waiting)' % (len(data), len(self.data_to_send)))
             self.data_to_send += data
+            self.all_data_sent = False
             self.__need_to_send_now() # send the data
         else:
             raise socket.error('cannot send data on a closed socket')
@@ -255,6 +257,8 @@ class TCPConnection():
             for i in range(1+num_chunks_to_send_now):
                 start_index = i * data_chunk_size
                 end_index_plus1 = min(sz, (i+1)*data_chunk_size) # exclusive
+                if end_index_plus1 == sz:
+                    self.all_data_sent = True
                 start_seq = base_offset + start_index
                 end_seq = start_seq + end_index_plus1 - start_index - 1 # inclusive
                 self.last_seq_sent = max(self.last_seq_sent, end_seq)
@@ -264,7 +268,7 @@ class TCPConnection():
                                            ack=self.__get_ack_num(),
                                            data=self.data_to_send[start_index:end_index_plus1]))
 
-        if self.closed and not self.my_fin_acked:
+        if self.closed and not self.my_fin_acked and self.all_data_sent:
             logging.debug('Adding my FIN packet to the outgoing queue')
             ret.append(make_tcp_packet(self.my_port, self.other_port,
                                        seq=base_offset + sz,
