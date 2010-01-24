@@ -9,8 +9,6 @@ import time
 
 from twisted.internet import reactor
 
-MAX_DATA_ALLOWED = 10000
-
 def make_tcp_packet(src_port, dst_port, seq=0, ack=0, window=5096, data='',
                     is_fin=False, is_rst=False, is_syn=False, is_ack=True):
     """Creates a TCP header with no options and with the checksum zeroed."""
@@ -58,14 +56,22 @@ class TCPSegment():
         return cmp(self.seq, x.seq)
 
 class TCPConnection():
+    """Manages the state of one half of a TCP connection."""
+    # Time from the connection is closed until calling connection_over_callback
+    WAIT_TIME_SEC = 5
+
     def __init__(self, syn_seq, my_ip, my_port, other_ip, other_port,
-                 assumed_rtt=1.0, mtu=1500):
+                 connection_over_callback, has_data_to_send_callback,
+                 assumed_rtt=0.5, mtu=1500, max_data=2048):
         self.my_ip = my_ip
         self.my_port = my_port
         self.other_ip = other_ip
         self.other_port = other_port
         self.rtt = assumed_rtt
         self.mtu = mtu
+        self.max_data = max_data
+        self.connection_over_callback = lambda : connection_over_callback(self)
+        self.has_data_to_send_callback = lambda : has_data_to_send_callback(self)
 
         self.segments = []
         self.next_seq_needed = syn_seq + 1
@@ -81,7 +87,12 @@ class TCPConnection():
         self.next_resend = 0
 
     def add_segment(self, segment):
-        """Merges segment into the bytes already received."""
+        """Merges segment into the bytes already received.  Raises socket.error
+        if this segment indicates that the data block will exceed the maximum
+        allowed."""
+        if len(self.segments) > 0 and segment.next-self.segments[0].seq>self.max_data:
+            raise socket.error('maximum data limit exceeded')
+
         self.__add_segment(segment)
         if len(self.segments) > 0 and self.segments[0].next > self.next_seq_needed:
             self.next_seq_needed = self.segments[0].next
@@ -110,7 +121,8 @@ class TCPConnection():
                 break
 
     def add_data_to_send(self, data):
-        """Adds data to be sent to the other side of the connection."""
+        """Adds data to be sent to the other side of the connection.  Raises
+        socket.error if the socket is closed."""
         if not self.closed:
             self.data_to_send += data
             self.__need_to_send_now() # send the data
@@ -118,9 +130,20 @@ class TCPConnection():
             raise socket.error('cannot send data on a closed socket')
 
     def close(self):
-        """Closes this end of the connection.  Will cause a FIN to be sent."""
-        self.closed = True
-        self.__need_to_send_now() # send the FIN
+        """Closes this end of the connection.  Will cause a FIN to be sent if
+        the connection was not already closed.  The connection will be call
+        its connection over callback TCPConnection.WAIT_TIME_SEC later."""
+        if not self.closed:
+            self.closed = True
+            self.__need_to_send_now() # send the FIN
+            if self.connection_over_callback:
+                reactor.callLater(TCPConnection.WAIT_TIME_SEC, self.connection_over_callback)
+
+    def fin_received(self, seq):
+        """Indicates that a FIN has been received from the other side."""
+        self.received_fin = True
+        self.next_seq_needed = seq + 1
+        self.__need_to_send_now() # ACK the FIN
 
     def __get_ack_num(self):
         """Returns the sequence number we should use for the ACK field on
@@ -134,11 +157,9 @@ class TCPConnection():
         else:
             return ''
 
-    def got_fin(self, seq):
-        """Indicates that a FIN has been received from the other side."""
-        self.received_fin = True
-        self.next_seq_needed = seq + 1
-        self.__need_to_send_now() # ACK the FIN
+    def get_socket_pair(self):
+        """Returns the socket pair describing this connection (other then self)."""
+        return ((self.other_ip, self.other_port), (self.my_ip, self.my_port))
 
     def has_ready_data(self):
         """Returns True if data has been received and there are no gaps in it."""
@@ -150,6 +171,8 @@ class TCPConnection():
         well as any unacknowledged data."""
         self.need_to_send_ack = True
         self.next_resend = 0  # send now
+        if self.has_data_to_send_callback:
+            self.has_data_to_send_callback()
 
     def set_ack(self, ack):
         """Handles receipt of an ACK."""
@@ -213,8 +236,9 @@ class TCPConnection():
                                        data=''))
 
         if ret:
-            self.next_resend = now + self.rtt
+            self.next_resend = now + 2*self.rtt
             self.need_to_send_ack = False
+            reactor.callLater(2*self.rtt, self.has_data_to_send_callback)
         return ret
 
 class TCPServer():
@@ -227,6 +251,18 @@ class TCPServer():
         assert(port>=0 and port<65536, "Port must be between 0 and 65536 (exclusive) or TCPServer.ANY_PORT")
         self.connections = {}
         self.listening_port_nbo = struct.pack('>H', port)
+
+    def __connection_over(self, conn):
+        """Called when it is ready to be removed.  Removes the connection."""
+        socket_pair = conn.get_socket_pair()
+        try:
+            del self.connections[socket_pair]
+        except KeyError:
+            logging.warn('Tried to remove connection which is not in our dictionary: %s' % str(socket_pair))
+
+    def __connection_has_data_to_send(self, conn):
+        """Called when a connection has data to send."""
+        pass
 
     def get_port_nbo(self):
         """Returns the 2-byte NBO representation of the port being listened on."""
@@ -254,7 +290,7 @@ class TCPServer():
             logging.debug('received TCP packet from a new socket pair: %s' % str(socket_pair))
             # there is no connection for this socket pair -- did we get a SYN?
             if pkt.is_tcp_syn():
-                conn = TCPConnection(seq, pkt.ip_dst, pkt.tcp_dst_port, pkt.ip_src, pkt.tcp_src_port)
+                conn = TCPConnection(seq, pkt.ip_dst, pkt.tcp_dst_port, pkt.ip_src, pkt.tcp_src_port, self.__connection_over, self.__connection_has_data_to_send)
                 self.connections[socket_pair] = conn
                 logging.debug('received TCP SYN packet -- new connection created: %s' % conn)
             else:
@@ -264,10 +300,15 @@ class TCPServer():
         # pull out the data
         if len(pkt.tcp_data):
             logging.debug('Adding segment for %d bytes received' % len(pkt.tcp_data))
-            conn.add_segment(TCPSegment(seq, pkt.tcp_data))
+            try:
+                conn.add_segment(TCPSegment(seq, pkt.tcp_data))
+            except socket.error:
+                logging.debug('Maximum data allowed for a connection exceeded: closing it')
+                conn.close()
+                return None
 
         if pkt.is_tcp_fin():
-            conn.got_fin(seq)
+            conn.fin_received(seq)
 
         # remember window and latest ACK
         conn.window = window
