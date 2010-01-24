@@ -246,11 +246,12 @@ class TCPServer():
     # Pass this value to the constructor and the TCPServer will accept connections on any port.
     ANY_PORT = 0
 
-    def __init__(self, port):
+    def __init__(self, port, max_active_conns=25):
         """port is the port the TCPServer should listen for SYN packets on."""
         assert(port>=0 and port<65536, "Port must be between 0 and 65536 (exclusive) or TCPServer.ANY_PORT")
         self.connections = {}
         self.listening_port_nbo = struct.pack('>H', port)
+        self.max_active_conns = max_active_conns
 
     def __connection_over(self, conn):
         """Called when it is ready to be removed.  Removes the connection."""
@@ -290,6 +291,10 @@ class TCPServer():
             logging.debug('received TCP packet from a new socket pair: %s' % str(socket_pair))
             # there is no connection for this socket pair -- did we get a SYN?
             if pkt.is_tcp_syn():
+                if len(self.connections) >= self.max_active_conns:
+                    logging.info('Ignoring new connection request: already have %d active connections (the max)' % self.max_active_conns)
+                    return None
+
                 conn = TCPConnection(seq, pkt.ip_dst, pkt.tcp_dst_port, pkt.ip_src, pkt.tcp_src_port, self.__connection_over, self.__connection_has_data_to_send)
                 self.connections[socket_pair] = conn
                 logging.debug('received TCP SYN packet -- new connection created: %s' % conn)
@@ -318,7 +323,7 @@ class TCPServer():
 
 class HTTPServer(TCPServer):
     """Implements a basic HTTP Server which handles raw TCP packets passed to it."""
-    def __init__(self, port, serve_from, default_page='index.html'):
+    def __init__(self, port, serve_from, max_active_conns=25, default_page='index.html'):
         """Constructs an HTTP server listening on the specified port and serving
         files from the specified folder 'serve_from'."""
         TCPServer.__init__(self, port)
