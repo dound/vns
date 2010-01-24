@@ -254,6 +254,7 @@ class TCPConnection():
                 logging.debug('not time to send any packets yet (now=%d next=%d)' % (now, self.next_resend))
                 return ret
         else:
+            logging.debug('retransmit timer has expired: will retransmit %dB outstanding bytes', self.last_seq_sent-self.first_unacked_seq+1)
             retransmit = True
 
         # do we have something to send?
