@@ -137,6 +137,7 @@ class TCPConnection():
             self.closed = True
             self.__need_to_send_now() # send the FIN
             if self.connection_over_callback:
+                logging.debug('will teardown in %d sec' % TCPConnection.WAIT_TIME_SEC)
                 reactor.callLater(TCPConnection.WAIT_TIME_SEC, self.connection_over_callback)
 
     def fin_received(self, seq):
@@ -256,6 +257,7 @@ class TCPServer():
     def __connection_over(self, conn):
         """Called when it is ready to be removed.  Removes the connection."""
         socket_pair = conn.get_socket_pair()
+        logging.debug('connection over callback from: %s' % str(socket_pair))
         try:
             del self.connections[socket_pair]
         except KeyError:
@@ -460,7 +462,7 @@ def test(dev, path_to_serve):
         # the method which will be called when a packet is captured
         def ph(_, data):
             # thread safety: call from the main twisted event loop
-            handle_packet_from_outside(data)
+            reactor.callFromThread(handle_packet_from_outside, data)
 
         # start the packet capture
         try:
