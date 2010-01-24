@@ -62,28 +62,35 @@ class TCPConnection():
 
     def __init__(self, syn_seq, my_ip, my_port, other_ip, other_port,
                  connection_over_callback, has_data_to_send_callback,
+        # socket pair
                  assumed_rtt=0.5, mtu=1500, max_data=2048):
         self.my_ip = my_ip
         self.my_port = my_port
         self.other_ip = other_ip
         self.other_port = other_port
+
+        # TCP configuration
         self.rtt = assumed_rtt
         self.mtu = mtu
         self.max_data = max_data
+
+        # callbacks
         self.connection_over_callback = lambda : connection_over_callback(self)
         self.has_data_to_send_callback = lambda : has_data_to_send_callback(self)
 
+        # info about this side of the TCP connection
         self.segments = []
         self.next_seq_needed = syn_seq + 1
         self.need_to_send_ack = False
         self.received_fin = False
+        self.closed = False
 
+        # information about outgoing data and relevant ACKs
         self.window = 0
         self.data_to_send = ''
         self.first_unacked_seq = random.randint(0, 0x8FFFFFFF)
         self.my_syn_acked = False
         self.my_fin_acked = False
-        self.closed = False
         self.next_resend = 0
 
     def add_segment(self, segment):
