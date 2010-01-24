@@ -198,6 +198,10 @@ class TCPConnection():
 
     def set_ack(self, ack):
         """Handles receipt of an ACK."""
+        if ack-1 > self.last_seq_sent:
+            logging.warn("truncating an ACK for bytes we haven't sent: ack=%d last_seq_sent=%d" % (ack, self.last_seq_sent))
+            ack = self.last_seq_sent + 1 # assume they meant to ack all bytes we have sent
+
         diff = ack - self.first_unacked_seq
         if diff > 0:
             self.__note_activity()
