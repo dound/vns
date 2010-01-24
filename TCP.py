@@ -7,6 +7,8 @@ import struct
 import sys
 import time
 
+from twisted.internet import reactor
+
 ASSUMED_RTT_SEC = 2.000
 CHUNK_SIZE = 1460
 MAX_DATA_ALLOWED = 10000
@@ -61,7 +63,6 @@ class TCPConnection():
         self.my_port = my_port
         self.other_ip = other_ip
         self.other_port = other_port
-
 
         self.segments = []
         self.next_seq_needed = syn_seq + 1
@@ -338,16 +339,15 @@ class HTTPServer(TCPServer):
                 logging.debug('unable to find requested file "%s": %s' % (url, e))
         return HTTPServer.__make_response_header(False)
 
-def test():
-    from twisted.internet import reactor
+def test(dev, path_to_serve):
     from pcapy import open_live, PcapError
     from ProtocolHelper import Packet
     from LoggingHelper import pktstr
+    import errno
     import socket
 
     def start_raw_socket(dev):
         """Starts a socket for sending raw Ethernet frames."""
-        import socket, errno
         try:
             raw_socket = socket.socket(socket.PF_PACKET, socket.SOCK_RAW)
             raw_socket.bind((dev, 0x9999))
@@ -360,17 +360,18 @@ def test():
             logging.exception('failed to open raw socket' + extra)
             sys.exit(-1)
 
-    ts = HTTPServer('\x00\x50', '/home/dgu/projects/vns/tmp-stuff/html') # listen on port 80
-    logging.debug('Created HTTPServer object listening on port 80')
-    raw_socket = start_raw_socket('eth0')
+    port = 80
+    server = HTTPServer(port, path_to_serve)
+    logging.debug('Created HTTPServer object listening on port %d' % port)
+    raw_socket = start_raw_socket(dev)
 
     def handle_packet_from_outside(data):
         logging.debug('got packet: %s' % pktstr(data))
         pkt = Packet(data)
 
-        if pkt.is_valid_tcp():
+        if pkt.is_tcp() and pkt.is_valid_tcp():
             logging.debug('passing on tcp packet ...')
-            tcp_conn = ts.handle_tcp(pkt)
+            tcp_conn = server.handle_tcp(pkt)
             if tcp_conn:
                 tcp_pts = tcp_conn.get_packets_to_send()
                 if tcp_pts:
@@ -393,7 +394,7 @@ def test():
         PROMISCUOUS  = 1       # promiscuous mode?
         READ_TIMEOUT = 100     # in milliseconds
         MAX_PKTS     = -1      # number of packets to capture; -1 => no limit
-        PCAP_FILTER  = 'ip src 192.168.1.101 and tcp port 80'
+        PCAP_FILTER  = 'tcp port 80'
 
         # the method which will be called when a packet is captured
         def ph(_, data):
@@ -411,7 +412,7 @@ def test():
         logging.debug("Listening on %s: net=%s, mask=%s, filter=%s" % (dev, p.getnet(), p.getmask(), PCAP_FILTER))
         p.loop(MAX_PKTS, ph)
 
-    reactor.callInThread(run_pcap, 'eth0')
+    reactor.callInThread(run_pcap, DEV)
     reactor.run()
 
 if __name__ == '__main__':
@@ -419,11 +420,10 @@ if __name__ == '__main__':
         import os
         os._exit(0)
 
-    from twisted.internet import reactor
     reactor.addSystemEventTrigger("before", "shutdown", bye)
     logging.basicConfig(level=logging.DEBUG, format='%(levelname)-8s %(module)s:%(funcName)s:%(lineno)d  %(message)s')
 
     try:
-        test()
+        test('eth0', './htdocs')
     except KeyboardInterrupt:
         sys.exit(0)
