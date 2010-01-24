@@ -249,14 +249,16 @@ class TCPConnection():
                           (num_chunks_to_send_now, num_chunks_left, data_chunk_size, self.window, outstanding_bytes))
             # create the individual TCP packets to send
             for i in range(1+num_chunks_to_send_now):
-                start = base_offset + i*data_chunk_size
-                end = min(sz, (i+1)*data_chunk_size)
-                self.last_seq_sent = max(self.last_seq_sent, end)
-                logging.debug('Adding data bytes from %d to %d to the outgoing queue' % (start, end-1))
+                start_index = i * data_chunk_size
+                end_index_plus1 = min(sz, (i+1)*data_chunk_size) # exclusive
+                start_seq = base_offset + start_index
+                end_seq = start_seq + end_index_plus1 - start_index - 1 # inclusive
+                self.last_seq_sent = max(self.last_seq_sent, end_seq)
+                logging.debug('Adding data bytes from %d to %d (inclusive) to the outgoing queue' % (start_seq, end_seq))
                 ret.append(make_tcp_packet(self.my_port, self.other_port,
-                                           seq=start,
+                                           seq=start_seq,
                                            ack=self.__get_ack_num(),
-                                           data=self.data_to_send[i*data_chunk_size:end]))
+                                           data=self.data_to_send[start_index:end_index_plus1]))
 
         if self.closed and not self.my_fin_acked:
             logging.debug('Adding my FIN packet to the outgoing queue')
