@@ -173,6 +173,10 @@ class Packet:
         """Returns True if the RST flag is set."""
         return (self.tcp_control_bits & 0x04) == 0x04
 
+    def is_tcp_ack(self):
+        """Returns True if the ACK flag is set."""
+        return (self.tcp_control_bits & 0x10) == 0x10
+
     @staticmethod
     def cksum_ip_hdr(ip_hdr):
         """Returns the provided IP header with the checksum set."""
