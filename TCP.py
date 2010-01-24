@@ -341,7 +341,7 @@ class TCPServer():
             conn.fin_received(seq)
 
         # remember window and latest ACK
-        conn.window = window
+        conn.window = max(1460, window)  # ignore requests to shrink the window below an MTU
         if pkt.is_tcp_ack():
             conn.set_ack(ack)
         return conn
