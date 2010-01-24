@@ -89,7 +89,7 @@ class TCPConnection():
         self.segments = []
         self.next_seq_needed = syn_seq + 1
         self.need_to_send_ack = False
-        self.need_to_send_data = False
+        self.need_to_send_data = True # need to send a SYN
         self.received_fin = False
         self.closed = False
         self.dead = False
@@ -104,6 +104,7 @@ class TCPConnection():
         self.my_fin_sent = False
         self.my_fin_acked = False
         self.next_resend = 0
+        self.reset_resend_timer()
 
     def add_segment(self, segment):
         """Merges segment into the bytes already received.  Raises socket.error
