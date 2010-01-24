@@ -70,7 +70,7 @@ class HTTPServer(TCPServer):
         match = HTTPServer.RE_OK_URL.match(url)
         if match:
             try:
-                f = open(self.serve_from + '/' + url)
+                f = open(self.serve_from + '/' + url, 'rb')
                 body = f.read()
                 f.close()
 
