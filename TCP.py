@@ -1,28 +1,28 @@
 """A very, very simple TCP stack."""
-from SocketServer import TCPServer
 import logging
 import random
 import re
+import socket
 import struct
 import sys
 import time
 
 from twisted.internet import reactor
 
-ASSUMED_RTT_SEC = 2.000
-CHUNK_SIZE = 1460
 MAX_DATA_ALLOWED = 10000
 
 def make_tcp_packet(src_port, dst_port, seq=0, ack=0, window=5096, data='',
-                    is_fin=False, is_rst=False, is_syn=False):
-    flags = 0x10 # ACK
+                    is_fin=False, is_rst=False, is_syn=False, is_ack=True):
+    """Creates a TCP header with no options and with the checksum zeroed."""
+    flags = 0x00
     if is_fin:
         flags |= 0x01
     if is_syn:
         flags |= 0x02
     if is_rst:
         flags |= 0x04
-
+    if is_ack:
+        flags |= 0x10
     return (src_port + dst_port + struct.pack('> 2I', seq, ack) + '\x50' + \
            struct.pack('>B H', flags, window) + '\x00\x00\x00\x00', data)
 
@@ -58,11 +58,14 @@ class TCPSegment():
         return cmp(self.seq, x.seq)
 
 class TCPConnection():
-    def __init__(self, syn_seq, my_ip, my_port, other_ip, other_port):
+    def __init__(self, syn_seq, my_ip, my_port, other_ip, other_port,
+                 assumed_rtt=1.0, mtu=1500):
         self.my_ip = my_ip
         self.my_port = my_port
         self.other_ip = other_ip
         self.other_port = other_port
+        self.rtt = assumed_rtt
+        self.mtu = mtu
 
         self.segments = []
         self.next_seq_needed = syn_seq + 1
@@ -78,11 +81,11 @@ class TCPConnection():
         self.next_resend = 0
 
     def add_segment(self, segment):
-        """Puts together a newly received segment."""
+        """Merges segment into the bytes already received."""
         self.__add_segment(segment)
         if len(self.segments) > 0 and self.segments[0].next > self.next_seq_needed:
             self.next_seq_needed = self.segments[0].next
-            self.need_to_send_ack = True # we just got new data
+            self.__need_to_send_now() # ACK the new data
 
     def __add_segment(self, segment):
         combined_index = None
@@ -106,15 +109,47 @@ class TCPConnection():
             else:
                 break
 
+    def add_data_to_send(self, data):
+        """Adds data to be sent to the other side of the connection."""
+        if not self.closed:
+            self.data_to_send += data
+            self.__need_to_send_now() # send the data
+        else:
+            raise socket.error('cannot send data on a closed socket')
+
+    def close(self):
+        """Closes this end of the connection.  Will cause a FIN to be sent."""
+        self.closed = True
+        self.__need_to_send_now() # send the FIN
+
+    def __get_ack_num(self):
+        """Returns the sequence number we should use for the ACK field on
+        outgoing packets."""
+        return self.next_seq_needed
+
+    def get_data(self):
+        """Returns the data received so far (up to the first gap, if any)."""
+        if self.segments:
+            return self.segments[0].data
+        else:
+            return ''
+
     def got_fin(self, seq):
         """Indicates that a FIN has been received from the other side."""
         self.received_fin = True
         self.next_seq_needed = seq + 1
+        self.__need_to_send_now() # ACK the FIN
+
+    def has_ready_data(self):
+        """Returns True if data has been received and there are no gaps in it."""
+        logging.debug('# segments = %d' % len(self.segments))
+        return len(self.segments) == 1
+
+    def __need_to_send_now(self):
+        """The next call to get_packets_to_send will ensure an ACK is sent as
+        well as any unacknowledged data."""
         self.need_to_send_ack = True
         self.next_resend = 0  # send now
-
-    def get_ack_num(self):
-        return self.next_seq_needed
 
     def set_ack(self, ack):
         """Handles receipt of an ACK."""
@@ -145,67 +180,42 @@ class TCPConnection():
             logging.debug('Adding my SYN packet to the outgoing queue')
             ret.append(make_tcp_packet(self.my_port, self.other_port,
                                        seq=self.first_unacked_seq,
-                                       ack=self.get_ack_num(),
+                                       ack=self.__get_ack_num(),
                                        data='',
                                        is_syn=True))
 
         sz = len(self.data_to_send)
         base_offset = self.first_unacked_seq + (0 if self.my_syn_acked else 1)
         if self.data_to_send:
-            for i in range(1+(sz-1)/CHUNK_SIZE):
-                start = base_offset + i*CHUNK_SIZE
-                end = min(sz, (i+1)*CHUNK_SIZE)
+            data_chunk_size = self.mtu - 40  # 20B IP and 20B TCP header: rest for data
+            for i in range(1+(sz-1)/data_chunk_size):
+                start = base_offset + i*data_chunk_size
+                end = min(sz, (i+1)*data_chunk_size)
                 logging.debug('Adding data bytes from %d to %d to the outgoing queue' % (start, end-1))
                 ret.append(make_tcp_packet(self.my_port, self.other_port,
                                            seq=start,
-                                           ack=self.get_ack_num(),
-                                           data=self.data_to_send[i*CHUNK_SIZE:end]))
+                                           ack=self.__get_ack_num(),
+                                           data=self.data_to_send[i*data_chunk_size:end]))
 
         if self.closed and not self.my_fin_acked:
             logging.debug('Adding my FIN packet to the outgoing queue')
             ret.append(make_tcp_packet(self.my_port, self.other_port,
                                        seq=base_offset + sz,
-                                       ack=self.get_ack_num(),
+                                       ack=self.__get_ack_num(),
                                        data='',
                                        is_fin=True))
 
         if not ret and self.need_to_send_ack:
             logging.debug('Adding a pure ACK to the outgoing queue (nothing to piggyback on)')
             ret.append(make_tcp_packet(self.my_port, self.other_port,
-                                       seq=self.get_ack_num(),
+                                       seq=self.__get_ack_num(),
                                        ack=self.next_seq_needed,
                                        data=''))
 
         if ret:
-            self.next_resend = now + ASSUMED_RTT_SEC
+            self.next_resend = now + self.rtt
             self.need_to_send_ack = False
         return ret
-
-    def add_data_to_send(self, data):
-        if not self.closed:
-            self.data_to_send += data
-            self.next_resend = 0  # send now
-        else:
-            raise Exception('cannot send data on a closed socket')
-
-    def close(self):
-        self.closed = True
-
-    def is_all_done(self):
-        """True if my fin has been acked."""
-        return self.my_fin_acked
-
-    def has_ready_data(self):
-        """Returns True if data has been received and there are no gaps in it."""
-        logging.debug('# segments = %d' % len(self.segments))
-        return len(self.segments) == 1
-
-    def get_data(self):
-        """Returns the data received so far (up to the first gap, if any)."""
-        if self.segments:
-            return self.segments[0].data
-        else:
-            return ''
 
 class TCPServer():
     """Implements a basic TCP Server which handles raw TCP packets passed to it."""
@@ -344,7 +354,6 @@ def test(dev, path_to_serve):
     from ProtocolHelper import Packet
     from LoggingHelper import pktstr
     import errno
-    import socket
 
     def start_raw_socket(dev):
         """Starts a socket for sending raw Ethernet frames."""
