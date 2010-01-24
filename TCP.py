@@ -82,6 +82,7 @@ class TCPConnection():
         self.segments = []
         self.next_seq_needed = syn_seq + 1
         self.need_to_send_ack = False
+        self.need_to_send_data = False
         self.received_fin = False
         self.closed = False
         self.dead = False
@@ -92,7 +93,7 @@ class TCPConnection():
         self.first_unacked_seq = random.randint(0, 0x8FFFFFFF)
         self.last_seq_sent = self.first_unacked_seq
         self.my_syn_acked = False
-        self.all_data_sent = False
+        self.all_data_sent = True
         self.my_fin_sent = False
         self.my_fin_acked = False
         self.next_resend = 0
@@ -139,7 +140,7 @@ class TCPConnection():
             logging.debug('Adding %dB to send (%dB already waiting)' % (len(data), len(self.data_to_send)))
             self.data_to_send += data
             self.all_data_sent = False
-            self.__need_to_send_now() # send the data
+            self.__need_to_send_now(True) # send the data
         else:
             raise socket.error('cannot send data on a closed socket')
 
@@ -188,10 +189,13 @@ class TCPConnection():
         logging.debug('# segments = %d' % len(self.segments))
         return len(self.segments) == 1
 
-    def __need_to_send_now(self):
+    def __need_to_send_now(self, data_not_ack=False):
         """The next call to get_packets_to_send will ensure an ACK is sent as
         well as any unacknowledged data."""
-        self.need_to_send_ack = True
+        if data_not_ack:
+            self.need_to_send_data = True
+        else:
+            self.need_to_send_ack = True
         if self.has_data_to_send_callback:
             self.has_data_to_send_callback()
 
@@ -223,7 +227,10 @@ class TCPConnection():
             logging.debug('received ack %d (last unacked was %d) => %dB less to send (%dB left)' % \
                           (ack, self.first_unacked_seq, diff, len(self.data_to_send)))
             self.first_unacked_seq = ack
-            self.__need_to_send_now() # we can send more data now
+
+            # if data has been ACK'ed, then send more if we have any
+            if diff > 0 and not self.all_data_sent and self.data_to_send:
+                self.__need_to_send_now(True)
 
     def get_packets_to_send(self):
         """Returns a list of packets which should be sent now."""
@@ -235,7 +242,7 @@ class TCPConnection():
         retransmit = False
         now = time.time()
         if now < self.next_resend:
-            if not self.need_to_send_ack:
+            if not self.need_to_send_ack and not self.need_to_send_data:
                 logging.debug('not time to send any packets yet (now=%d next=%d)' % (now, self.next_resend))
                 return ret
         else:
@@ -289,7 +296,9 @@ class TCPConnection():
                                            ack=self.__get_ack_num(),
                                            data=self.data_to_send[start_index:end_index_plus1]))
 
-        if self.closed and not self.my_fin_acked and self.all_data_sent:
+        # send a FIN if we're closed, our FIN hasn't been ACKed, and we've sent
+        # all the data we were asked to already (or there isn't any)
+        if self.closed and not self.my_fin_acked and (self.all_data_sent or not self.data_to_send):
             logging.debug('Adding my FIN packet to the outgoing queue')
             ret.append(make_tcp_packet(self.my_port, self.other_port,
                                        seq=base_offset + sz,
