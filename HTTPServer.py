@@ -17,7 +17,7 @@ class HTTPServer(TCPServer):
         self.serve_from = serve_from
         self.default_page = default_page
 
-    RE_GET = re.compile('GET (.*) HTTP/1.1\r\n((.|\n)+\r\n)?\r\n')
+    RE_GET = re.compile('GET (.*) HTTP/\d+.\d+\r\n((.|\n)+\r\n)?\r\n')
     def extract_http_get_request(self, conn):
         """If the data received is an HTTP GET request, then the requested URL
         is returned.  Otherwise, None is returned."""
