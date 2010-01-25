@@ -470,7 +470,7 @@ class TopologyUserFilter(Model):
     user = ForeignKey(User)
 
     def __unicode__(self):
-        return u'%s may interact with %s' % (self.user(), self.topology.__unicode__())
+        return u'%s may interact with %s' % (self.user.username, self.topology.__unicode__())
 
 class IPAssignment(Model):
     """Maps an IP address to a port on a particular node in a particular
