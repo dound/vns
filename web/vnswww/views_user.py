@@ -1,3 +1,5 @@
+import re
+
 from django import forms
 from django.contrib import messages
 from django.contrib.auth import authenticate
@@ -88,6 +90,12 @@ class RegistrationForm(forms.Form):
     email      = forms.CharField(label='E-mail Address', max_length=75)
     pw         = forms.CharField(label='Password', min_length=6, widget=forms.PasswordInput(render_value=False))
     pos        = forms.ChoiceField(label='Position', choices=[(1, u'Student'), (4, u'TA')])
+
+    def clean_username(self):
+        un = self.cleaned_data['username']
+        if not re.match('^\w+$', un):
+            raise forms.ValidationError("Only alphanumeric characters and spaces are allowed in a user's name.")
+        return un
 
 def user_create(request):
     tn = 'vns/user_create.html'
