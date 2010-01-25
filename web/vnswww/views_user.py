@@ -63,7 +63,7 @@ def user_access_check(request, callee, requester_is_staff_req, requester_in_same
 
     # make sure the requester is in the same organization as the user in question if required
     if requester_in_same_org_req:
-        if not requester.is_superuser and not requester.org==up.org:
+        if not requester.is_superuser and not requester.get_profile().org==up.org:
             grp_txt = 'staff' if requester_is_staff_req else 'users'
             messages.error(request, "Only %s in %s may do that." % (grp_txt, up.org.name))
             return HttpResponseRedirect('/')
