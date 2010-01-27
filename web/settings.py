@@ -1,12 +1,17 @@
 import os
+import socket
 
 DEBUG = TEMPLATE_DEBUG = False
 
+# information about who to e-mail and how in case of a problem
 ADMINS = (
     ('David Underhill', 'dgu@cs.stanford.edu'),
 )
-
 MANAGERS = ADMINS
+EMAIL_HOST = 'smtp.stanford.edu'
+SEND_BROKEN_LINK_EMAILS = True
+SERVER_EMAIL = 'vns-django@' + socket.gethostname() + '.stanford.edu'
+
 PROJECT_PATH = os.path.abspath(os.path.dirname(__file__))
 
 DATABASES = {
