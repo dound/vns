@@ -97,6 +97,7 @@ class TCPConnection():
         # information about outgoing data and relevant ACKs
         self.window = 0
         self.data_to_send = ''
+        self.num_data_bytes_acked = 0
         self.first_unacked_seq = random.randint(0, 0x8FFFFFFF)
         self.last_seq_sent = self.first_unacked_seq
         self.my_syn_acked = False
@@ -192,6 +193,10 @@ class TCPConnection():
         """Returns the socket pair describing this connection (other then self)."""
         return ((self.other_ip, self.other_port), (self.my_ip, self.my_port))
 
+    def has_data_to_send(self):
+        """Returns True if there is an unACK'ed data waiting to be sent."""
+        return self.num_unacked_data_bytes() > 0
+
     def has_ready_data(self):
         """Returns True if data has been received and there are no gaps in it."""
         logging.debug('# segments = %d' % len(self.segments))
@@ -210,6 +215,10 @@ class TCPConnection():
     def __note_activity(self):
         """Marks the current time as the last active time."""
         self.last_activity = time.time()
+
+    def num_unacked_data_bytes(self):
+        """Returns the number of outgoing data bytes which have not been ACK'ed."""
+        return len(self.data_to_send) - self.num_data_bytes_acked
 
     def reset_resend_timer(self):
         """Resets the retransmission timer."""
@@ -230,16 +239,18 @@ class TCPConnection():
                 diff = diff - 1
                 self.my_syn_acked = True
 
-            if diff > len(self.data_to_send):
+            if diff > self.num_unacked_data_bytes():
                 self.my_fin_acked = True
+                diff = self.num_unacked_data_bytes()
 
-            self.data_to_send = self.data_to_send[diff:]
-            logging.debug('received ack %d (last unacked was %d) => %dB less to send (%dB left)' % \
-                          (ack, self.first_unacked_seq, diff, len(self.data_to_send)))
+            self.num_data_bytes_acked += diff
+
+            #logging.debug('received ack %d (last unacked was %d) => %dB less to send (%dB left)' % \
+            #              (ack, self.first_unacked_seq, diff, self.num_unacked_data_bytes()))
             self.first_unacked_seq = ack
 
             # if data has been ACK'ed, then send more if we have any
-            if diff > 0 and not self.all_data_sent and self.data_to_send:
+            if diff > 0 and not self.all_data_sent and self.has_data_to_send():
                 self.__need_to_send_now(True)
 
     def get_packets_to_send(self):
@@ -268,9 +279,9 @@ class TCPConnection():
                                        data='',
                                        is_syn=True))
 
-        sz = len(self.data_to_send)
+        sz = self.num_unacked_data_bytes()
         base_offset = self.first_unacked_seq + (0 if self.my_syn_acked else 1)
-        if self.data_to_send:
+        if sz > 0:
             # figure out how many chunks we can send now
             data_chunk_size = self.mtu - 40  # 20B IP and 20B TCP header: rest for data
             num_chunks_left = sz / data_chunk_size
@@ -283,7 +294,7 @@ class TCPConnection():
             for i in range(1+num_chunks_to_send_now):
                 # determine what bytes and sequence numbers this chunk includes
                 start_index = i * data_chunk_size
-                end_index_plus1 = min(sz, (i+1)*data_chunk_size) # exclusive
+                end_index_plus1 = min(sz, start_index + data_chunk_size) # exclusive
                 if end_index_plus1 == sz:
                     self.all_data_sent = True
                 start_seq = base_offset + start_index
@@ -299,6 +310,11 @@ class TCPConnection():
                         start_seq += diff
                         start_index += 1
 
+                # indices are relative to the first unsent byte: transform these
+                # to the actual queue (i.e., skip the ACK'ed bytes)
+                start_index += self.num_data_bytes_acked
+                end_index_plus1 += self.num_data_bytes_acked
+
                 # track the latest byte we've sent and formulate this chunk into a packet
                 self.last_seq_sent = max(self.last_seq_sent, end_seq)
                 logging.debug('Adding data bytes from %d to %d (inclusive) to the outgoing queue' % (start_seq, end_seq))
@@ -309,7 +325,7 @@ class TCPConnection():
 
         # send a FIN if we're closed, our FIN hasn't been ACKed, and we've sent
         # all the data we were asked to already (or there isn't any)
-        if self.closed and not self.my_fin_acked and (self.all_data_sent or not self.data_to_send):
+        if self.closed and not self.my_fin_acked and (self.all_data_sent or sz<=0):
             if not self.my_fin_sent or retransmit:
                 if ret:
                     logging.debug('Making the last packet a FIN packet')
