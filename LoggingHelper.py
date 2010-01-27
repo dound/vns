@@ -40,6 +40,7 @@ __last_pkt = None
 __decoder = EthDecoder()
 def pktstr(pkt):
     """Returns a human-readable dump of the specified packet."""
+    return '' # PERFORMANCE: remove this to get packet-level print-outs (but it has a huge impact on performance: >2x)
     global __last_pkt
     if pkt is __last_pkt:
         return 'same as last'
