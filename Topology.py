@@ -116,7 +116,7 @@ class Topology():
 
         if start_stats:
             self.stats = db.StatsTopology()
-            self.stats.init(t.template, client_ip, user)
+            self.stats.init(t, client_ip, user)
             self.stats.save()
             logging.info('Topology instantiated:\n%s' % self.str_all(include_clients=False))
 

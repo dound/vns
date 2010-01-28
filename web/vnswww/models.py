@@ -6,10 +6,12 @@ import re
 from socket import inet_aton, inet_ntoa
 import string
 import struct
+import uuid
 
 from django.db.models import AutoField, BooleanField, CharField, DateField, \
                              DateTimeField, FloatField, ForeignKey, Q, TextField, \
                              IntegerField, IPAddressField, ManyToManyField, Model
+from django.db.models.signals import post_init
 from django.contrib.auth.models import User
 
 def get_delta_time_sec(t1, t2):
@@ -385,11 +387,20 @@ class Topology(Model):
     id = AutoField(primary_key=True,
                    help_text='Users will connect virtual nodes to this ' +
                              'topology by specifying this number.')
+    uuid = CharField(max_length=32)
     owner = ForeignKey(User)
     template = ForeignKey(TopologyTemplate)
     enabled = BooleanField(help_text='Whether this topology is active.')
     public = BooleanField(help_text='Whether any user may connect to a node on this topology.')
     temporary = BooleanField(help_text='Whether this topology was only allocated temporarily.')
+
+    @staticmethod
+    def __post_init__(sender, instance, **kwargs):
+        if not instance.uuid:
+            print 'new uuid'
+            instance.uuid = uuid.uuid4().hex
+        else:
+            print 'keeping old uuid'
 
     def get_readme(self):
         """Returns the readme for this topology.  An error string will be returned
@@ -428,6 +439,7 @@ class Topology(Model):
     def __unicode__(self):
         str_enabled = '' if self.enabled else ' (disabled)'
         return u'Topology %d%s' % (self.id, str_enabled)
+post_init.connect(Topology.__post_init__, sender=Topology)
 
 def base_subnet(subnet_str):
     """Converts a subnet string to just the (masked) prefix."""
@@ -559,6 +571,7 @@ class RecentIPBlockAllocation(Model):
 
 class StatsTopology(Model):
     """Statistics about Topology during a single session."""
+    topo_uuid = CharField(max_length=32)
     template = ForeignKey(TopologyTemplate)
     client_ip = IPAddressField(help_text='IP address of the first client to connect to the topology')
     user = ForeignKey(User)
@@ -571,8 +584,9 @@ class StatsTopology(Model):
     num_pkts_from_client = IntegerField(default=0, help_text='Counts packets sent from any client node in the topology.')
     active = BooleanField(default=True, help_text='True as long as this topology is still running on the simulator.')
 
-    def init(self, template, client_ip, user):
-        self.template = template
+    def init(self, topo, client_ip, user):
+        self.topo_uuid = topo.uuid
+        self.template = topo.template
         self.client_ip = client_ip
         self.user = user
         self.time_last_changed = datetime.datetime.now()

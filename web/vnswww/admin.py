@@ -56,9 +56,9 @@ class LinkAdmin(admin.ModelAdmin):
                      'port2__node__name', 'lossiness')
 
 class TopologyAdmin(admin.ModelAdmin):
-    list_display = ('owner', 'id', 'template', 'enabled', 'public', 'temporary')
+    list_display = ('owner', 'id', 'template', 'enabled', 'public', 'temporary', 'uuid')
     ordering = ('owner', 'id')
-    search_fields = ('id', 'owner__name', 'template__name')
+    search_fields = ('id', 'owner__name', 'template__name', 'uuid')
 
 class TopologySourceIPFilterAdmin(admin.ModelAdmin):
     list_display = ('topology', 'ip')
@@ -96,9 +96,9 @@ class RecentIPBlockAllocationAdmin(admin.ModelAdmin):
     search_fields = ('user.username', 'template.name', 'start_addr')
 
 class StatsTopologyAdmin(admin.ModelAdmin):
-    list_display = ('template', 'user', 'client_ip', 'time_connected', 'total_time_connected_sec', 'num_pkts_to_topo', 'num_pkts_from_topo', 'num_pkts_to_client', 'num_pkts_from_client', 'active')
+    list_display = ('template', 'user', 'client_ip', 'time_connected', 'total_time_connected_sec', 'num_pkts_to_topo', 'num_pkts_from_topo', 'num_pkts_to_client', 'num_pkts_from_client', 'active', 'topo_uuid')
     ordering = ('time_connected',)
-    search_fields = ('template__name', 'user__username', 'client_ip')
+    search_fields = ('template__name', 'user__username', 'client_ip', 'uuid')
 
 class SystemInfoAdmin(admin.ModelAdmin):
     list_display = ('name', 'value')
