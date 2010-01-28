@@ -171,12 +171,12 @@ class VNSSimulator:
             else:
                 logging.debug('unexpected VNS message received: %s' % vns_msg)
 
-    def start_topology(self, tid, client_ip, username):
+    def start_topology(self, tid, client_ip, user):
         """Handles starting up the specified topology id.  Returns a 2-tuple.
         The first element is None and the second is a string if an error occurs;
         otherwise the first element is the topology."""
         try:
-            topo = Topology(tid, self.raw_socket, client_ip, username)
+            topo = Topology(tid, self.raw_socket, client_ip, user)
         except TopologyCreationException as e:
             return (None, str(e))
         except db.Topology.DoesNotExist:
@@ -229,15 +229,15 @@ class VNSSimulator:
 
     def handle_open_msg(self, conn, open_msg):
         # get the topology the client is trying to connect to
-        self.handle_connect_to_topo(conn, open_msg.topo_id, open_msg.user, open_msg.vhost)
+        self.handle_connect_to_topo(conn, open_msg.topo_id, open_msg.vhost)
 
-    def handle_connect_to_topo(self, conn, tid, username, vhost):
+    def handle_connect_to_topo(self, conn, tid, vhost):
         logging.info('client %s connected to topology %d' % (conn, tid))
         try:
             topo = self.topologies[tid]
         except KeyError:
             client_ip = conn.transport.getPeer().host
-            (topo, err_msg) = self.start_topology(tid, client_ip, username)
+            (topo, err_msg) = self.start_topology(tid, client_ip, conn.vns_user_profile.user)
             if topo is None:
                 self.terminate_connection(conn, err_msg)
                 return
@@ -245,7 +245,7 @@ class VNSSimulator:
         # try to connect the client to the requested node
         self.clients[conn] = tid
         requested_name = vhost.replace('\x00', '')
-        user = conn.vns_user_profile.user if conn.vns_user_profile else None
+        user = conn.vns_user_profile.user
         ret = topo.connect_client(conn, user, requested_name)
         if not ret.is_success():
             self.terminate_connection(conn, ret.fail_reason)
@@ -292,8 +292,7 @@ class VNSSimulator:
             rtable_msg = VNSRtable(ot.vrhost, VNSSimulator.build_rtable(topo, s2intfnum))
             conn.send(rtable_msg)
             logging.debug('Sent client routing table message: %s' % rtable_msg)
-            who = conn.vns_user_profile.user.username
-            self.handle_connect_to_topo(conn, topo.id, who, ot.vrhost)
+            self.handle_connect_to_topo(conn, topo.id, ot.vrhost)
 
     @staticmethod
     def build_rtable(topo, s2intfnum):
@@ -319,7 +318,7 @@ class VNSSimulator:
             return
 
         try:
-            up = db.UserProfile.objects.get(user__username=ar.username)
+            up = db.UserProfile.objects.get(user__username=ar.username, retired=False)
         except db.UserProfile.DoesNotExist:
             logging.info('unrecognized username tried to login: %s' % ar.username)
             self.terminate_connection(conn, "authentication failed")

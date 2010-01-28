@@ -67,6 +67,7 @@ class UserProfile(Model):
     sim_key = CharField(max_length=SIM_KEY_SZ,
                         help_text="The ASCII string (system-generated) "+
                                   "which the user uses to authenticate with the simulator.")
+    retired = BooleanField(default=False, help_text='Whether this object is still in use.  It is kept around after retirement for stats purposes.')
 
     @staticmethod
     def cmp_pos_order(a, b):
@@ -560,7 +561,7 @@ class StatsTopology(Model):
     """Statistics about Topology during a single session."""
     template = ForeignKey(TopologyTemplate)
     client_ip = IPAddressField(help_text='IP address of the first client to connect to the topology')
-    username = CharField(max_length=100)
+    user = ForeignKey(User)
     time_connected = DateTimeField(auto_now_add=True)
     time_last_changed = DateTimeField(auto_now_add=True)
     total_time_connected_sec = IntegerField(default=0)
@@ -570,10 +571,10 @@ class StatsTopology(Model):
     num_pkts_from_client = IntegerField(default=0, help_text='Counts packets sent from any client node in the topology.')
     active = BooleanField(default=True, help_text='True as long as this topology is still running on the simulator.')
 
-    def init(self, template, client_ip, username):
+    def init(self, template, client_ip, user):
         self.template = template
         self.client_ip = client_ip
-        self.username = username
+        self.user = user
         self.time_last_changed = datetime.datetime.now()
         self.changed = False
 
@@ -627,7 +628,7 @@ class StatsTopology(Model):
 
     def __unicode__(self):
         return (u'Template %s stats: ' % self.template.name) + \
-               (u'Started by client %s at %s; ' % (self.username, self.client_ip)) + \
+               (u'Started by client %s at %s; ' % (self.user.username, self.client_ip)) + \
                (u'Active for %dsec; ' % self.total_time_connected_sec) + \
                (u'# Packets [Topo to=%d from=%d] ' % (self.num_pkts_to_topo, self.num_pkts_from_topo)) + \
                (u'[User to=%d from=%d]' % (self.num_pkts_to_client, self.num_pkts_from_client))

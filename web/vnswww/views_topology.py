@@ -112,7 +112,7 @@ def topology_info(request, tid, topo):
 def make_apu_form(user, topo):
     user_org = user.get_profile().org
     existing_tuf_users = [tuf.user for tuf in db.TopologyUserFilter.objects.filter(topology=topo)]
-    user_choices = [(up.user.username,up.user.username) for up in db.UserProfile.objects.filter(org=user_org).exclude(user=user).exclude(user__in=existing_tuf_users)]
+    user_choices = [(up.user.username,up.user.username) for up in db.UserProfile.objects.filter(org=user_org, retired=False).exclude(user=user).exclude(user__in=existing_tuf_users)]
 
     class APUForm(forms.Form):
         usr = forms.ChoiceField(label='User', choices=user_choices)
@@ -127,7 +127,7 @@ def topology_permitted_user_add(request, tid, topo):
             username = form.cleaned_data['usr']
 
             try:
-                user = db.UserProfile.objects.get(user__username=username).user
+                user = db.UserProfile.objects.get(user__username=username, retired=False).user
             except db.UserProfile.DoesNotExist:
                 return direct_to_template(request, tn, {'form':form, 'more_error':'invalid username', 'tid':tid})
 

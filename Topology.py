@@ -33,7 +33,7 @@ class TopologyCreationException(Exception):
 
 class Topology():
     """A topology to simulate."""
-    def __init__(self, tid, raw_socket, client_ip, username, start_stats=True):
+    def __init__(self, tid, raw_socket, client_ip, user, start_stats=True):
         """Reads topology with the specified id from the database.  A
         DoesNotExist exception (Topology or IPAssignment) is raised if this fails."""
         self.raw_socket = raw_socket
@@ -116,7 +116,7 @@ class Topology():
 
         if start_stats:
             self.stats = db.StatsTopology()
-            self.stats.init(t.template, client_ip, username)
+            self.stats.init(t.template, client_ip, user)
             self.stats.save()
             logging.info('Topology instantiated:\n%s' % self.str_all(include_clients=False))
 

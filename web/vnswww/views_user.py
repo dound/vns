@@ -29,7 +29,7 @@ def user_access_check(request, callee, requester_is_staff_req, requester_in_same
     try:
         un = kwargs[var_un]
         try:
-            up = db.UserProfile.objects.get(user__username=un)
+            up = db.UserProfile.objects.get(user__username=un, retired=False)
             kwargs['up'] = up
             if del_un:
                 del kwargs[var_un]
@@ -79,7 +79,7 @@ def user_access_check(request, callee, requester_is_staff_req, requester_in_same
 
 def user_org(request, org):
     tn = 'vns/user_org.html'
-    users = [u for u in db.UserProfile.objects.filter(org=org)]
+    users = [u for u in db.UserProfile.objects.filter(org=org, retired=False)]
     users.sort(db.UserProfile.cmp_pos_order)
     return direct_to_template(request, tn, {'org':org, 'users':users})
 
@@ -163,7 +163,8 @@ def user_delete(request, up, **kwargs):
     user = up.user
     un = user.username
     on = up.org.name
-    user.delete()
+    user.retired = True
+    user.save()
     messages.success(request, "You have successfully deleted %s." % un)
     return HttpResponseRedirect('/org/%s/' % on)
 

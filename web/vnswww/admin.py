@@ -20,7 +20,7 @@ class OrganizationAdmin(admin.ModelAdmin):
     search_fields = ('name', 'parentOrg__name') + make_user_search_fields('boss')
 
 class UserProfileAdmin(admin.ModelAdmin):
-    list_display = ('user', 'org', 'pos')
+    list_display = ('user', 'org', 'pos', 'retired')
     ordering = ('user',)
     search_fields = make_user_search_fields('user') + ('org__name', 'pos__name')
 
@@ -96,9 +96,9 @@ class RecentIPBlockAllocationAdmin(admin.ModelAdmin):
     search_fields = ('user.username', 'template.name', 'start_addr')
 
 class StatsTopologyAdmin(admin.ModelAdmin):
-    list_display = ('template', 'username', 'client_ip', 'time_connected', 'total_time_connected_sec', 'num_pkts_to_topo', 'num_pkts_from_topo', 'num_pkts_to_client', 'num_pkts_from_client', 'active')
+    list_display = ('template', 'user', 'client_ip', 'time_connected', 'total_time_connected_sec', 'num_pkts_to_topo', 'num_pkts_from_topo', 'num_pkts_to_client', 'num_pkts_from_client', 'active')
     ordering = ('time_connected',)
-    search_fields = ('template__name', 'username', 'client_ip')
+    search_fields = ('template__name', 'user__username', 'client_ip')
 
 class SystemInfoAdmin(admin.ModelAdmin):
     list_display = ('name', 'value')
