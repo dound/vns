@@ -1,7 +1,6 @@
 import hashlib
 import logging
 import random
-import re
 import socket
 from socket import inet_aton, inet_ntoa
 import struct
