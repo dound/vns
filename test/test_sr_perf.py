@@ -266,5 +266,5 @@ def run_test(vns_client, rtr_ips, svr_ips,
        ping_percent_reply_svr, ping_rtt_svr, xput_percent_ok, xput_avg_kbps)
 
 if __name__ == '__main__':
-    logging.basicConfig(format='%(levelname)-8s %(funcName)s:%(lineno)d  %(message)s', level=logging.DEBUG)
+    logging.basicConfig(format='%(levelname)-8s %(funcName)s:%(lineno)d  %(message)s', level=logging.WARNING)
     exit(main())
