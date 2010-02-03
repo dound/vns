@@ -7,8 +7,8 @@ import os
 from os.path import dirname
 import socket
 import sys
+from time import sleep, time
 from threading import Lock
-from time import time
 
 from pcapy import open_live, PcapError
 from twisted.internet import reactor
@@ -99,6 +99,8 @@ class VNSSimulator:
         local_job_queues_list = []
 
         while True:
+            serviced_a_job = False
+            
             # get a copy of the latest topology list in a thread-safe manner
             with self.topologies_lock:
                 if self.topologies_changed:
@@ -112,6 +114,12 @@ class VNSSimulator:
                     # thread safety: run each job from the main twisted event loop
                     reactor.callFromThread(job)
                     job = q.task_done()
+                    serviced_a_job = True
+                    
+            # If we didn't do anything this time, then pause for about 50ms (no
+            # reason to run up the CPU by repeatedly checking empty queues).
+            if not serviced_a_job:
+                sleep(0.05)
 
     def __start_raw_socket(self, dev):
         """Starts a socket for sending raw Ethernet frames."""
