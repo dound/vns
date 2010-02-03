@@ -7,6 +7,7 @@ import os
 from os.path import dirname
 import socket
 import sys
+from threading import Lock
 from time import time
 
 from pcapy import open_live, PcapError
@@ -55,6 +56,17 @@ class VNSSimulator:
         else:
             self.raw_socket = None
 
+        # lock used to prevent self.topologies from being *changed* by the main
+        # twisted thread while the topology queue service thread is reading it
+        self.topologies_lock = Lock()
+
+        # communicates from the main twisted thread to the topology queue
+        # service thread that the topologies dictionary has changed
+        self.topologies_changed = False
+
+        # run the topology queue service thread
+        reactor.callInThread(self.__run_topology_queue_service_thread)
+
         self.periodic_callback()
 
     def __run_pcap(self, dev):
@@ -79,6 +91,27 @@ class VNSSimulator:
         p.setfilter(PCAP_FILTER)
         logging.info("Listening on %s: net=%s, mask=%s, filter=%s" % (dev, p.getnet(), p.getmask(), PCAP_FILTER))
         p.loop(MAX_PKTS, ph)
+
+    def __run_topology_queue_service_thread(self):
+        """Monitors the job queue of each topology and serves them in a round
+        robin fashion."""
+        # list of queues to service
+        local_job_queues_list = []
+
+        while True:
+            # get a copy of the latest topology list in a thread-safe manner
+            with self.topologies_lock:
+                if self.topologies_changed:
+                    local_job_queues_list = [t.job_queue for t in self.topologies.values()]
+                    self.topologies_changed = False
+
+            # serve each topology's queue
+            for q in local_job_queues_list:
+                job = q.start_service()
+                while job:
+                    # thread safety: run each job from the main twisted event loop
+                    reactor.callFromThread(job)
+                    job = q.task_done()
 
     def __start_raw_socket(self, dev):
         """Starts a socket for sending raw Ethernet frames."""
@@ -148,7 +181,7 @@ class VNSSimulator:
             logging.debug('sniffed raw packet to %s (topology %s): %s' %
                           (str_addr, ','.join([str(t.id) for t in topos]), pktstr(packet)))
             for topo in topos:
-                topo.handle_incoming_packet(packet, rewrite_dst_mac)
+                topo.create_job_for_incoming_packet(packet, rewrite_dst_mac)
 
     def handle_recv_msg(self, conn, vns_msg):
         if vns_msg is not None:
@@ -190,7 +223,9 @@ class VNSSimulator:
 
         if topo.has_gateway():
             self.resolver.register_topology(topo)
-        self.topologies[tid] = topo
+        with self.topologies_lock:
+            self.topologies[tid] = topo
+            self.topologies_changed = True
         return (topo, None)
 
     def stop_topology(self, topo, why, notify_client=True, log_it=True, lvl=logging.INFO):
@@ -222,7 +257,9 @@ class VNSSimulator:
             if not topo.is_active():
                 if topo.has_gateway():
                     self.resolver.unregister_topology(topo)
-                del self.topologies[tid]
+                with self.topologies_lock:
+                    del self.topologies[tid]
+                    self.topologies_changed = True
                 topo.get_stats().finalize()
                 if topo.is_temporary():
                     AddressAllocation.free_topology(tid)

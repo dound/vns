@@ -1,5 +1,6 @@
 import hashlib
 import logging
+import Queue
 import random
 import socket
 from socket import inet_aton, inet_ntoa
@@ -7,6 +8,7 @@ import struct
 import time
 
 from settings import ARP_CACHE_TIMEOUT, MAY_FORWARD_TO_PRIVATE_IPS, WEB_SERVER_ROOT_WWW
+from DRRQueue import DRRQueue
 from HTTPServer import HTTPServer
 from LoggingHelper import log_exception, addrstr, pktstr
 import ProtocolHelper
@@ -14,6 +16,8 @@ from ProtocolHelper import is_http_port, Packet
 from TCPStack import TCPServer
 from VNSProtocol import VNSPacket, VNSInterface, VNSHardwareInfo
 import web.vnswww.models as db
+
+MAX_JOBS_PER_TOPO = 25
 
 class ConnectionReturn():
     def __init__(self, fail_reason=None, prev_client=None):
@@ -36,6 +40,9 @@ class Topology():
         """Reads topology with the specified id from the database.  A
         DoesNotExist exception (Topology or IPAssignment) is raised if this fails."""
         self.raw_socket = raw_socket
+
+        # stores jobs which need to be done for this topology
+        self.job_queue = DRRQueue(MAX_JOBS_PER_TOPO)
 
         # maps clients connected to this topology to the node they are connected to
         self.clients = {}
@@ -221,6 +228,13 @@ class Topology():
         # failed to find the specified interface
         fmt = 'bad packet request: invalid interface: %s'
         return fmt % (n.name, departure_intf_name)
+
+    def create_job_for_incoming_packet(self, packet, rewrite_dst_mac):
+        """Enqueues a job for handling this packet with handle_incoming_packet()."""
+        try:
+            self.job_queue.put_nowait(lambda : self.handle_incoming_packet(packet, rewrite_dst_mac))
+        except Queue.Full:
+            logging.debug("Queue full for topology %s, dropping incoming packet: %s" % (str(self), pktstr(packet)))
 
     def handle_incoming_packet(self, packet, rewrite_dst_mac):
         """Forwards packet to the node connected to the gateway.  If
