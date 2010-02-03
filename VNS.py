@@ -26,6 +26,12 @@ from VNSProtocol import VNS_DEFAULT_PORT, create_vns_server
 from VNSProtocol import VNSOpen, VNSClose, VNSPacket, VNSOpenTemplate, VNSBanner, VNSRtable, VNSAuthRequest, VNSAuthReply, VNSAuthStatus
 from web.vnswww import models as db
 
+# Number of seconds the topology queue service thread will continue to run at
+# full speed without servicing any jobs.  If no jobs have been serviced in this
+# period of time, then the thread will pause for 50ms before checking for new
+# jobs.  This prevents the thread from waiting too often.
+SERVICE_IDLE_TIME_SEC = 1.0
+
 class VNSSimulator:
     """The VNS simulator.  It gives clients control of nodes in simulated
     topologies."""
@@ -67,7 +73,7 @@ class VNSSimulator:
         # The topology queue service thread will wait on this condition for a 
         # a chosen/dequeued job to be finish (so it can pick the next one).
         self.service_condition = Condition()
-
+        
         # run the topology queue service thread
         reactor.callInThread(self.__run_topology_queue_service_thread)
 
@@ -102,7 +108,11 @@ class VNSSimulator:
         # list of queues to service
         local_job_queues_list = []
 
+        # when the last job was run
+        last_service = 0.0
+        
         while True:
+            # whether or not a job has been serviced on this loop
             serviced_a_job = False
             
             # get a copy of the latest topology list in a thread-safe manner
@@ -120,9 +130,14 @@ class VNSSimulator:
                     job = q.task_done()
                     serviced_a_job = True
                     
-            # If we didn't do anything this time, then pause for about 50ms (no
+            # If we haven't done anything for a while, pause for about 50ms (no
             # reason to run up the CPU by repeatedly checking empty queues).
-            if not serviced_a_job:
+            # Implementation Note: We could get the thread to pause only when it
+            # needed to by using a conditional wait, but this would add overhead
+            # when there were lots of jobs (when we don't need overhead).
+            if serviced_a_job:
+                last_service = time()
+            elif last_service + SERVICE_IDLE_TIME_SEC <= time():
                 sleep(0.05)
 
     def __do_job_then_notify(self, job):
