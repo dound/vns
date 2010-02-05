@@ -521,12 +521,6 @@ class VNSSimulator:
         if tid is not None:
             del self.ti_clients[conn]
 
-def sha1(s):
-    """Return the SHA1 digest of the string s"""
-    d = hashlib.sha1()
-    d.update(s)
-    return d.digest()
-
 class NoOpTwistedLogger:
     """Discards all logging messages (our custom handler takes care of them)."""
     def flush(self):
