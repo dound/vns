@@ -26,11 +26,6 @@ from VNSProtocol import VNS_DEFAULT_PORT, create_vns_server
 from VNSProtocol import VNSOpen, VNSClose, VNSPacket, VNSOpenTemplate, VNSBanner, VNSRtable, VNSAuthRequest, VNSAuthReply, VNSAuthStatus
 from web.vnswww import models as db
 
-# Number of seconds the topology queue service thread will continue to run at
-# full speed without servicing any jobs.  If no jobs have been serviced in this
-# period of time, then the thread will pause for 50ms before checking for new
-# jobs.  This prevents the thread from waiting too often.
-SERVICE_IDLE_TIME_SEC = 1.0
 
 class VNSSimulator:
     """The VNS simulator.  It gives clients control of nodes in simulated
