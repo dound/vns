@@ -7,7 +7,7 @@ import os
 from os.path import dirname
 import socket
 import sys
-from threading import Condition, Lock
+from threading import Condition, Event, Lock
 from time import sleep, time
 
 from pcapy import open_live, PcapError
@@ -74,6 +74,12 @@ class VNSSimulator:
         # a chosen/dequeued job to be finish (so it can pick the next one).
         self.service_condition = Condition()
         
+        # Is set when a job is enqueued.  Is cleared when the queues are empty.
+        # The topology queue service thread will clear this event if it makes a
+        # a pass over all the queues and they are empty.  If it makes a pass 
+        # and this event is cleared, then it will wait on this event. 
+        self.job_available_event = Event()
+        
         # run the topology queue service thread
         reactor.callInThread(self.__run_topology_queue_service_thread)
 
@@ -108,9 +114,6 @@ class VNSSimulator:
         # list of queues to service
         local_job_queues_list = []
 
-        # when the last job was run
-        last_service = 0.0
-        
         while True:
             # whether or not a job has been serviced on this loop
             serviced_a_job = False
@@ -135,10 +138,11 @@ class VNSSimulator:
             # Implementation Note: We could get the thread to pause only when it
             # needed to by using a conditional wait, but this would add overhead
             # when there were lots of jobs (when we don't need overhead).
-            if serviced_a_job:
-                last_service = time()
-            elif last_service + SERVICE_IDLE_TIME_SEC <= time():
-                sleep(0.05)
+            if not serviced_a_job:
+                if self.job_available_event.is_set():
+                    self.job_available_event.clear()
+                else:
+                    self.job_available_event.wait()
 
     def __do_job_then_notify(self, job):
         """Acquires the service_condition lock, runs job, and the notifies all
@@ -226,6 +230,7 @@ class VNSSimulator:
                           (str_addr, ','.join([str(t.id) for t in topos]), pktstr(packet)))
             for topo in topos:
                 topo.create_job_for_incoming_packet(packet, rewrite_dst_mac)
+                self.job_available_event.set()
 
     def handle_recv_msg(self, conn, vns_msg):
         if vns_msg is not None:
