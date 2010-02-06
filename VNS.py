@@ -1,5 +1,11 @@
 """The VNS simulator."""
 
+try:
+    import psyco
+    psyco.full()
+except ImportError:
+    pass
+
 import errno
 import hashlib
 import logging, logging.config

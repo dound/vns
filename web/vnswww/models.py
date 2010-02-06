@@ -1,3 +1,10 @@
+try:
+    from django.db import models as django_models
+    import psyco
+    psyco.cannotcompile(django_models.sql.query.Query.clone)
+except ImportError:
+    pass 
+
 import datetime
 import hashlib
 import math
