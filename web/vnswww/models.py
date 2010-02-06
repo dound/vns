@@ -397,10 +397,7 @@ class Topology(Model):
     @staticmethod
     def __post_init__(sender, instance, **kwargs):
         if not instance.uuid:
-            print 'new uuid'
             instance.uuid = uuid.uuid4().hex
-        else:
-            print 'keeping old uuid'
 
     def get_readme(self):
         """Returns the readme for this topology.  An error string will be returned
