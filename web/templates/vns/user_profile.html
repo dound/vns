@@ -15,11 +15,11 @@
         </tr><tr>
             <th>Position</th>
             <td>{{ up.get_position_str }}</td>
+        {% if user.is_authenticated %}
         </tr><tr>
             <th>E-mail Address</th>
             <td>{{ up.user.email }}</td>
-        {% if user.is_authenticated %}
-        {% if user == up.user or user.get_profile.is_staff %}
+        {% if user == up.user or user.get_profile.is_staff or user.is_superuser %}
         </tr><tr>
             <th>Simulation Auth Key</th>
             <td>{{ up.get_sim_auth_key }}</td>

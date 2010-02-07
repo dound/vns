@@ -11,9 +11,13 @@
             <th>Position</th>
             <th>Username</th>
             <th>Name</th>
+            {% if user.is_authenticated %}
             <th>E-mail</th>
-            {% if user.is_authenticated and user.get_profile.is_staff and user.get_profile.org == org %}
+            {% if user.get_profile.is_staff %}
+            {% if user.get_profile.org == org or user.is_superuser %}
             <th>Actions</th>
+            {% endif %}
+            {% endif %}
             {% endif %}
         </tr>
     {% endif %}
@@ -22,9 +26,13 @@
             <td>{{ u.get_position_str }}</td>
             <td><a href="/user/{{ u.user.username }}/">{{ u.user.username }}</a></td>
             <td>{{ u.user.get_full_name }}</td>
+            {% if user.is_authenticated %}
             <td>{{ u.user.email }}</td>
-            {% if user.is_authenticated and user.get_profile.is_staff and user.get_profile.org == org %}
+            {% if user.get_profile.is_staff %}
+            {% if user.get_profile.org == org or user.is_superuser %}
             <td><a href="/user/{{ u.user.username }}/delete/">Delete</a></td>
+            {% endif %}
+            {% endif %}
             {% endif %}
         </tr>
     {% empty %}
