@@ -47,8 +47,8 @@ dict_topo_xml       = make_topology_access_check_dict(topology_to_xml)
 dict_topo_xml_clack = make_topology_access_check_dict(topology_to_xml, login_req=False) # TODO: temporary so Clack can access the xml
 
 # dictionaries which specify access requirements for various user/org views
-def make_user_access_check_dict(callee, requester_is_staff_req=False, requester_in_same_org_req=False, self_req=False):
-    return { 'callee':callee, 'requester_is_staff_req':requester_is_staff_req, 'requester_in_same_org_req':requester_in_same_org_req, 'self_req':self_req }
+def make_user_access_check_dict(callee, requester_is_staff_req=False, requester_in_same_org_req=False, self_req=False, login_required=True):
+    return { 'callee':callee, 'requester_is_staff_req':requester_is_staff_req, 'requester_in_same_org_req':requester_in_same_org_req, 'self_req':self_req, 'login_required':login_required }
 dict_user_org       = make_user_access_check_dict(user_org)
 dict_user_create    = make_user_access_check_dict(user_create, True)
 dict_user_change_pw = make_user_access_check_dict(user_change_pw, self_req=True)

@@ -9,7 +9,7 @@ from django.http import HttpResponseRedirect
 
 import models as db
 
-def user_access_check(request, callee, requester_is_staff_req, requester_in_same_org_req, self_req,
+def user_access_check(request, callee, requester_is_staff_req, requester_in_same_org_req, self_req, login_required,
                       var_un='un', del_un=True, **kwargs):
     """This wrapper function checks to make sure that a user exists if 'un' is
     one of the kwargs keys.  It also verifies the requester is logged in, etc.
@@ -21,7 +21,7 @@ def user_access_check(request, callee, requester_is_staff_req, requester_in_same
     If these tests pass, callee is called with (request, **kwargs)."""
     # make sure the user is logged in
     requester = request.user
-    if not requester.is_authenticated():
+    if login_required and not requester.is_authenticated():
         messages.warning(request, 'You must login before proceeding.')
         return HttpResponseRedirect('/login/?next=%s' % request.path)
 
