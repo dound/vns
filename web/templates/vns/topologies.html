@@ -11,7 +11,7 @@
             <th colspan="2">Owner</th>
             <th>Type</th>
             <th>ID</th>
-            <th># IPs Used</th>
+            <th>IPs Assigned</th>
             <th>IPs Allocated From</th>
             <th>More</th>
         </tr>
@@ -22,8 +22,8 @@
             <td>{{ t.owner|fnamelink }}</td>
             <td>{{ t.template.name }}</td>
             <td>{{ t.id }}</td>
-            <td>{{ t.get_where_ips_allocated.size }}</td>
-            <td>{{ t.get_where_ips_allocated.block_from }} ({{ t.get_where_ips_allocated.block_from.org.name }})</td>
+            <td>{{ t.get_where_ips_allocated.start_addr }}/{{ t.get_where_ips_allocated.mask }}</td>
+            <td>{{ t.get_where_ips_allocated.block_from.org.name }}</td>
             <td><a href="/topology{{ t.id }}/">Details</a></td>
         </tr>
     {% empty %}
