@@ -18,9 +18,15 @@
     {% endif %}
     {% for t in topos_list %}
         <tr>
-            <td>{{ t.owner.get_profile.org|orglink }}</td>
-            <td>{{ t.owner|fnamelink }}</td>
-            <td>{{ t.template.name }}</td>
+            {% if t.org_num %}
+            <td rowspan="{{ t.org_num }}">{{ t.owner.get_profile.org|orglink }}</td>
+            {% endif %}
+            {% if t.owner_num %}
+            <td rowspan="{{ t.owner_num }}">{{ t.owner|fnamelink }}</td>
+            {% endif %}
+            {% if t.template_num %}
+            <td rowspan="{{ t.template_num }}">{{ t.template.name }}</td>
+            {% endif %}
             <td>{{ t.id }}</td>
             <td>{{ t.get_where_ips_allocated.start_addr }}/{{ t.get_where_ips_allocated.mask }}</td>
             <td>{{ t.get_where_ips_allocated.block_from.org.name }}</td>

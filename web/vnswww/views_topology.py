@@ -3,6 +3,7 @@ import struct
 
 from django import forms
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 from django.views.generic.simple import direct_to_template
 from django.http import HttpResponse, HttpResponseRedirect
 from SubnetTree import SubnetTree
@@ -112,6 +113,46 @@ def topology_access_check(request, callee, login_req, owner_req, pu_req,
 
 def topology_info(request, tid, topo):
     return direct_to_template(request, 'vns/topology.html', {'t':topo, 'tid':tid})
+
+@login_required
+def topologies_list(request):
+    topos = db.Topology.objects.filter(enabled=True).order_by('owner__userprofile__org__name', 'owner__username', 'template__name', 'id')
+    orgs = {}
+    # count the number of times each org/owner/template appears
+    for t in topos:
+        v, owners = orgs.get(t.owner.get_profile().org.name, (0,{}))
+        orgs[t.owner.get_profile().org.name] = (v + 1, owners)
+        v, templates = owners.get(t.owner.username, (0,{}))
+        owners[t.owner.username] = (v + 1, templates)
+        v = templates.get(t.template.name, 0)
+        templates[t.template.name] = v + 1
+    
+    # embed counts of how many of the next orgs/owners/templates are the same as
+    # the first one in each streak of these (hierarchical); 0 if not first
+    pon = pun = ptn = None
+    for t in topos:
+        on = t.owner.get_profile().org.name
+        un = t.owner.username
+        tn = t.template.name
+        
+        t.org_num = t.owner_num = t.template_num = 0
+        
+        if on != pon:
+            pun = None
+            t.org_num, owners = orgs[on]
+        
+        if un != pun:
+            ptn = None
+            t.owner_num, templates = owners[un]
+            
+        if tn != ptn:
+            t.template_num = templates[tn]
+        
+        pon = on
+        pun = un
+        ptn = tn
+    
+    return direct_to_template(request, 'vns/topologies.html', {'topos_list':topos})
 
 def make_apu_form(user, topo):
     user_org = user.get_profile().org

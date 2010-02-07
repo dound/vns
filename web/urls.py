@@ -1,6 +1,5 @@
 from django.conf.urls.defaults import *
 from django.contrib import admin
-from django.contrib.auth.decorators import login_required
 from django.views.generic import list_detail
 from django.views.generic.simple import direct_to_template, redirect_to
 
@@ -17,12 +16,6 @@ summary_info = {
     'template_object_name': 'stats'
 }
 
-topologies_info = {
-    'queryset': db.Topology.objects.filter(enabled=True).order_by('owner__userprofile__org__name', 'template__name', 'id'),
-    'template_name': 'vns/topologies.html',
-    'template_object_name': 'topos'
-}
-
 organizations_info = {
     'queryset': db.Organization.objects.exclude(name='Public').order_by('name'),
     'template_name': 'vns/organizations.html',
@@ -36,6 +29,7 @@ dict_topo_delete    = make_topology_access_check_dict(checked_delete, True)
 dict_topo_delete['delete_hook'] = topology_delete
 dict_topo_delete['kind'] = 'Topology'
 dict_topo_delete['var_tid'] = 'what'
+dict_topo_list      = make_topology_access_check_dict(topologies_list)
 dict_topo_info      = make_topology_access_check_dict(topology_info)
 dict_topo_pua       = make_topology_access_check_dict(topology_permitted_user_add, True)
 dict_topo_pur       = make_topology_access_check_dict(topology_permitted_user_remove, True)
@@ -59,10 +53,6 @@ dict_user_delete['var_un'] = 'what'
 dict_user_delete['del_un'] = False
 dict_user_profile   = make_user_access_check_dict(user_profile)
 
-@login_required
-def limited_object_list(*args, **kwargs):
-    return list_detail.object_list(*args, **kwargs)
-
 urlpatterns = patterns('web.vnswww.views',
     (r'^admin/', include(admin.site.urls)),
     (r'^$',                                             homepage),
@@ -70,7 +60,7 @@ urlpatterns = patterns('web.vnswww.views',
     (r'^vns.css$',                                      direct_to_template, {'mimetype':'text/css', 'template':'vns.css'}),
 
     # topology URLs
-    (r'^topologies/?$',                                 limited_object_list, topologies_info),
+    (r'^topologies/?$',                                 topologies_list),
     (r'^topology(?P<tid>\d+)/?$',                       topology_access_check, dict_topo_info),
     (r'^topology/create/?$',                            topology_create),
     (r'^topology(?P<tid>\d+)/allow_new_user/?$',        topology_access_check, dict_topo_pua),
