@@ -53,8 +53,8 @@ def user_access_check(request, callee, requester_is_staff_req, requester_in_same
 
     # make sure the requester is the boss of their own organization if required
     if requester_is_staff_req and not requester.get_profile().is_staff():
-            messages.error(request, "Only staff members may do that.")
-            return HttpResponseRedirect('/')
+        messages.error(request, "Only staff members may do that.")
+        return HttpResponseRedirect('/')
 
     # make sure we have up if it is needed
     if requester_in_same_org_req and not up:
@@ -63,15 +63,21 @@ def user_access_check(request, callee, requester_is_staff_req, requester_in_same
 
     # make sure the requester is in the same organization as the user in question if required
     if requester_in_same_org_req:
-        if not requester.is_superuser and not requester.get_profile().org==up.org:
-            grp_txt = 'staff' if requester_is_staff_req else 'users'
-            messages.error(request, "Only %s in %s may do that." % (grp_txt, up.org.name))
+        grp_txt = 'staff' if requester_is_staff_req else 'users'
+        msg = "Only %s in %s may do that." % (grp_txt, up.org.name)
+        if requester.is_superuser:
+            messages.info(request, msg + "  However, so can you since you're a superuser.")
+        elif not requester.get_profile().org==up.org:
+            messages.error(request, msg)
             return HttpResponseRedirect('/')
 
     # make sure the requester is up him/herself if required
     if self_req and up and request.user != up.user:
-        if not requester.is_superuser and not requester.get_profile().is_staff() and not requester.org==up.org:
-            messages.error(request, 'Only %s or staff in his/her organization may do that.' % un)
+        msg = 'Only %s or staff in his/her organization may do that.' % un
+        if requester.is_superuser:
+            messages.info(request, msg + "  However, so can you since you're a superuser.")
+        elif not requester.get_profile().is_staff() or not requester.org==up.org:
+            messages.error(request, msg)
             return HttpResponseRedirect('/')
 
     kwargs['request'] = request

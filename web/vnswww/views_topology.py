@@ -90,8 +90,12 @@ def topology_access_check(request, callee, login_req, owner_req, pu_req,
 
     # make sure the user is the owner if required
     if owner_req and request.user != topo.owner:
-        messages.error(request, 'Only the owner (%s) can do this.' % topo.owner.username)
-        return HttpResponseRedirect('/topology%d/' % tid)
+        msg = 'Only the owner (%s) can do this.' % topo.owner.username
+        if request.user.is_superuser:
+            messages.info(request, msg + "  However, so you can because you're a superuser." % topo.owner.username)
+        else:
+            messages.error(request, msg)
+            return HttpResponseRedirect('/topology%d/' % tid)
 
     # make sure the user is a permitted user if required
     if (not owner_req and pu_req) and request.user != topo.owner:
