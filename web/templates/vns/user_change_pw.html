@@ -6,7 +6,7 @@
 
 {% block content %}
     {% if form %}
-        <form action="/user/change_password/" method="post">
+        <form action="/user/{{ un }}/change_password/" method="post">
         <table>
         {{ form.as_table }}
         <tr><td colspan="2" style="text-align:center"><input type="submit" value="Change password" /></td></tr>

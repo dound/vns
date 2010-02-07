@@ -46,7 +46,13 @@
         </tr>
     </table>
 
-    {% if user.is_authenticated and user == up.user %}
-        <p><a href="/user/change_password/">Change Your Password</a></p>
+    {% if user.is_authenticated %}
+        {% if user == up.user %}
+            <p><a href="/user/{{ up.user.username }}/change_password/">Change Your Password</a></p>
+        {% else %}
+            {% if user.get_profile.is_staff or user.is_superuser %}
+                <p><b>Staff Action</b>: <a href="/user/{{ up.user.username }}/change_password/">Change {{ up.user.get_full_name }}'s Password</a></p>
+            {% endif %}
+        {% endif %}
     {% endif %}
 {% endblock %}

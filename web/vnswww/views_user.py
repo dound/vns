@@ -133,37 +133,47 @@ def user_create(request):
         form = RegistrationForm()
     return direct_to_template(request, tn, { 'form': form })
 
+class AdminChangePasswordForm(forms.Form):
+    new_pw1  = forms.CharField(label='New Password', min_length=6, widget=forms.PasswordInput(render_value=False))
+    new_pw2  = forms.CharField(label='New Password (again)', widget=forms.PasswordInput(render_value=False))
+
 class ChangePasswordForm(forms.Form):
     old_pw   = forms.CharField(label='Current Password', widget=forms.PasswordInput(render_value=False))
     new_pw1  = forms.CharField(label='New Password', min_length=6, widget=forms.PasswordInput(render_value=False))
     new_pw2  = forms.CharField(label='New Password (again)', widget=forms.PasswordInput(render_value=False))
-
-def user_change_pw(request):
+    
+def user_change_pw(request, up):
     tn = 'vns/user_change_pw.html'
+    is_admin = up.user != request.user
+    Form = AdminChangePasswordForm if is_admin else ChangePasswordForm
     if request.method == 'POST':
-        form = ChangePasswordForm(request.POST)
+        form = Form(request.POST)
         if form.is_valid():
-            old_pw = form.cleaned_data['old_pw']
+            if not is_admin:
+                old_pw = form.cleaned_data['old_pw']
             new_pw1 = form.cleaned_data['new_pw1']
             new_pw2 = form.cleaned_data['new_pw2']
 
             if new_pw1 != new_pw2:
                 messages.error(request, "Try again: the two versions of your new password do not match.")
-                return direct_to_template(request, tn, { 'form': form })
+                return direct_to_template(request, tn, { 'form': form, 'un':up.user.username })
 
-            if not authenticate(username=request.user.username, password=old_pw):
+            if not is_admin and not authenticate(username=up.user.username, password=old_pw):
                 messages.error(request, "Incorrect current password.")
-                return direct_to_template(request, tn, { 'form': form })
+                return direct_to_template(request, tn, { 'form': form, 'un':up.user.username })
 
-            request.user.set_password(new_pw1)
-            request.user.save()
+            up.user.set_password(new_pw1)
+            up.user.save()
 
-            messages.success(request, "You have successfully updated your password.")
-            return HttpResponseRedirect('/user/%s/' % request.user.username)
+            if is_admin:
+                messages.success(request, "You have successfully updated %s's password." % up.user.username)
+            else:
+                messages.success(request, "You have successfully updated your password.")
+            return HttpResponseRedirect('/user/%s/' % up.user.username)
     else:
-        form = ChangePasswordForm()
+        form = Form()
 
-    return direct_to_template(request, tn, { 'form': form })
+    return direct_to_template(request, tn, { 'form': form, 'un':up.user.username })
 
 def user_delete(request, up, **kwargs):
     user = up.user

@@ -87,7 +87,7 @@ urlpatterns = patterns('web.vnswww.views',
     (r'^organizations/?$',                              list_detail.object_list, organizations_info),
     (r'^org/(?P<on>[^/]+)/?$',                          user_access_check, dict_user_org),
     (r'^user/create/?$',                                user_access_check, dict_user_create),
-    (r'^user/change_password/?$',                       user_access_check, dict_user_change_pw),
+    (r'^user/(?P<un>\w+)/change_password/?$',           user_access_check, dict_user_change_pw),
     (r'^user/(?P<what>\w+)/delete/?$',                  user_access_check, dict_user_delete),
     (r'^user/(?P<un>\w+)/?$',                           user_access_check, dict_user_profile),
 )
