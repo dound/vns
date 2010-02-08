@@ -1,3 +1,4 @@
+import logging
 from os import path
 import re
 import sys
@@ -14,6 +15,11 @@ vns_root_dir = path.join(path.dirname(path.abspath(__file__)), '').replace('\\',
 one_above_vns_root_dir = path.abspath(vns_root_dir + '/..')
 sys.path.append(vns_root_dir)
 sys.path.append(one_above_vns_root_dir)
+
+# enable logging if we're in web DEBUG mode
+from web.settings import DEBUG as VNSWWW_DEBUG
+level = logging.DEBUG if VNSWWW_DEBUG else logging.WARN
+logging.basicConfig(format='%(levelname)-8s %(funcName)s:%(lineno)d  %(message)s', level=level)
 
 # this also sets the DJANGO_SETTINGS_MODULE environment variable
 from settings import VNS_WEB_SERVER_PORT as PORT
