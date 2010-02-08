@@ -142,6 +142,7 @@ def __allocate_ip_block(block_from, num_blocks_to_alloc, min_block_mask_bits, sr
 
         start_addr2, _ = aoc[i + 1]
         num_addrs_avail = start_addr2 - aligned_faa
+        logging.debug('considering space b/w %s and %s => %d addresses available' % (__aoc_to_str(aoc[i]), __aoc_to_str(aoc[i+1]), num_addrs_avail))
         if num_addrs_avail >= num_addrs_needed:
             # if we're not too worried about fragmentation, then choose from
             # among the possible sub-blocks in this block
@@ -254,3 +255,12 @@ def __realloc_if_available_work(ra, ip_block_from):
 def __str_ip_to_int(str_ip):
     """Converts a string to an IP address and returns the associated int value."""
     return struct.unpack('>I', inet_aton(str_ip))[0]
+
+def __int_to_str_ip(int_ip):
+    """Converts an int to the associated string representing an IP address."""
+    return inet_ntoa(struct.pack('>I', int_ip))
+
+def __aoc_to_str(aoc):
+    """Converts an allocation of concern pair into an IP/mask string."""
+    ip, mask = aoc
+    return "%s/%d" % (__int_to_str_ip(ip), mask)
