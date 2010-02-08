@@ -10,6 +10,7 @@ from SubnetTree import SubnetTree
 
 import models as db
 from vns.AddressAllocation import instantiate_template
+from vns.Topology import Topology as VNSTopology
 
 def make_ctform(user):
     user_org = user.get_profile().org
@@ -262,6 +263,10 @@ def topology_rtable(request, tid, topo):
     return HttpResponse(topo.get_rtable(), mimetype='text/plain')
 
 def topology_to_xml(request, tid, topo):
+    # The argument topo is the DB's Topology object passed from the access  
+    # checker - ignore it and instead create the needed vns.Topology object.
+    topo = VNSTopology(tid, None, None, None, False)
+    
     # populate xml IDs
     id = 1
     for node in topo.nodes:
