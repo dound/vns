@@ -22,6 +22,12 @@ def durationf_ifnonzero(num_secs, format='%s'):
     else:
         return format % durationf(num_secs)
 
+@register.filter(name='durationfr')
+def durationfr(num_secs, rounded=30):
+    """Returns a string represented the time this topology has been connected
+    rounded to be in integer multiples of rounded."""
+    return durationf((num_secs // rounded) * rounded)
+
 @register.filter(name='orglink')
 def orglink(org):
     return mark_safe('<a href="/org/%s/">%s</a>' % (org.name, org.name))
