@@ -32,7 +32,6 @@ from VNSProtocol import VNS_DEFAULT_PORT, create_vns_server
 from VNSProtocol import VNSOpen, VNSClose, VNSPacket, VNSOpenTemplate, VNSBanner, VNSRtable, VNSAuthRequest, VNSAuthReply, VNSAuthStatus
 from web.vnswww import models as db
 
-
 class VNSSimulator:
     """The VNS simulator.  It gives clients control of nodes in simulated
     topologies."""
@@ -71,16 +70,16 @@ class VNSSimulator:
         # service thread that the topologies dictionary has changed
         self.topologies_changed = False
 
-        # The topology queue service thread will wait on this condition for a 
+        # The topology queue service thread will wait on this condition for a
         # a chosen/dequeued job to be finish (so it can pick the next one).
         self.service_condition = Condition()
-        
+
         # Is set when a job is enqueued.  Is cleared when the queues are empty.
         # The topology queue service thread will clear this event if it makes a
-        # a pass over all the queues and they are empty.  If it makes a pass 
-        # and this event is cleared, then it will wait on this event. 
+        # a pass over all the queues and they are empty.  If it makes a pass
+        # and this event is cleared, then it will wait on this event.
         self.job_available_event = Event()
-        
+
         # run the topology queue service thread
         reactor.callInThread(self.__run_topology_queue_service_thread)
 
@@ -118,7 +117,7 @@ class VNSSimulator:
         while True:
             # whether or not a job has been serviced on this loop
             serviced_a_job = False
-            
+
             # get a copy of the latest topology list in a thread-safe manner
             with self.topologies_lock:
                 if self.topologies_changed:
@@ -133,7 +132,7 @@ class VNSSimulator:
                     self.__return_after_running_job_on_main_thread(job)
                     job = q.task_done()
                     serviced_a_job = True
-                    
+
             # If we haven't done anything for a while, pause for about 50ms (no
             # reason to run up the CPU by repeatedly checking empty queues).
             # Implementation Note: We could get the thread to pause only when it
@@ -153,15 +152,15 @@ class VNSSimulator:
             self.service_condition.notifyAll()
 
     def __return_after_running_job_on_main_thread(self, job):
-        """Requests that job be run on the main thread.  Waits on 
+        """Requests that job be run on the main thread.  Waits on
         service_condition until it is notified that the job is done."""
         with self.service_condition:
             # ask the main thread to run our job (it cannot start until we release this lock)
             reactor.callFromThread(lambda : self.__do_job_then_notify(job))
-            
+
             # wait for the main thread to finish running the job
             self.service_condition.wait()
-            
+
     def __start_raw_socket(self, dev):
         """Starts a socket for sending raw Ethernet frames."""
         try:
