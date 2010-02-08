@@ -221,7 +221,7 @@ class Topology():
             if intf.name == departure_intf_name:
                 logging.debug('%s: client sending packet from %s out %s: %s' %
                               (self, n.name, intf.name, pktstr(pkt_msg.ethernet_frame)))
-                self.stats.note_pkt_from_client()
+                self.stats.note_pkt_from_client(len(pkt_msg.ethernet_frame))
                 n.send_packet(intf, pkt_msg.ethernet_frame)
                 return True
 
@@ -242,7 +242,7 @@ class Topology():
         first simulated node attached to the gateway."""
         gw_intf = self.gw_intf_to_first_hop
         if gw_intf:
-            self.stats.note_pkt_to_topo()
+            self.stats.note_pkt_to_topo(len(packet))
             if rewrite_dst_mac:
                 if self.is_arp_cache_valid():
                     new_dst_mac = self.arp_translation
@@ -296,7 +296,7 @@ class Topology():
                 for intf in n.interfaces:
                     if intf.name == intf_name:
                         if intf.link:
-                            self.stats.note_pkt_to_topo()
+                            self.stats.note_pkt_to_topo(len(ethernet_frame))
                             intf.link.send_to_other(intf, ethernet_frame)
                             return True
                         else:
@@ -593,7 +593,7 @@ class VirtualNode(Node):
         if self.conn is not None:
             logging.debug('%s got packet on %s - forwarding to VNS client: %s' %
                           (self.di(), incoming_intf.name, pktstr(packet)))
-            self.topo.stats.note_pkt_to_client()
+            self.topo.stats.note_pkt_to_client(len(packet))
             self.conn.send(VNSPacket(incoming_intf.name, packet))
 
     def __str__(self):
@@ -656,7 +656,7 @@ class Gateway(Node):
         if self.raw_socket:
             try:
                 logging.debug('%s sending packet out to the real world: %s' % (self.di(), pktstr(packet)))
-                self.topo.stats.note_pkt_from_topo()
+                self.topo.stats.note_pkt_from_topo(len(packet))
                 self.raw_socket.send(packet)
             except socket.error:
                 # this is recoverable - the network may come back up

@@ -586,6 +586,10 @@ class StatsTopology(Model):
     num_pkts_from_topo = IntegerField(default=0, help_text='Counts packets sent from the topology out to the real world.')
     num_pkts_to_client = IntegerField(default=0, help_text='Counts packets sent to any client node in the topology.')
     num_pkts_from_client = IntegerField(default=0, help_text='Counts packets sent from any client node in the topology.')
+    num_bytes_to_topo = IntegerField(default=0, help_text='Counts bytes arriving from the real world or through the topology interaction protocol.')
+    num_bytes_from_topo = IntegerField(default=0, help_text='Counts bytes sent from the topology out to the real world.')
+    num_bytes_to_client = IntegerField(default=0, help_text='Counts bytes sent to any client node in the topology.')
+    num_bytes_from_client = IntegerField(default=0, help_text='Counts bytes sent from any client node in the topology.')
     active = BooleanField(default=True, help_text='True as long as this topology is still running on the simulator.')
 
     def init(self, topo, client_ip, user):
@@ -616,20 +620,28 @@ class StatsTopology(Model):
         else:
             return get_delta_time_sec(self.time_last_changed, datetime.datetime.now())
 
-    def note_pkt_to_topo(self):
+    def get_idle_time_sec_rounded(self, rounded=30):
+        """Returns the amount of time this topology has been idle in seconds rounded."""
+        return (self.get_idle_time_sec() // rounded) * rounded
+
+    def note_pkt_to_topo(self, sz):
         self.num_pkts_to_topo += 1
+        self.num_bytes_to_topo += sz
         self.changed = True
 
-    def note_pkt_from_topo(self):
+    def note_pkt_from_topo(self, sz):
         self.num_pkts_from_topo += 1
+        self.num_bytes_from_topo += sz
         self.changed = True
 
-    def note_pkt_to_client(self):
+    def note_pkt_to_client(self, sz):
         self.num_pkts_to_client += 1
+        self.num_bytes_to_client += sz
         self.changed = True
 
-    def note_pkt_from_client(self):
+    def note_pkt_from_client(self, sz):
         self.num_pkts_from_client += 1
+        self.num_bytes_from_client += sz
         self.changed = True
 
     def save_if_changed(self):
