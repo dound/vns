@@ -121,8 +121,9 @@ def __allocate_ip_block(block_from, num_blocks_to_alloc, min_block_mask_bits, sr
     # randomize the order in which we consider allocations => less likely to
     # reallocate a block soon after it is deallocated => user who wants to reuse
     # a particular IP block should be able to more often
-    split_index = random.randint(0, len(aoc)-1)
-    aoc = aoc[split_index:] + aoc[:split_index + 1] # +1 => overlap so i,i+1 block is still checked
+    if not use_first_available:
+        split_index = random.randint(0, len(aoc)-1)
+        aoc = aoc[split_index:] + aoc[:split_index + 1] # +1 => overlap so i,i+1 block is still checked
 
     # iterate over each adjacent pair of used block until a free segment
     # (between used blocks) is found
