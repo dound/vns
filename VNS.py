@@ -265,6 +265,8 @@ class VNSSimulator:
             return (None, 'topology %d does not exist' % tid)
         except db.IPAssignment.DoesNotExist:
             return (None, 'topology %d is missing an IP assignment' % tid)
+        except db.IPBlockAllocation.DoesNotExist:
+            return (None, 'topology %d is not allocated any IPs' % tid)
         except:
             msg = 'topology instantiation unexpectedly failed'
             log_exception(logging.ERROR, msg)

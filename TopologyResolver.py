@@ -58,7 +58,7 @@ class TopologyResolver:
                 self.m2t[mac] = [topo]
                 logging.debug('%s: MAC registered: %s' % (topo, addrstr(mac)))
 
-        for ip in topo.get_my_ip_addrs():
+        for ip in topo.get_all_ip_addrs_in_my_ip_block():
             # get the source filtering tree associated with the destination
             try:
                 st = self.i2t[ip]
@@ -95,7 +95,7 @@ class TopologyResolver:
             except KeyError:
                 logging.error('%s: missing topo list for %s' % (topo, addrstr(mac)))
 
-        for ip in topo.get_my_ip_addrs():
+        for ip in topo.get_all_ip_addrs_in_my_ip_block():
             # get the source filtering tree associated with the destination
             try:
                 st = self.i2t[ip]
