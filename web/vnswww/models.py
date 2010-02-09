@@ -620,10 +620,6 @@ class StatsTopology(Model):
         else:
             return get_delta_time_sec(self.time_last_changed, datetime.datetime.now())
 
-    def get_idle_time_sec_rounded(self, rounded=30):
-        """Returns the amount of time this topology has been idle in seconds rounded."""
-        return (self.get_idle_time_sec() // rounded) * rounded
-
     def note_pkt_to_topo(self, sz):
         self.num_pkts_to_topo += 1
         self.num_bytes_to_topo += sz
