@@ -66,7 +66,7 @@ class Topology():
 
         # determine what IP block is allocated to this topology
         ipba = db.IPBlockAllocation.objects.get(topology=t)
-        self.ip_block = (struct.unpack('>I',inet_aton(ipba.start_addr))[0], ipba.mask)  
+        self.ip_block = (struct.unpack('>I',inet_aton(ipba.start_addr))[0], ipba.mask)
 
         # determine who may connect to nodes in this topology
         if t.public:
@@ -191,13 +191,13 @@ class Topology():
                 for intf in node.interfaces:
                     addrs.append(intf.ip)
         return addrs
-    
+
     def get_my_ip_block(self):
         """Returns a 2-tuple containing the subnet and associated mask which
         contains all IPs assigned to this topology.  The subnet is expressed as
         a 4B NBO integer."""
         return self.ip_block
-    
+
     def get_all_ip_addrs_in_my_ip_block(self):
         """Returns a list of NBO byte-strings representing the IPs allocated to this topology."""
         dst_block_start_ip, dst_block_mask = self.get_my_ip_block()
@@ -223,7 +223,7 @@ class Topology():
         return self.permitted_source_prefixes
 
     def get_stats(self):
-        """Returns the StatsTopology object maintained by this Topology instance."""
+        """Returns the UsageStats object maintained by this Topology instance."""
         return self.stats
 
     def handle_packet_from_client(self, conn, pkt_msg):
