@@ -3,7 +3,7 @@ try:
     import psyco
     psyco.cannotcompile(django_models.sql.query.Query.clone)
 except ImportError:
-    pass 
+    pass
 
 import datetime
 import hashlib
@@ -135,7 +135,7 @@ class TopologyTemplate(Model):
         (2, u'Public - anyone'),
     )
 
-    name = CharField(max_length=30, unique=True)
+    name = CharField("Name", max_length=30, unique=True)
     date_updated = DateField(auto_now=True, auto_now_add=True)
     owner = ForeignKey(User,
                        help_text='The user who created the template.')
@@ -575,21 +575,21 @@ class RecentIPBlockAllocation(Model):
 
 class StatsTopology(Model):
     """Statistics about Topology during a single session."""
-    topo_uuid = CharField(max_length=32)
-    template = ForeignKey(TopologyTemplate)
-    client_ip = IPAddressField(help_text='IP address of the first client to connect to the topology')
-    user = ForeignKey(User)
-    time_connected = DateTimeField(auto_now_add=True)
-    time_last_changed = DateTimeField(auto_now_add=True)
-    total_time_connected_sec = IntegerField(default=0)
-    num_pkts_to_topo = IntegerField(default=0, help_text='Counts packets arriving from the real world or through the topology interaction protocol.')
-    num_pkts_from_topo = IntegerField(default=0, help_text='Counts packets sent from the topology out to the real world.')
-    num_pkts_to_client = IntegerField(default=0, help_text='Counts packets sent to any client node in the topology.')
-    num_pkts_from_client = IntegerField(default=0, help_text='Counts packets sent from any client node in the topology.')
-    num_bytes_to_topo = IntegerField(default=0, help_text='Counts bytes arriving from the real world or through the topology interaction protocol.')
-    num_bytes_from_topo = IntegerField(default=0, help_text='Counts bytes sent from the topology out to the real world.')
-    num_bytes_to_client = IntegerField(default=0, help_text='Counts bytes sent to any client node in the topology.')
-    num_bytes_from_client = IntegerField(default=0, help_text='Counts bytes sent from any client node in the topology.')
+    topo_uuid = CharField("Topology UUID", max_length=32)
+    template = ForeignKey(TopologyTemplate, verbose_name="Template")
+    client_ip = IPAddressField("Client IP", help_text='IP address of the first client to connect to the topology')
+    user = ForeignKey(User, verbose_name="User")
+    time_connected = DateTimeField("Date/Time Connected", auto_now_add=True)
+    time_last_changed = DateTimeField("Time Last Changed", auto_now_add=True)
+    total_time_connected_sec = IntegerField("Total Time Connected (sec)", default=0)
+    num_pkts_to_topo = IntegerField("# Packets to Topology", default=0, help_text='Counts packets arriving from the real world or through the topology interaction protocol.')
+    num_pkts_from_topo = IntegerField("# Packets from Topology", default=0, help_text='Counts packets sent from the topology out to the real world.')
+    num_pkts_to_client = IntegerField("# Packets to Client", default=0, help_text='Counts packets sent to any client node in the topology.')
+    num_pkts_from_client = IntegerField("# Packets from Client", default=0, help_text='Counts packets sent from any client node in the topology.')
+    num_bytes_to_topo = IntegerField("# Bytes to Topology", default=0, help_text='Counts bytes arriving from the real world or through the topology interaction protocol.')
+    num_bytes_from_topo = IntegerField("# Bytes from Topology", default=0, help_text='Counts bytes sent from the topology out to the real world.')
+    num_bytes_to_client = IntegerField("# Bytes to Client", default=0, help_text='Counts bytes sent to any client node in the topology.')
+    num_bytes_from_client = IntegerField("# Bytes from Client", default=0, help_text='Counts bytes sent from any client node in the topology.')
     active = BooleanField(default=True, help_text='True as long as this topology is still running on the simulator.')
 
     def init(self, topo, client_ip, user):
