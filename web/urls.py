@@ -11,7 +11,7 @@ from vnswww.views_user import *
 admin.autodiscover()
 
 summary_info = {
-    'queryset': db.StatsTopology.objects.filter(active=True).order_by('id'),
+    'queryset': db.UsageStats.objects.filter(active=True).order_by('id'),
     'template_name': 'vns/current_usage.html',
     'template_object_name': 'stats'
 }

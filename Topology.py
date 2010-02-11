@@ -126,7 +126,7 @@ class Topology():
                 self.gw_intf_to_first_hop = intf
 
         if start_stats:
-            self.stats = db.StatsTopology()
+            self.stats = db.UsageStats()
             self.stats.init(t, client_ip, user)
             self.stats.save()
             logging.info('Topology instantiated:\n%s' % self.str_all(include_clients=False))

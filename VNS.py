@@ -38,7 +38,7 @@ class VNSSimulator:
     def __init__(self):
         # close out any hanging stats records (shouldn't be any unless the
         # server was shutdown abnormally with no chance to cleanup)
-        db.StatsTopology.objects.filter(active=True).update(active=False)
+        db.UsageStats.objects.filter(active=True).update(active=False)
 
         # free any hanging temporary topologies
         for t in db.Topology.objects.filter(temporary=True):

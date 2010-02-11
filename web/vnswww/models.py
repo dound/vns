@@ -573,7 +573,7 @@ class RecentIPBlockAllocation(Model):
     def __unicode__(self):
         return u'%s <- %s/%d (for %s)' % (self.template, self.start_addr, self.mask, self.user)
 
-class StatsTopology(Model):
+class UsageStats(Model):
     """Statistics about Topology during a single session."""
     topo_uuid = CharField("Topology UUID", max_length=32)
     template = ForeignKey(TopologyTemplate, verbose_name="Template")

@@ -1,5 +1,5 @@
 from django.contrib import admin
-from models import Simulator, Organization, UserProfile, StatsTopology, \
+from models import Simulator, Organization, UserProfile, UsageStats, \
                    TopologyTemplate, Node, WebServer, WebServerPath, Port, Link, \
                    Topology, TopologySourceIPFilter, TopologyUserFilter, \
                    IPAssignment, MACAssignment, IPBlock, IPBlockAllocation, \
@@ -95,7 +95,7 @@ class RecentIPBlockAllocationAdmin(admin.ModelAdmin):
     ordering = ('user', 'template')
     search_fields = ('user.username', 'template.name', 'start_addr')
 
-class StatsTopologyAdmin(admin.ModelAdmin):
+class UsageStatsAdmin(admin.ModelAdmin):
     list_display = ('template', 'user', 'client_ip', 'time_connected', 'total_time_connected_sec', 'num_pkts_to_topo', 'num_pkts_from_topo', 'num_pkts_to_client', 'num_pkts_from_client', 'active', 'topo_uuid')
     ordering = ('time_connected',)
     search_fields = ('template__name', 'user__username', 'client_ip', 'uuid')
@@ -122,5 +122,5 @@ admin.site.register(MACAssignment, MACAssignmentAdmin)
 admin.site.register(IPBlock, IPBlockAdmin)
 admin.site.register(IPBlockAllocation, IPBlockAllocationAdmin)
 admin.site.register(RecentIPBlockAllocation, RecentIPBlockAllocationAdmin)
-admin.site.register(StatsTopology, StatsTopologyAdmin)
+admin.site.register(UsageStats, UsageStatsAdmin)
 admin.site.register(SystemInfo, SystemInfoAdmin)
