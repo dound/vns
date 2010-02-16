@@ -53,6 +53,9 @@ dict_user_delete['var_un'] = 'what'
 dict_user_delete['del_un'] = False
 dict_user_profile   = make_user_access_check_dict(user_profile)
 
+def redirect_to_file(request, folder, file, ext):
+    return redirect_to(request, folder + file + '.' + ext)
+
 urlpatterns = patterns('web.vnswww.views',
     (r'^admin/', include(admin.site.urls)),
     (r'^$',                                             homepage),
@@ -83,6 +86,7 @@ urlpatterns = patterns('web.vnswww.views',
 )
 urlpatterns += patterns('',
     (r'^favicon[.]ico$', redirect_to, {'url':'/media/favicon.ico'}),
+    (r'^js/(?P<file>.*)[.]js$', redirect_to_file, {'folder':'/media/js/', 'ext':'js'}),
     (r'^login/?$', 'django.contrib.auth.views.login', {'template_name': 'vns/login.html'}),
     (r'^logout/?$', 'django.contrib.auth.views.logout', {'template_name': 'vns/logout.html'}),
 )
