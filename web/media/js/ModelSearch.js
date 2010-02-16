@@ -1,7 +1,7 @@
 /**
  * ModelSearch creates dynamic form elements for searching a model.  The input
  * fields it creates will be of the form "<type><filter#>_<condition#>_<field>"
- * where <type> is either "in" or "ex" (inclusive/exclusive filter) and <field>
+ * where <type> is either "i" or "e" (inclusive/exclusive filter) and <field>
  * is "field" (index of the field this filter's condition is on), "op" (index of
  * the operator to search the field with), or "v1" or "v2" (search values; v2
  * may only be applicable for some operators).  The field and operator index
@@ -142,7 +142,7 @@ function ModelSearch(field_infos, inclusive_node, exclusive_node) {
      */
     function FilterSet(inclusive, container) {
         // prefix associated with this filter set for form fields
-        var FORM_PREFIX = inclusive ? 'in' : 'ex';
+        var FORM_PREFIX = inclusive ? 'i' : 'e';
 
         // filters associated with this set (these are OR'ed together)
         var filters = [];

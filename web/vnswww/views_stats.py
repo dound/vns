@@ -1,6 +1,10 @@
+import re
+
+from django.contrib import messages
 from django.core.exceptions import FieldError
+from django.http import HttpResponse
 from django.db.models import AutoField, BooleanField, CharField, DateField, \
-                             DateTimeField, FloatField, ForeignKey, TextField, \
+                             DateTimeField, FloatField, ForeignKey, Q, TextField, \
                              IntegerField, IPAddressField
 from django.views.generic.simple import direct_to_template
 
@@ -30,8 +34,11 @@ class SearchDescription():
     SEARCH_OPERATORS_BOOL = ('exact',)
 
     OP_TO_STR_MAPPING = dict(exact='=', gt='>', gte='>=', lt='<', lte='<=',
-                             startswith='starts with', endswith='ends with',
+                             contains='contains', startswith='starts with', endswith='ends with',
                              year='is year', month='is month', day='is day')
+
+    STR_TO_OP_MAPPING = dict([(v,k) for k,v in OP_TO_STR_MAPPING.iteritems()])
+
     @staticmethod
     def op_to_displayable_str(op):
         return SearchDescription.OP_TO_STR_MAPPING.get(op, op)
@@ -58,7 +65,7 @@ class SearchDescription():
         ret = [(n, v, o) for n, (v,o) in self.searchable_fields.items()]
         for field_name, (vname, model_search_desc) in self.searchable_foreign_key_fields.iteritems():
             for sub_field_name, sub_vname, sub_field_lookups in model_search_desc.get_searchable_fields():
-                fqn = '.'.join((field_name, sub_field_name))
+                fqn = '__'.join((field_name, sub_field_name))
                 fqvn = ' '.join((vname, sub_vname))
                 ret.append( (fqn, fqvn, sub_field_lookups) )
         return ret
@@ -101,6 +108,125 @@ class SearchDescription():
                     raise FieldError('%s is not a ForeignKey field on %s' % (field_name, str_modcls(self.model)))
         raise FieldError('%s is not a field on %s' % (field_name, str_modcls(self.model)))
 
+class Condition():
+    """Stores information about a single condition.  Data is stored exactly as
+    submitted from the HTML form.
+
+    @param searchable_views  This should be the result of calling
+               get_searchable_fields() on the SearchDescription object this
+               condition is for.
+
+    @param searchable_views_ordered  Must be the list of 2-tuples used to
+               initialize the dynamic form.  The first element in each tuple is
+               the display name of each variable and the second is a list of
+               operators (display version).
+    """
+    def __init__(self, searchable_views, searchable_views_ordered,
+                 field_index=None, op_index=None, field_value1=None, field_value2=None):
+        self.searchable_views = searchable_views
+        self.searchable_views_ordered = searchable_views_ordered
+        self.field_index = field_index
+        self.op_index = op_index
+        self.field_value1 = field_value1
+        self.field_value2 = field_value2
+
+    def set(self, kind, value):
+        """Sets the field specified by kind to the specified value.  ValueError
+        is raised if kind is field or op and value is not an integer."""
+        if kind == 'field':
+            self.field_index = int(value)
+        elif kind == 'op':
+            self.op_index = int(value)
+        elif kind == 'v1':
+            self.field_value1 = value
+        elif kind == 'v2':
+            self.field_value2 = value
+        else:
+            raise KeyError("unknown kind '%s' passed to Condition.set()" % kind)
+
+    def get_search_kv(self):
+        """Gets the search field name (including operator, e.g., 'name__contains')
+        and value as a 2-tuple.  IndexError is raised if an invalid search field
+        or operator field choice was made.  It is also raised if any needed
+        field is missing."""
+        if not self.is_complete():
+            raise IndexError('missing search field')
+
+        try:
+            field_name_long, ops = self.searchable_views_ordered[self.field_index]
+        except IndexError:
+            raise IndexError('invalid search field')
+
+        field_name = None
+        for n, v, _ in self.searchable_views:
+            if field_name_long == v:
+                field_name = n
+        if not field_name:
+            raise KeyError('invalid search field')  # shouldn't be able to happen
+
+        try:
+            op = ops[self.op_index]
+        except IndexError:
+            raise IndexError('invalid operator selection')
+        how = SearchDescription.STR_TO_OP_MAPPING[op]
+
+        if op == 'range':
+            if self.field_value2 is None:
+                raise IndexError('missing search field for range operator')
+            v = (self.field_value1, self.field_value2)
+        else:
+            v = self.field_value1
+
+        k = '%s__%s' % (field_name, how)
+        return (k, v)
+
+    def is_complete(self):
+        return self.field_index is not None  and \
+               self.op_index is not None     and \
+               self.field_value1 is not None
+
+class Filter():
+    """Represents a filter."""
+    def __init__(self):
+        self.conditions = {}
+
+    def make_query_filter(self):
+        """Creates a query for this filter.  IndexError is raised if an invalid
+        search field or operator field choice is used by any condition."""
+        dict_conditions = dict([c.get_search_kv() for c in self.conditions.values()])
+        return Q(**dict_conditions)
+
+    @staticmethod
+    def combine_filters(filters):
+        """OR all the filters together.  May raise IndexError (see make_query_filter)."""
+        if not filters:
+            return None
+        overall_query = filters[0].make_query_filter()
+        for f in filters[1:]:
+            overall_query = overall_query | f.make_query_filter()
+        return overall_query
+
+def get_filtered_data(model, exclusive_filters, inclusive_filters):
+    """Returns the QuerySet containing the data from the specified model which
+    meets the criteria specified by any of the inclusive filters and none of the
+    exclusive filters.  Raises IndexError if any of the filters conditions
+    cannot be decoded."""
+    exclusive_q = Filter.combine_filters(exclusive_filters)
+    inclusive_q = Filter.combine_filters(inclusive_filters)
+    if inclusive_q is None:
+        if exclusive_q is None:
+            return model.objects.all()
+        else:
+            return model.objects.exclude(exclusive_q)
+    else:
+        if exclusive_q is None:
+            return model.objects.filter(inclusive_q)
+        else:
+            return model.objects.exclude(exclusive_q).filter(inclusive_q)
+
+def create_output(groups):
+    return '%d results\n\n' % len(groups) + '\n'.join(str(g) for g in groups)
+
 class TemplateSearchDesc(SearchDescription):
     model = db.TopologyTemplate
     fields = ('name',)
@@ -111,15 +237,52 @@ class UsageStatsSearchDesc(SearchDescription):
     model = db.UsageStats
     fields = ('topo_uuid', 'time_connected', 'num_pkts_to_topo')
     foreign_key_fields = ( ('template',SD_TEMPLATE), )
-SD_TOPOLOGY = SearchDescription(UsageStatsSearchDesc)
+SD_USAGE_STATS = SearchDescription(UsageStatsSearchDesc)
 
 # precompute them and store them in sorted order
-TOPOLOGY_SEARCHABLE_FIELDS = SD_TOPOLOGY.get_searchable_fields()
+TOPOLOGY_SEARCHABLE_FIELDS = SD_USAGE_STATS.get_searchable_fields()
 TOPOLOGY_SEARCHABLE_FIELDS_FOR_VIEW = [(v, [SearchDescription.op_to_displayable_str(o) for o in ops])
                                        for n,v,ops in TOPOLOGY_SEARCHABLE_FIELDS]
 TOPOLOGY_SEARCHABLE_FIELDS_FOR_VIEW.sort()
 TOPOLOGY_SEARCHABLE_FIELDS_FOR_DECODE = [(v, n) for n,v,ops in TOPOLOGY_SEARCHABLE_FIELDS]
 
+RE_MODEL_SEARCH_FIELD = re.compile(r'(e|i)(\d+)_(\d+)_((field)|(op)|(v1)|(v2))')
 def stats_search(request):
     tn = 'vns/stats_search.html'
-    return direct_to_template(request, tn, {'fields_list': TOPOLOGY_SEARCHABLE_FIELDS_FOR_VIEW})
+    if request.method == 'POST':
+        # extract all of the inclusive and exclusive filters
+        in_filters = {}
+        ex_filters = {}
+        for k,v in request.POST.iteritems():
+            m = RE_MODEL_SEARCH_FIELD.match(k)
+            if m:
+                f_type, f_id, c_id, kind, _,_,_,_ = m.groups()
+                filters = in_filters if f_type=='i' else ex_filters
+                try:
+                    f = filters[f_id]
+                except KeyError:
+                    f = Filter()
+                    filters[f_id] = f
+                try:
+                    c = f.conditions[c_id]
+                except KeyError:
+                    c = Condition(TOPOLOGY_SEARCHABLE_FIELDS, TOPOLOGY_SEARCHABLE_FIELDS_FOR_VIEW)
+                    f.conditions[c_id] = c
+                try:
+                    c.set(kind, v)
+                except ValueError:
+                    # user has supplied a non-integer field or op index: they didn't use our form
+                    messages.error('Invalid search: please use our search form')
+                    return direct_to_template(request, tn, {'fields_list': TOPOLOGY_SEARCHABLE_FIELDS_FOR_VIEW})
+
+        try:
+            data = get_filtered_data(db.UsageStats, ex_filters.values(), in_filters.values())
+        except IndexError as e:
+            # user has supplied a bad field or operator: they didn't use our form
+            messages.error('Invalid search: ' + str(e))
+            return direct_to_template(request, tn, {'fields_list': TOPOLOGY_SEARCHABLE_FIELDS_FOR_VIEW})
+
+        output = create_output(data)
+        return HttpResponse(output, content_type='text/plain')
+    else:
+        return direct_to_template(request, tn, {'fields_list': TOPOLOGY_SEARCHABLE_FIELDS_FOR_VIEW})
