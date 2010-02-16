@@ -7,6 +7,7 @@ from vnswww import models as db
 from vnswww.views import checked_delete, homepage
 from vnswww.views_topology import *
 from vnswww.views_user import *
+from vnswww.views_stats import stats_search
 
 admin.autodiscover()
 
@@ -83,6 +84,9 @@ urlpatterns = patterns('web.vnswww.views',
     (r'^user/(?P<un>\w+)/change_password/?$',           user_access_check, dict_user_change_pw),
     (r'^user/(?P<what>\w+)/delete/?$',                  user_access_check, dict_user_delete),
     (r'^user/(?P<un>\w+)/?$',                           user_access_check, dict_user_profile),
+
+    # stats URLs
+    (r'^stats/search/?$',                               stats_search),
 )
 urlpatterns += patterns('',
     (r'^favicon[.]ico$', redirect_to, {'url':'/media/favicon.ico'}),

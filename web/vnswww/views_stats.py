@@ -119,3 +119,7 @@ TOPOLOGY_SEARCHABLE_FIELDS_FOR_VIEW = [(v, [SearchDescription.op_to_displayable_
                                        for n,v,ops in TOPOLOGY_SEARCHABLE_FIELDS]
 TOPOLOGY_SEARCHABLE_FIELDS_FOR_VIEW.sort()
 TOPOLOGY_SEARCHABLE_FIELDS_FOR_DECODE = [(v, n) for n,v,ops in TOPOLOGY_SEARCHABLE_FIELDS]
+
+def stats_search(request):
+    tn = 'vns/stats_search.html'
+    return direct_to_template(request, tn, {'fields_list': TOPOLOGY_SEARCHABLE_FIELDS_FOR_VIEW})

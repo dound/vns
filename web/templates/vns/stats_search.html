@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% load custom_filters %}
+
+{% block titlebar %}Search Usage Statistics{% endblock %}
+{% block title %}Search Usage Statistics{% endblock %}
+{% block head %}
+<script type="text/javascript" src="/js/ModelSearch.js"></script>
+{% endblock %}
+
+{% block content %}
+<form method="post" action="">
+<h2>Inclusive Filter(s):</h2>
+<div id="inclusive_filters"></div>
+<hr/>
+
+<h2>Exclusive Filter(s):</h2>
+<div id="exclusive_filters"></div>
+<hr/>
+
+<p><input type="submit" value="Search"/></p>
+</form>
+
+<script type="text/javascript">
+<!--
+var fields = [];
+{% for dname, allowed_ops in fields_list %}
+fields[{{ forloop.counter0 }}] = ['{{ dname }}', [{% for op in allowed_ops %}'{{ op|safe }}'{% if not forloop.last %}, {% endif %}{% endfor %}]];{% endfor %}
+
+in_div = document.getElementById('inclusive_filters');
+ex_div = document.getElementById('exclusive_filters');
+ms = ModelSearch(fields, in_div, ex_div);
+//-->
+</script>
+
+Records matching <i>any</i> inclusive filter will be included <i>except</i>
+those which match <i>any</i> exclusive filter.
+{% endblock %}
