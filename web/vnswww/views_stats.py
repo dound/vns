@@ -2,7 +2,7 @@ import re
 
 from django.contrib import messages
 from django.core.exceptions import FieldError
-from django.http import HttpResponse
+from django.http import HttpResponse, HttpResponseRedirect
 from django.db.models import AutoField, BooleanField, CharField, DateField, \
                              DateTimeField, FloatField, ForeignKey, Q, TextField, \
                              IntegerField, IPAddressField
@@ -248,6 +248,11 @@ TOPOLOGY_SEARCHABLE_FIELDS_FOR_DECODE = [(v, n) for n,v,ops in TOPOLOGY_SEARCHAB
 
 RE_MODEL_SEARCH_FIELD = re.compile(r'(e|i)(\d+)_(\d+)_((field)|(op)|(v1)|(v2))')
 def stats_search(request):
+    # make sure the user is logged in
+    if not request.user.is_authenticated():
+        messages.warning(request, 'You must login before proceeding.')
+        return HttpResponseRedirect('/login/?next=%s' % request.path)
+
     tn = 'vns/stats_search.html'
     if request.method == 'POST':
         # extract all of the inclusive and exclusive filters
