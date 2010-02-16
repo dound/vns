@@ -57,7 +57,7 @@ urlpatterns = patterns('web.vnswww.views',
     (r'^admin/', include(admin.site.urls)),
     (r'^$',                                             homepage),
     (r'^summary/?$',                                    list_detail.object_list, summary_info),
-    (r'^vns.css$',                                      direct_to_template, {'mimetype':'text/css', 'template':'vns.css'}),
+    (r'^vns[.]css$',                                    direct_to_template, {'mimetype':'text/css', 'template':'vns.css'}),
 
     # topology URLs
     (r'^topologies/?$',                                 topologies_list),
@@ -82,7 +82,7 @@ urlpatterns = patterns('web.vnswww.views',
     (r'^user/(?P<un>\w+)/?$',                           user_access_check, dict_user_profile),
 )
 urlpatterns += patterns('',
-    (r'^favicon.ico$', redirect_to, {'url':'/media/favicon.ico'}),
+    (r'^favicon[.]ico$', redirect_to, {'url':'/media/favicon.ico'}),
     (r'^login/?$', 'django.contrib.auth.views.login', {'template_name': 'vns/login.html'}),
     (r'^logout/?$', 'django.contrib.auth.views.logout', {'template_name': 'vns/logout.html'}),
 )
