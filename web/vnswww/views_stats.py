@@ -246,7 +246,7 @@ TOPOLOGY_SEARCHABLE_FIELDS_FOR_VIEW = [(v, [SearchDescription.op_to_displayable_
 TOPOLOGY_SEARCHABLE_FIELDS_FOR_VIEW.sort()
 TOPOLOGY_SEARCHABLE_FIELDS_FOR_DECODE = [(v, n) for n,v,ops in TOPOLOGY_SEARCHABLE_FIELDS]
 
-RE_MODEL_SEARCH_FIELD = re.compile(r'(e|i)(\d+)_(\d+)_((field)|(op)|(v1)|(v2))')
+RE_MODEL_SEARCH_FIELD = re.compile(r'(e|i)(\w+)_(\d+)_((field)|(op)|(v1)|(v2))')
 def stats_search(request):
     # make sure the user is logged in
     if not request.user.is_authenticated():
