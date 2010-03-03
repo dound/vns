@@ -101,6 +101,9 @@ function ModelSearch(field_infos, inclusive_node, exclusive_node) {
         // conditions associated with this filter (these are AND'ed together)
         var conditions = [];
 
+        // id to use for the next condition
+        var next_cond_id = 0;
+
         // create the default contents of the container node for this filter
         var txtJoin = (num == 1) ? '' : 'OR ';
         container.appendChild(document.createTextNode(txtJoin + 'Filter #' + num));
@@ -110,7 +113,8 @@ function ModelSearch(field_infos, inclusive_node, exclusive_node) {
         // adds a new condition to this filter
         function add_condition(first) {
             // add a new condition to this filter
-            var cname = fname + '_' + conditions.length;
+            var cname = fname + '_' + next_cond_id;
+            next_cond_id = next_cond_id + 1;
             var cdiv = document.createElement('div');
             var txtNode = document.createTextNode(' AND ');
             if(first) {
@@ -147,6 +151,9 @@ function ModelSearch(field_infos, inclusive_node, exclusive_node) {
         // filters associated with this set (these are OR'ed together)
         var filters = [];
 
+        // id to use for the next filter
+        var next_filter_id = 0;
+
         // initial contents
         var default_contents = document.createElement('div');
         if(inclusive)
@@ -159,9 +166,10 @@ function ModelSearch(field_infos, inclusive_node, exclusive_node) {
         var btnAddFilter = createOrdinaryButton('Add a filter');
         btnAddFilter.onclick = function() {
             // add a new filter to this filter set
-            var fname = FORM_PREFIX + filters.length;
-            var fdiv = document.createElement('div')
+            var fname = FORM_PREFIX + next_filter_id;
+            var fdiv = document.createElement('div');
             filters.push(new Filter(fname, fdiv, filters.length+1));
+            next_filter_id = next_filter_id + 1;
             container.insertBefore(fdiv, btnAddFilter);
 
             // hide the default contents
