@@ -7,12 +7,21 @@
  * may only be applicable for some operators).  The field and operator index
  * correspond to the position of elements in the field_infos argument.
  *
+ * URL parameters can be used to initialize the filters.  To have filters
+ * automatically created pass the following parameters:
+ *     <prefix><type>_num_filters - number of filters to create
+ *     <prefix><type><filter#>_num_conds - number of conditions for the specified filter
+ *     <prefix><type><filter#>_<cond#>_<op> - specifies a condition for the specified filter
+ *     note: filters and conditions must be numbered from 1 to n.
+ *
  * @param prefix       Text to prefix each input field with
  * @param field_infos  An array of of information about fields.  Each element is
  *                     an array of two items: the name of the field and an array
  *                     of operators it can use.
  * @param inclusive_node  DOM element where inclusive form fields should be put
  * @param exclusive_node  DOM element where exclusive form fields should be put
+ *
+ * @author David Underhill (http://www.dound.com)
  */
 function createModelSearch(prefix, field_infos, inclusive_node, exclusive_node) {
     // build option element html for field options and fields' operator options
@@ -52,6 +61,20 @@ function createModelSearch(prefix, field_infos, inclusive_node, exclusive_node) 
         return btn;
     }
 
+    /** parses the URL and returns the value of the parameter with the specified name, if any */
+    function get_url_param(name) {
+        var url, results;
+        url = window.location.href;
+        name = name.replace(/[\[]/,"\\\[").replace(/[\]]/,"\\\]");
+        results = new RegExp("[\\?&]"+name+"=([^&#]*)").exec(url);
+        if(results === null) {
+            return null;
+        }
+        else { // decodeURIComponent doesn't recognize + as encoding for space
+            return decodeURIComponent(results[1].replace(/\+/g," "));
+        }
+    }
+
     /**
      * A Condition manages what restrictions are on a single field.
      *
@@ -77,6 +100,11 @@ function createModelSearch(prefix, field_infos, inclusive_node, exclusive_node) 
         value1 = createValueField(cname, 1);
         txtBetweenValues = document.createTextNode(' to ');
         value2 = createValueField(cname, 2);
+
+        this.field_choices = field_choices;
+        this.op_choices = op_choices;
+        this.value1 = value1;
+        this.value2 = value2;
 
         // initialize the field choices combo box
         field_choices.setAttribute('name', cname + '_field');
@@ -125,6 +153,14 @@ function createModelSearch(prefix, field_infos, inclusive_node, exclusive_node) 
         this.leading_span.style.visibility = ((n === 1) ? 'hidden' : 'visible');
     };
 
+    /** Sets the condition */
+    Condition.prototype.set = function (field, op, v1, v2) {
+        this.field_choices.selectedIndex = field;
+        this.op_choices.selectedIndex = op;
+        this.value1.value = v1;
+        this.value2.value = v2;
+    };
+
     /**
      * A Filter manages a set of conditions.
      *
@@ -157,14 +193,14 @@ function createModelSearch(prefix, field_infos, inclusive_node, exclusive_node) 
         this.conditions_container.appendChild(this.btnAddCondition);
 
         // create the default condition
-        this.add_condition(true);
+        this.add_condition();
 
         // clicking on the button should create a new condition
-        this.btnAddCondition.onclick = function () { me.add_condition(false); };
+        this.btnAddCondition.onclick = function () { me.add_condition(); };
     }
 
     /** adds a new condition to a filter */
-    Filter.prototype.add_condition = function (first) {
+    Filter.prototype.add_condition = function () {
         var cname, cdiv;
 
         // add a new condition to this filter
@@ -173,6 +209,7 @@ function createModelSearch(prefix, field_infos, inclusive_node, exclusive_node) 
         cdiv = document.createElement('div');
         this.conditions.push(new Condition(this, cname, cdiv, this.conditions.length+1));
         this.conditions_container.insertBefore(cdiv, this.btnAddCondition);
+        return this.conditions[this.conditions.length - 1];
     };
 
     /** callback issued when a condition is deleted from a filter */
@@ -239,12 +276,17 @@ function createModelSearch(prefix, field_infos, inclusive_node, exclusive_node) 
         this.btnAddFilter = createOrdinaryButton('Add a filter');
         this.btnAddFilter.onclick = function () { me.add_filter(); };
         this.container.appendChild(this.btnAddFilter);
+
+        // populate them with any params passed in the URL
+        this.populate_from_url();
     }
 
     /** Add a filter to the filter set. */
-    FilterSet.prototype.add_filter = function () {
-        var fname, fdiv;
-        fname = this.FORM_PREFIX + this.next_filter_id;
+    FilterSet.prototype.add_filter = function (fname) {
+        var fdiv;
+        if(fname === undefined) {
+            fname = this.FORM_PREFIX + this.next_filter_id;
+        }
         fdiv = document.createElement('div');
         this.filters.push(new Filter(this, fname, fdiv, this.filters.length+1));
         this.next_filter_id += 1;
@@ -253,6 +295,7 @@ function createModelSearch(prefix, field_infos, inclusive_node, exclusive_node) 
         // hide the default contents
         this.default_contents.style.display = 'none';
         this.btnAddFilter.innerHTML = 'Add another filter';
+        return this.filters[this.filters.length - 1];
     };
 
     /** Callback to issue when a filter from this set is deleted. */
@@ -275,6 +318,39 @@ function createModelSearch(prefix, field_infos, inclusive_node, exclusive_node) 
         if(this.filters.length === 0) {
             this.default_contents.style.display = 'block';
             this.btnAddFilter.innerHTML = 'Add a filter';
+        }
+    };
+
+    /** Parses URL parameters and creates filters for this filter set. */
+    FilterSet.prototype.populate_from_url = function() {
+        var cond, cprefix, filter, fname, fprefix, i, j, num_conds, num_filters, field, op, v1, v2;
+
+        num_filters = get_url_param(this.FORM_PREFIX + "_num_filters");
+        if(num_filters === null) {
+            return; // no filters
+        }
+
+        for(i=1; i<=num_filters; i++) {
+            fname = this.FORM_PREFIX + i;
+            fprefix = fname + '_';
+            num_conds = get_url_param(fprefix + "num_conds");
+            if(num_conds !== null && num_conds > 0) {
+                filter = this.add_filter(fname);
+                for(j=1; j<=num_conds; j++) {
+                    cprefix = fprefix + j + "_";
+                    field = get_url_param(cprefix + "field");
+                    op = get_url_param(cprefix + "op");
+                    v1 = get_url_param(cprefix + "v1");
+                    v2 = get_url_param(cprefix + "v2");
+                    if(j === 1) {
+                        cond = filter.conditions[0]; // first cond is auto-created
+                    }
+                    else {
+                        cond = filter.add_condition();
+                    }
+                    cond.set(field, op, v1, v2);
+                }
+            }
         }
     };
 
