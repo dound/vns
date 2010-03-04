@@ -26,9 +26,12 @@ var fields = [];
 {% for dname, allowed_ops in fields_list %}
 fields[{{ forloop.counter0 }}] = ['{{ dname }}', [{% for op in allowed_ops %}'{{ op|safe }}'{% if not forloop.last %}, {% endif %}{% endfor %}]];{% endfor %}
 
-in_div = document.getElementById('inclusive_filters');
-ex_div = document.getElementById('exclusive_filters');
-ms = createModelSearch("", fields, in_div, ex_div);
+(function () { // keep names out of the global namespace
+    var in_div, ex_div, ms;
+    in_div = document.getElementById('inclusive_filters');
+    ex_div = document.getElementById('exclusive_filters');
+    ms = createModelSearch("", fields, in_div, ex_div);
+}());
 //-->
 </script>
 
