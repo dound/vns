@@ -28,7 +28,7 @@ fields[{{ forloop.counter0 }}] = ['{{ dname }}', [{% for op in allowed_ops %}'{{
 
 in_div = document.getElementById('inclusive_filters');
 ex_div = document.getElementById('exclusive_filters');
-ms = ModelSearch(fields, in_div, ex_div);
+ms = createModelSearch("", fields, in_div, ex_div);
 //-->
 </script>
 

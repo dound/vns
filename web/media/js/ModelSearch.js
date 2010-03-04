@@ -1,6 +1,6 @@
 /**
- * ModelSearch creates dynamic form elements for searching a model.  The input
- * fields it creates will be of the form "<type><filter#>_<condition#>_<field>"
+ * This function creates dynamic form elements for searching a model.  The input
+ * fields it creates will be of the form "<prefix><type><filter#>_<condition#>_<field>"
  * where <type> is either "i" or "e" (inclusive/exclusive filter) and <field>
  * is "field" (index of the field this filter's condition is on), "op" (index of
  * the operator to search the field with), or "v1" or "v2" (search values; v2
@@ -13,7 +13,7 @@
  * @param inclusive_node  DOM element where inclusive form fields should be put
  * @param exclusive_node  DOM element where exclusive form fields should be put
  */
-function ModelSearch(field_infos, inclusive_node, exclusive_node) {
+function createModelSearch(field_infos, inclusive_node, exclusive_node) {
     // build option element html for field options and fields' operator options
     var FIELD_OPTIONS = '';
     var OPERATORS_OPTIONS = [];
