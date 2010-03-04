@@ -55,11 +55,23 @@ function createModelSearch(prefix, field_infos, inclusive_node, exclusive_node) 
     /**
      * A Condition manages what restrictions are on a single field.
      *
-     * @param cname      unique name of this condition
-     * @param container  DOM element which will hold this condition's elements
+     * @param parent_fitler  filter which this condition is part of
+     * @param cname          unique name of this condition
+     * @param container      DOM element which will hold this condition's elements
+     * @param n              this condition's number
      */
-    function Condition(cname, container) {
-        var field_choices, op_choices, value1, txtBetweenValues, value2;
+    function Condition(parent_filter, cname, container, n) {
+        var me, txtNode, field_choices, op_choices, value1, txtBetweenValues, value2, btnRm;
+        me = this;
+        this.parent_filter = parent_filter;
+        this.container = container;
+
+        txtNode = document.createTextNode(' AND ');
+        this.leading_span = document.createElement('span');
+        this.leading_span.appendChild(txtNode);
+        container.appendChild(this.leading_span);
+        this.renumber(n);
+
         field_choices = document.createElement('select');
         op_choices = document.createElement('select');
         value1 = createValueField(cname, 1);
@@ -86,16 +98,32 @@ function createModelSearch(prefix, field_infos, inclusive_node, exclusive_node) 
             value2.style.display = state;
         };
 
+        // create a button to delete this condition
+        btnRm = createOrdinaryButton('X');
+        btnRm.onclick = function() { me.remove(); };
+
         // add each of the new elements to our container
         container.appendChild(field_choices);
         container.appendChild(op_choices);
         container.appendChild(value1);
         container.appendChild(txtBetweenValues);
         container.appendChild(value2);
+        container.appendChild(btnRm);
 
         // trigger onchange() for the default selections
         field_choices.onchange();
     }
+
+    /** deletes this condition (removes it from the DOM and from its Filter) */
+    Condition.prototype.remove = function () {
+        this.container.parentNode.removeChild(this.container);
+        this.parent_filter.condition_deleted_callback(this);
+    };
+
+    /** Changes the number of this condition (1 is first). */
+    Condition.prototype.renumber = function (n) {
+        this.leading_span.style.visibility = ((n === 1) ? 'hidden' : 'visible');
+    };
 
     /**
      * A Filter manages a set of conditions.
@@ -103,70 +131,79 @@ function createModelSearch(prefix, field_infos, inclusive_node, exclusive_node) 
      * @param parent_fs  FilterSet which is the parent of this Filter
      * @param fname      unique name of this filter
      * @param container  DOM element which will hold this filter's elements
-     * @param num        which filter number this is (1 indexed)
+     * @param n          which filter number this is (1 indexed)
      */
-    function Filter(parent_fs, fname, container, num) {
-        var conditions, next_cond_id, txtJoin, conditions_container, btnAddCondition;
+    function Filter(parent_fs, fname, container, n) {
+        var me = this;
+        this.parent_fs = parent_fs;
+        this.fname = fname;
+        this.container = container;
 
         // conditions associated with this filter (these are AND'ed together)
-        conditions = [];
+        this.conditions = [];
 
         // id to use for the next condition
-        next_cond_id = 0;
+        this.next_cond_id = 0;
 
         // create the default contents of the container node for this filter
-        txtJoin = (num === 1) ? '' : 'OR ';
-        container.appendChild(document.createTextNode(txtJoin + 'Filter #' + num));
-        conditions_container = document.createElement('blockquote');
-        container.appendChild(conditions_container);
+        this.txtJoin = document.createTextNode('');
+        container.appendChild(this.txtJoin);
+        this.renumber(n);
+        this.conditions_container = document.createElement('blockquote');
+        container.appendChild(this.conditions_container);
 
         // create a button to add more conditions
-        btnAddCondition = createOrdinaryButton('AND ...');
-        conditions_container.appendChild(btnAddCondition);
-
-        // adds a new condition to this filter
-        function add_condition(first) {
-            var cname, cdiv, txtNode, invisible_span;
-
-            // add a new condition to this filter
-            cname = fname + '_' + next_cond_id;
-            next_cond_id = next_cond_id + 1;
-            cdiv = document.createElement('div');
-            txtNode = document.createTextNode(' AND ');
-            if(first) {
-                invisible_span = document.createElement('span');
-                invisible_span.style.visibility = 'hidden';
-                invisible_span.appendChild(txtNode);
-                cdiv.appendChild(invisible_span);
-            }
-            else {
-                cdiv.appendChild(txtNode);
-            }
-            conditions.push(new Condition(cname, cdiv));
-            conditions_container.insertBefore(cdiv, btnAddCondition);
-        }
+        this.btnAddCondition = createOrdinaryButton('AND ...');
+        this.conditions_container.appendChild(this.btnAddCondition);
 
         // create the default condition
-        add_condition(true);
+        this.add_condition(true);
 
         // clicking on the button should create a new condition
-        btnAddCondition.onclick = function () { add_condition(false); };
-
-        // callback issued when a condition is deleted from this filter
-        function condition_deleted_callback(c) {
-            // if the last condition is being removed, then delete this filter
-            if(conditions.length === 1) {
-                parent_fs.filter_deleted_callback(this);
-            }
-            else {
-                // remove c from our list of conditions
-                // TODO ...
-
-                // renumber remaining conditions
-                // TODO ...
-            }
-        }
+        this.btnAddCondition.onclick = function () { me.add_condition(false); };
     }
+
+    /** adds a new condition to a filter */
+    Filter.prototype.add_condition = function (first) {
+        var cname, cdiv;
+
+        // add a new condition to this filter
+        cname = this.fname + '_' + this.next_cond_id;
+        this.next_cond_id = this.next_cond_id + 1;
+        cdiv = document.createElement('div');
+        this.conditions.push(new Condition(this, cname, cdiv, this.conditions.length+1));
+        this.conditions_container.insertBefore(cdiv, this.btnAddCondition);
+    };
+
+    /** callback issued when a condition is deleted from a filter */
+    Filter.prototype.condition_deleted_callback = function (c) {
+        var i;
+
+        // if the last condition is being removed, then delete this filter
+        if(this.conditions.length === 1) {
+            this.container.parentNode.removeChild(this.container);
+            this.parent_fs.filter_deleted_callback(this);
+        }
+        else {
+            // remove c from our list of conditions
+            for(i=0; i<this.conditions.length; i++) {
+                if(this.conditions[i] === c) {
+                    this.conditions.splice(i, 1);
+                    break;
+                }
+            }
+
+            // renumber remaining conditions
+            for(; i<this.conditions.length; i++) {
+                this.conditions[i].renumber(i+1);
+           }
+        }
+    };
+
+    /** renumber this filter */
+    Filter.prototype.renumber = function (n) {
+        this.txtJoin.nodeValue = ((n === 1) ? '' : 'OR ') + 'Filter #' + n;
+    };
 
     /**
      * A FilterSet manages a set of filters and their conditions.
@@ -220,11 +257,25 @@ function createModelSearch(prefix, field_infos, inclusive_node, exclusive_node) 
 
     /** Callback to issue when a filter from this set is deleted. */
     FilterSet.prototype.filter_deleted_callback = function (f) {
+        var i;
         // remove f from filters
-        // TODO ...
+        for(i=0; i<this.filters.length; i++) {
+            if(this.filters[i] === f) {
+                this.filters.splice(i, 1);
+                break;
+            }
+        }
 
         // renumber the remaining filters
-        // TODO ...
+        for(; i<this.filters.length; i++) {
+            this.filters[i].renumber(i+1);
+        }
+
+        // show the default contents again if there are no filters left
+        if(this.filters.length === 0) {
+            this.default_contents.style.display = 'block';
+            this.btnAddFilter.innerHTML = 'Add a filter';
+        }
     };
 
     // create each of the filter sets
