@@ -7,13 +7,14 @@
  * may only be applicable for some operators).  The field and operator index
  * correspond to the position of elements in the field_infos argument.
  *
+ * @param prefix       Text to prefix each input field with
  * @param field_infos  An array of of information about fields.  Each element is
  *                     an array of two items: the name of the field and an array
  *                     of operators it can use.
  * @param inclusive_node  DOM element where inclusive form fields should be put
  * @param exclusive_node  DOM element where exclusive form fields should be put
  */
-function createModelSearch(field_infos, inclusive_node, exclusive_node) {
+function createModelSearch(prefix, field_infos, inclusive_node, exclusive_node) {
     // build option element html for field options and fields' operator options
     var FIELD_OPTIONS = '';
     var OPERATORS_OPTIONS = [];
@@ -146,7 +147,7 @@ function createModelSearch(field_infos, inclusive_node, exclusive_node) {
      */
     function FilterSet(inclusive, container) {
         // prefix associated with this filter set for form fields
-        var FORM_PREFIX = inclusive ? 'i' : 'e';
+        var FORM_PREFIX = prefix + (inclusive ? 'i' : 'e');
 
         // filters associated with this set (these are OR'ed together)
         var filters = [];
