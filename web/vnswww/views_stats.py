@@ -240,11 +240,10 @@ class UsageStatsSearchDesc(SearchDescription):
 SD_USAGE_STATS = SearchDescription(UsageStatsSearchDesc)
 
 # precompute them and store them in sorted order
-TOPOLOGY_SEARCHABLE_FIELDS = SD_USAGE_STATS.get_searchable_fields()
-TOPOLOGY_SEARCHABLE_FIELDS_FOR_VIEW = [(v, [SearchDescription.op_to_displayable_str(o) for o in ops])
-                                       for n,v,ops in TOPOLOGY_SEARCHABLE_FIELDS]
-TOPOLOGY_SEARCHABLE_FIELDS_FOR_VIEW.sort()
-TOPOLOGY_SEARCHABLE_FIELDS_FOR_DECODE = [(v, n) for n,v,ops in TOPOLOGY_SEARCHABLE_FIELDS]
+STATS_SEARCHABLE_FIELDS = SD_USAGE_STATS.get_searchable_fields()
+STATS_SEARCHABLE_FIELDS_FOR_VIEW = [(v, [SearchDescription.op_to_displayable_str(o) for o in ops])
+                                       for n,v,ops in STATS_SEARCHABLE_FIELDS]
+STATS_SEARCHABLE_FIELDS_FOR_VIEW.sort()
 
 RE_MODEL_SEARCH_FIELD = re.compile(r'(e|i)(\w+)_(\d+)_((field)|(op)|(v1)|(v2))')
 def stats_search(request):
@@ -271,23 +270,23 @@ def stats_search(request):
                 try:
                     c = f.conditions[c_id]
                 except KeyError:
-                    c = Condition(TOPOLOGY_SEARCHABLE_FIELDS, TOPOLOGY_SEARCHABLE_FIELDS_FOR_VIEW)
+                    c = Condition(STATS_SEARCHABLE_FIELDS, STATS_SEARCHABLE_FIELDS_FOR_VIEW)
                     f.conditions[c_id] = c
                 try:
                     c.set(kind, v)
                 except ValueError:
                     # user has supplied a non-integer field or op index: they didn't use our form
                     messages.error('Invalid search: please use our search form')
-                    return direct_to_template(request, tn, {'fields_list': TOPOLOGY_SEARCHABLE_FIELDS_FOR_VIEW})
+                    return direct_to_template(request, tn, {'fields_list': STATS_SEARCHABLE_FIELDS_FOR_VIEW})
 
         try:
             data = get_filtered_data(db.UsageStats, ex_filters.values(), in_filters.values())
         except IndexError as e:
             # user has supplied a bad field or operator: they didn't use our form
             messages.error('Invalid search: ' + str(e))
-            return direct_to_template(request, tn, {'fields_list': TOPOLOGY_SEARCHABLE_FIELDS_FOR_VIEW})
+            return direct_to_template(request, tn, {'fields_list': STATS_SEARCHABLE_FIELDS_FOR_VIEW})
 
         output = create_output(data)
         return HttpResponse(output, content_type='text/plain')
     else:
-        return direct_to_template(request, tn, {'fields_list': TOPOLOGY_SEARCHABLE_FIELDS_FOR_VIEW})
+        return direct_to_template(request, tn, {'fields_list': STATS_SEARCHABLE_FIELDS_FOR_VIEW})
