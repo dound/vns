@@ -79,29 +79,68 @@ class SearchDescription():
         for fk_field, sd in msd.__dict__.get('groupable_and_searchable_foreign_key_fields', []):
             self.enable_foreign_key_field(fk_field, sd)
 
+        # memoization vars
+        self.group_up_to_date = False
+        self.search_up_to_date = False
+        self.processed_groupable_fields = None
+        self.processed_groupable_fields_for_view = None
+        self.processed_searchable_fields = None
+        self.processed_searchable_fields_for_view = None
+
     def get_groupable_fields(self):
         """Returns all groupable fields on the associated model as a 3-tuple
         (field name, verbose field name, GROUP_OPERATORS_*) (names are fully
         qualified)."""
+        if not self.group_up_to_date:
+            self.__update_groupable_fields()
+        return self.processed_groupable_fields
+
+    def get_groupable_fields_for_view(self):
+        """Returns all groupable fields on the associated model as a 2-tuple
+        (verbose field name, operator) (names are fully qualified)."""
+        if not self.group_up_to_date:
+            self.__update_groupable_fields()
+        return self.processed_groupable_fields_for_view
+
+    def __update_groupable_fields(self):
         ret = [(n, v, o) for n, (v,o) in self.groupable_fields.items()]
         for field_name, (vname, model_search_desc) in self.groupable_foreign_key_fields.iteritems():
             for sub_field_name, sub_vname, sub_field_lookups in model_search_desc.get_groupable_fields():
                 fqn = '__'.join((field_name, sub_field_name))
                 fqvn = ' '.join((vname, sub_vname))
                 ret.append( (fqn, fqvn, sub_field_lookups) )
-        return ret
+        self.processed_groupable_fields = ret
+        self.processed_groupable_fields_for_view = [(v, ops) for n,v,ops in ret]
+        self.processed_groupable_fields_for_view.sort()
+        self.group_up_to_date = True
 
     def get_searchable_fields(self):
         """Returns all searchable fields on the associated model as a 3-tuple
         (field name, verbose field name, SEARCH_OPERATORS_*) (names are fully
         qualified)."""
+        if not self.search_up_to_date:
+            self.__update_searchable_fields()
+        return self.processed_searchable_fields
+
+    def get_searchable_fields_for_view(self):
+        """Returns all searchable fields on the associated model as a 2-tuple
+        (verbose field name, operator in view form) (names are fully qualified)."""
+        if not self.search_up_to_date:
+            self.__update_searchable_fields()
+        return self.processed_searchable_fields_for_view
+
+    def __update_searchable_fields(self):
         ret = [(n, v, o) for n, (v,o) in self.searchable_fields.items()]
         for field_name, (vname, model_search_desc) in self.searchable_foreign_key_fields.iteritems():
             for sub_field_name, sub_vname, sub_field_lookups in model_search_desc.get_searchable_fields():
                 fqn = '__'.join((field_name, sub_field_name))
                 fqvn = ' '.join((vname, sub_vname))
                 ret.append( (fqn, fqvn, sub_field_lookups) )
-        return ret
+        self.processed_searchable_fields = ret
+        self.processed_searchable_fields_for_view = [(v, [SearchDescription.op_to_displayable_str(o) for o in ops])
+                                                        for n,v,ops in ret]
+        self.processed_searchable_fields_for_view.sort()
+        self.search_up_to_date = True
 
     def enable_grouping(self, field_name):
         """Enable grouping on the specified field name (may not be a foreign key field)."""
@@ -135,8 +174,10 @@ class SearchDescription():
                     raise FieldError("Don't know how to enable search/grouping for field of type %s.%s" % (cls.__module__, cls.__name__))
 
                 if for_grouping:
+                    self.group_up_to_date = False
                     self.groupable_fields[field.name] = (field.verbose_name, gops)
                 if for_searching:
+                    self.search_up_to_date = False
                     self.searchable_fields[field.name] = (field.verbose_name, sops)
                 return
         raise FieldError('%s is not a field on %s' % (field_name, str_modcls(self.model)))
@@ -162,8 +203,10 @@ class SearchDescription():
                     m2 = field.related.parent_model
                     if m1 == m2:
                         if for_grouping:
+                            self.group_up_to_date = False
                             self.groupable_foreign_key_fields[field_name] = (field.verbose_name, foreign_search_desc)
                         if for_searching:
+                            self.search_up_to_date = False
                             self.searchable_foreign_key_fields[field_name] = (field.verbose_name, foreign_search_desc)
                         return
                     else:
@@ -176,19 +219,12 @@ class Condition():
     """Stores information about a single condition.  Data is stored exactly as
     submitted from the HTML form.
 
-    @param searchable_views  This should be the result of calling
-               get_searchable_fields() on the SearchDescription object this
-               condition is for.
-
-    @param searchable_views_ordered  Must be the list of 2-tuples used to
-               initialize the dynamic form.  The first element in each tuple is
-               the display name of each variable and the second is a list of
-               operators (display version).
+    @param search_desc  The SearchDescription object this condition is for.
     """
-    def __init__(self, searchable_views, searchable_views_ordered,
+    def __init__(self, search_desc,
                  field_index=None, op_index=None, field_value1=None, field_value2=None):
-        self.searchable_views = searchable_views
-        self.searchable_views_ordered = searchable_views_ordered
+        self.searchable_views = search_desc.get_searchable_fields()
+        self.searchable_views_ordered = search_desc.get_searchable_fields_for_view()
         self.field_index = field_index
         self.op_index = op_index
         self.field_value1 = field_value1
@@ -303,11 +339,10 @@ class UsageStatsSearchDesc(SearchDescription):
     groupable_and_searchable_foreign_key_fields = ( ('template',SD_TEMPLATE), )
 SD_USAGE_STATS = SearchDescription(UsageStatsSearchDesc)
 
-# precompute them and store them in sorted order
-STATS_SEARCHABLE_FIELDS = SD_USAGE_STATS.get_searchable_fields()
-STATS_SEARCHABLE_FIELDS_FOR_VIEW = [(v, [SearchDescription.op_to_displayable_str(o) for o in ops])
-                                       for n,v,ops in STATS_SEARCHABLE_FIELDS]
-STATS_SEARCHABLE_FIELDS_FOR_VIEW.sort()
+def create_stats_search_page(request):
+    d = {'gfields_list': SD_USAGE_STATS.get_groupable_fields_for_view(),
+         'sfields_list': SD_USAGE_STATS.get_searchable_fields_for_view()}
+    return direct_to_template(request, 'vns/stats_search.html', d)
 
 RE_MODEL_SEARCH_FIELD = re.compile(r'(e|i)(\w+)_(\d+)_((field)|(op)|(v1)|(v2))')
 def stats_search(request):
@@ -316,7 +351,7 @@ def stats_search(request):
         messages.warning(request, 'You must login before proceeding.')
         return HttpResponseRedirect('/login/?next=%s' % request.path)
 
-    tn = 'vns/stats_search.html'
+
     if request.method == 'POST':
         # extract all of the inclusive and exclusive filters
         in_filters = {}
@@ -334,23 +369,23 @@ def stats_search(request):
                 try:
                     c = f.conditions[c_id]
                 except KeyError:
-                    c = Condition(STATS_SEARCHABLE_FIELDS, STATS_SEARCHABLE_FIELDS_FOR_VIEW)
+                    c = Condition(SD_USAGE_STATS)
                     f.conditions[c_id] = c
                 try:
                     c.set(kind, v)
                 except ValueError:
                     # user has supplied a non-integer field or op index: they didn't use our form
                     messages.error('Invalid search: please use our search form')
-                    return direct_to_template(request, tn, {'fields_list': STATS_SEARCHABLE_FIELDS_FOR_VIEW})
+                    return create_stats_search_page(request)
 
         try:
             data = get_filtered_data(db.UsageStats, ex_filters.values(), in_filters.values())
         except IndexError as e:
             # user has supplied a bad field or operator: they didn't use our form
             messages.error('Invalid search: ' + str(e))
-            return direct_to_template(request, tn, {'fields_list': STATS_SEARCHABLE_FIELDS_FOR_VIEW})
+            return create_stats_search_page(request)
 
         output = create_output(data)
         return HttpResponse(output, content_type='text/plain')
     else:
-        return direct_to_template(request, tn, {'fields_list': STATS_SEARCHABLE_FIELDS_FOR_VIEW})
+        return create_stats_search_page(request)
