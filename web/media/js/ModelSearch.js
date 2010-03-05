@@ -27,6 +27,10 @@
  * @author David Underhill (http://www.dound.com)
  */
 function createModelSearch(prefix, gfield_infos, sfield_infos, inclusive_node, exclusive_node, group_node) {
+    // constants
+    var S_OP_NEEDS_TWO_VALUES = ['range']
+    var G_OP_NEEDS_EXTRA_VALUE = ['first characters', 'fixed # of buckets', 'equi-width buckets', 'log-width buckets']
+
     // build option element html for field options and fields' operator options
     var G_FIELD_OPTIONS, G_OPERATORS_OPTIONS, S_FIELD_OPTIONS, S_OPERATORS_OPTIONS;
     function create_options(infos) {
@@ -132,9 +136,15 @@ function createModelSearch(prefix, gfield_infos, sfield_infos, inclusive_node, e
         op_choices.setAttribute('name', cname + '_op');
         op_choices.onchange = function () {
             // show the number of value fields as appropriate
-            var op, state;
+            var i, op, state;
             op = op_choices.options[op_choices.selectedIndex].innerHTML;
-            state = (op === 'range') ? 'inline' : 'none';
+            state = 'none';
+            for(i=0; i<S_OP_NEEDS_TWO_VALUES.length; i++) {
+                if(op === S_OP_NEEDS_TWO_VALUES[i]) {
+                    state = 'inline';
+                    break;
+                }
+            }
             txtBetweenValues.nodeValue = (state === 'inline') ? ' to ' : '';
             value2.style.display = state;
         };
