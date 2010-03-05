@@ -19,29 +19,40 @@ class ModelSearchDescription():
     # the model this search description is for
     model = None
 
-    # names of non-foreign key fields on the model to make searchable
-    fields = ()
+    # names of non-foreign key fields on the model to make group/searchable
+    groupable_fields = ()
+    searchable_fields = ()
+    groupable_and_searchable_fields = ()
 
-    # 2-tuples of foreign key fields make searchable.  First element is the name
+    # 2-tuples of foreign keys to make group/searchable.  First elt is the name
     # of the field and the second element is the associated SearchDescription.
-    foreign_key_fields = ()
+    groupable_foreign_key_fields = ()
+    searchable_foreign_key_fields = ()
+    groupable_and_searchable_foreign_key_fields = ()
 
 class SearchDescription():
+    """Describes what kind of searches can be done on a particular model and how
+    those search results may be grouped.  This is essentially an efficient
+    programatic representation of the user-friendly description provided by an
+    instance of ModelSearchDescription."""
     # define what kinds of searches can be done on different kinds of fields
     SEARCH_OPERATORS_NUM  = ('exact', 'gt', 'gte', 'lt', 'lte', 'range')
     SEARCH_OPERATORS_TEXT = ('exact', 'contains', 'startswith', 'endswith', 'range')
     SEARCH_OPERATORS_DATE = ('exact', 'gt', 'gte', 'lt', 'lte', 'range', 'year', 'month', 'day')
     SEARCH_OPERATORS_BOOL = ('exact',)
-
-    OP_TO_STR_MAPPING = dict(exact='=', gt='>', gte='>=', lt='<', lte='<=',
+    SEARCH_OPERATOR_TO_STR_MAPPING = dict(exact='=', gt='>', gte='>=', lt='<', lte='<=',
                              contains='contains', startswith='starts with', endswith='ends with',
                              year='is year', month='is month', day='is day')
+    STR_TO_SEARCH_OPERATOR_MAPPING = dict([(v,k) for k,v in SEARCH_OPERATOR_TO_STR_MAPPING.iteritems()])
 
-    STR_TO_OP_MAPPING = dict([(v,k) for k,v in OP_TO_STR_MAPPING.iteritems()])
+    GROUP_OPERATORS_NUM  = ('distinct', 'fixed # of buckets', 'equi-width buckets', 'log-width buckets')
+    GROUP_OPERATORS_TEXT = ('distinct', 'first characters')
+    GROUP_OPERATORS_DATE = ('distinct', 'day of week', 'day of month', 'day of year', 'hour of day', 'day', 'month', 'year')
+    GROUP_OPERATORS_BOOL = ('distinct',)
 
     @staticmethod
     def op_to_displayable_str(op):
-        return SearchDescription.OP_TO_STR_MAPPING.get(op, op)
+        return SearchDescription.SEARCH_OPERATOR_TO_STR_MAPPING.get(op, op)
 
     def __init__(self, msd):
         """Takes a ModelSearchDescription and uses it to initialize this object."""
@@ -49,14 +60,36 @@ class SearchDescription():
 
         # maps field name to a 2-tuple of (display name, search operators)
         self.searchable_fields = {}
-        for field in msd.fields:
-            self.enable_search(field)
+        self.groupable_fields = {}
+        for field in msd.__dict__.get('groupable_fields', []):
+            self.enable_grouping(field)
+        for field in msd.__dict__.get('searchable_fields', []):
+            self.enable_searching(field)
+        for field in msd.__dict__.get('groupable_and_searchable_fields', []):
+            self.enable_field(field)
 
         # maps field name to a 2-tuple of (display name, SearchDescription which
         # contains subfields which can be searched)
         self.searchable_foreign_key_fields = {}
-        for fk_field, sd in msd.foreign_key_fields:
-            self.enable_foreign_key_search(fk_field, sd)
+        self.groupable_foreign_key_fields = {}
+        for fk_field, sd in msd.__dict__.get('groupable_foreign_key_fields', []):
+            self.enable_foreign_key_grouping(fk_field, sd)
+        for fk_field, sd in msd.__dict__.get('searchable_foreign_key_fields', []):
+            self.enable_foreign_key_searching(fk_field, sd)
+        for fk_field, sd in msd.__dict__.get('groupable_and_searchable_foreign_key_fields', []):
+            self.enable_foreign_key_field(fk_field, sd)
+
+    def get_groupable_fields(self):
+        """Returns all groupable fields on the associated model as a 3-tuple
+        (field name, verbose field name, GROUP_OPERATORS_*) (names are fully
+        qualified)."""
+        ret = [(n, v, o) for n, (v,o) in self.groupable_fields.items()]
+        for field_name, (vname, model_search_desc) in self.groupable_foreign_key_fields.iteritems():
+            for sub_field_name, sub_vname, sub_field_lookups in model_search_desc.get_groupable_fields():
+                fqn = '__'.join((field_name, sub_field_name))
+                fqvn = ' '.join((vname, sub_vname))
+                ret.append( (fqn, fqvn, sub_field_lookups) )
+        return ret
 
     def get_searchable_fields(self):
         """Returns all searchable fields on the associated model as a 3-tuple
@@ -70,37 +103,68 @@ class SearchDescription():
                 ret.append( (fqn, fqvn, sub_field_lookups) )
         return ret
 
-    def enable_search(self, field_name):
+    def enable_grouping(self, field_name):
+        """Enable grouping on the specified field name (may not be a foreign key field)."""
+        self.enable_field(field_name, True, False)
+
+    def enable_searching(self, field_name):
         """Enable search on the specified field name (may not be a foreign key field)."""
+        self.enable_field(field_name, False, True)
+
+    def enable_field(self, field_name, for_grouping=True, for_searching=True):
+        """Enables the specified non-foreign-key field to be searched (if
+        for_searching is True) and grouped by (if for_grouping is True)."""
         for field in self.model._meta.fields:
             if field.name == field_name:
                 cls = field.__class__
                 if cls in [AutoField, FloatField, IntegerField]:
-                    ops = SearchDescription.SEARCH_OPERATORS_NUM
+                    gops = SearchDescription.GROUP_OPERATORS_NUM
+                    sops = SearchDescription.SEARCH_OPERATORS_NUM
                 elif cls in [CharField, IPAddressField, TextField]:
-                    ops = SearchDescription.SEARCH_OPERATORS_TEXT
+                    gops = SearchDescription.GROUP_OPERATORS_TEXT
+                    sops = SearchDescription.SEARCH_OPERATORS_TEXT
                 elif cls in [DateField, DateTimeField]:
-                    ops = SearchDescription.SEARCH_OPERATORS_DATE
+                    gops = SearchDescription.GROUP_OPERATORS_DATE
+                    sops = SearchDescription.SEARCH_OPERATORS_DATE
                 elif cls in [BooleanField]:
-                    ops = SearchDescription.SEARCH_OPERATORS_BOOL
+                    gops = SearchDescription.GROUP_OPERATORS_BOOL
+                    sops = SearchDescription.SEARCH_OPERATORS_BOOL
                 elif cls == ForeignKey:
-                    raise FieldError("May not enable search on foreign key fields with enable_search()")
+                    raise FieldError("May not enable search/grouping on foreign key fields with enable_field()")
                 else:
-                    raise FieldError("Don't know how to enable search for field of type %s.%s" % (cls.__module__, cls.__name__))
-                self.searchable_fields[field.name] = (field.verbose_name, ops)
+                    raise FieldError("Don't know how to enable search/grouping for field of type %s.%s" % (cls.__module__, cls.__name__))
+
+                if for_grouping:
+                    self.groupable_fields[field.name] = (field.verbose_name, gops)
+                if for_searching:
+                    self.searchable_fields[field.name] = (field.verbose_name, sops)
                 return
         raise FieldError('%s is not a field on %s' % (field_name, str_modcls(self.model)))
 
-    def enable_foreign_key_search(self, field_name, foreign_search_desc):
-        """Enable search on the specified field name which is a foreign key
+    def enable_foreign_key_grouping(self, field_name, foreign_search_desc):
+        """Enable grouping on the specified field name which is a foreign key
         whose SearchDescription is passed as foreign_search_desc."""
+        self.enable_foreign_key_field(field_name, foreign_search_desc, True, False)
+
+    def enable_foreign_key_searching(self, field_name, foreign_search_desc):
+        """Enable searching on the specified field name which is a foreign key
+        whose SearchDescription is passed as foreign_search_desc."""
+        self.enable_foreign_key_field(field_name, foreign_search_desc, False, True)
+
+    def enable_foreign_key_field(self, field_name, foreign_search_desc, for_grouping=True, for_searching=True):
+        """Enable searching (if for_searching) and grouping (if for_grouping) on
+        the specified field name which is a foreign key whose SearchDescription
+        is passed as foreign_search_desc."""
         for field in self.model._meta.fields:
             if field.name == field_name:
                 if field.__class__ == ForeignKey:
                     m1 = foreign_search_desc.model
                     m2 = field.related.parent_model
                     if m1 == m2:
-                        self.searchable_foreign_key_fields[field_name] = (field.verbose_name, foreign_search_desc)
+                        if for_grouping:
+                            self.groupable_foreign_key_fields[field_name] = (field.verbose_name, foreign_search_desc)
+                        if for_searching:
+                            self.searchable_foreign_key_fields[field_name] = (field.verbose_name, foreign_search_desc)
                         return
                     else:
                         raise ValueError("The model supported by foreign_search_desc (%s) is not the model used by the specified foreign key field %s (%s)" % (str_modcls(m1), field_name, str_modcls(m2)))
@@ -168,7 +232,7 @@ class Condition():
             op = ops[self.op_index]
         except IndexError:
             raise IndexError('invalid operator selection')
-        how = SearchDescription.STR_TO_OP_MAPPING[op]
+        how = SearchDescription.STR_TO_SEARCH_OPERATOR_MAPPING[op]
 
         if op == 'range':
             if self.field_value2 is None:
@@ -229,14 +293,14 @@ def create_output(groups):
 
 class TemplateSearchDesc(SearchDescription):
     model = db.TopologyTemplate
-    fields = ('name',)
-    foreign_key_fields = ()
+    groupable_and_searchable_fields = ('name',)
+    groupable_and_searchable_foreign_key_fields = ()
 SD_TEMPLATE = SearchDescription(TemplateSearchDesc)
 
 class UsageStatsSearchDesc(SearchDescription):
     model = db.UsageStats
-    fields = ('topo_uuid', 'time_connected', 'num_pkts_to_topo')
-    foreign_key_fields = ( ('template',SD_TEMPLATE), )
+    groupable_and_searchable_fields = ('topo_uuid', 'time_connected', 'num_pkts_to_topo')
+    groupable_and_searchable_foreign_key_fields = ( ('template',SD_TEMPLATE), )
 SD_USAGE_STATS = SearchDescription(UsageStatsSearchDesc)
 
 # precompute them and store them in sorted order
