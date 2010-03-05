@@ -15,35 +15,48 @@
  *     note: filters and conditions must be numbered from 1 to n.
  *
  * @param prefix       Text to prefix each input field with
- * @param field_infos  An array of of information about fields.  Each element is
- *                     an array of two items: the name of the field and an array
- *                     of operators it can use.
+ * @param gfield_infos An of information about groupable fields.  Same structure
+ *                     as sfield_infos.
+ * @param sfield_infos An array of information about searchable fields.  Each
+ *                     element is an array of two items: the name of the field
+ *                     and an array of operators it can use.
  * @param inclusive_node  DOM element where inclusive form fields should be put
  * @param exclusive_node  DOM element where exclusive form fields should be put
+ * @param group_node      DOM element where grouping form fields should be put.
  *
  * @author David Underhill (http://www.dound.com)
  */
-function createModelSearch(prefix, field_infos, inclusive_node, exclusive_node) {
+function createModelSearch(prefix, gfield_infos, sfield_infos, inclusive_node, exclusive_node, group_node) {
     // build option element html for field options and fields' operator options
-    var FIELD_OPTIONS, OPERATORS_OPTIONS, OPERATOR_OPTIONS;
-    (function () { // create extra vars within a private scope ...
-        var i, j, field_info, field_name, field_ops, op_name;
-        FIELD_OPTIONS = '';
-        OPERATORS_OPTIONS = [];
-        for(i=0; i<field_infos.length; i++) {
-            field_info = field_infos[i];
+    var G_FIELD_OPTIONS, G_OPERATORS_OPTIONS, S_FIELD_OPTIONS, S_OPERATORS_OPTIONS;
+    function create_options(infos) {
+        var i, j, field_info, field_name, field_ops, field_options, op_name, op_options, options;
+        field_options = '';
+        op_options = [];
+        for(i=0; i<sfield_infos.length; i++) {
+            field_info = sfield_infos[i];
             field_name = field_info[0];
-            FIELD_OPTIONS += "<option value='" + i + "'>" + field_name + "</option>";
+            field_options += "<option value='" + i + "'>" + field_name + "</option>";
 
             field_ops = field_info[1];
-            OPERATOR_OPTIONS = '';
+            options = '';
             for(j=0; j<field_ops.length; j++) {
                 op_name = field_ops[j];
-                OPERATOR_OPTIONS += "<option value ='" + j + "'>" + op_name + "</option";
+                options += "<option value ='" + j + "'>" + op_name + "</option";
             }
-            OPERATORS_OPTIONS[i] = OPERATOR_OPTIONS;
+            op_options[i] = options;
         }
-    }());
+        return [field_options, op_options]
+    }
+    (function () {
+        var pair;
+        pair = create_options(gfield_infos);
+        G_FIELD_OPTIONS = pair[0];
+        G_OPERATORS_OPTIONS = pair[1];
+        pair = create_options(sfield_infos);
+        S_FIELD_OPTIONS = pair[0];
+        S_OPERATORS_OPTIONS = pair[1];
+    }())
 
     /** create a textual input field */
     function createValueField(cname, id) {
@@ -108,10 +121,10 @@ function createModelSearch(prefix, field_infos, inclusive_node, exclusive_node) 
 
         // initialize the field choices combo box
         field_choices.setAttribute('name', cname + '_field');
-        field_choices.innerHTML = FIELD_OPTIONS;
+        field_choices.innerHTML = S_FIELD_OPTIONS;
         field_choices.onchange = function () {
             // show the operators allowed with this kind of field
-            op_choices.innerHTML = OPERATORS_OPTIONS[field_choices.selectedIndex];
+            op_choices.innerHTML = S_OPERATORS_OPTIONS[field_choices.selectedIndex];
             op_choices.onchange();
         };
 
