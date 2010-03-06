@@ -7,12 +7,21 @@
  * may only be applicable for some operators).  The field and operator index
  * correspond to the position of elements in the field_infos argument.
  *
+ * It also creates similar form elements for specifying how to group results.
+ * The input fields for grouping will be of the form "<prefix>group<group#>_<field>"
+ * where <field> is "field", "op", or "v" (specifies a value associated with op,
+ * if needed, e.g., bucket width).
+ *
  * URL parameters can be used to initialize the filters.  To have filters
  * automatically created pass the following parameters:
  *     <prefix><type>_num_filters - number of filters to create
  *     <prefix><type><filter#>_num_conds - number of conditions for the specified filter
- *     <prefix><type><filter#>_<cond#>_<op> - specifies a condition for the specified filter
+ *     <prefix><type><filter#>_<cond#>_<field> - specifies a condition for the specified filter
  *     note: filters and conditions must be numbered from 1 to n.
+ *
+ * Group form fields can likewise be initialized from URL parameters:
+ *     <prefix>num_groups
+ *     <prefix>group<group#>_<field>
  *
  * @param prefix       Text to prefix each input field with
  * @param gfield_infos An of information about groupable fields.  Same structure
@@ -30,6 +39,7 @@ function createModelSearch(prefix, gfield_infos, sfield_infos, inclusive_node, e
     // constants
     var S_OP_NEEDS_TWO_VALUES = ['range'];
     var G_OP_NEEDS_EXTRA_VALUE = ['first characters', 'fixed # of buckets', 'equi-width buckets', 'log-width buckets'];
+    var G_OP_NEEDS_EXTRA_VALUE_DESC = ['# of chars', '# of buckets', 'bucket width', 'log base'];
 
     // build option element html for field options and fields' operator options
     var G_FIELD_OPTIONS, G_OPERATORS_OPTIONS, S_FIELD_OPTIONS, S_OPERATORS_OPTIONS;
@@ -378,7 +388,184 @@ function createModelSearch(prefix, gfield_infos, sfield_infos, inclusive_node, e
         }
     };
 
+    /** Manages a single grouping. */
+    function Group(parent, gname, container, n) {
+        var me = this, field_choices, op_choices, extra_container, extra_value, extra_value_desc, btnRm;
+        this.parent = parent;
+        this.gname = gname;
+        this.container = container;
+
+        // create the default contents of the container node for this group
+        this.leading_span = document.createElement('span');
+        this.leading_span.appendChild(document.createTextNode('then '));
+        container.appendChild(this.leading_span);
+        container.appendChild(document.createTextNode('group by '));
+        this.renumber(n);
+
+        field_choices = document.createElement('select');
+        op_choices = document.createElement('select');
+        extra_container = document.createElement('span');
+        extra_value = createValueField(gname, '');
+        extra_value.setAttribute('size', 3);
+        extra_value_desc = document.createTextNode('');
+
+        this.field_choices = field_choices;
+        this.op_choices = op_choices;
+        this.extra_value = extra_value;
+
+        // initialize the field choices combo box
+        field_choices.setAttribute('name', gname + '_field');
+        field_choices.innerHTML = G_FIELD_OPTIONS;
+        field_choices.onchange = function () {
+            // show the operators allowed with this kind of field
+            op_choices.innerHTML = G_OPERATORS_OPTIONS[field_choices.selectedIndex];
+            op_choices.onchange();
+        };
+
+        //initialize the operator choices combo box
+        op_choices.setAttribute('name', gname + '_op');
+        op_choices.onchange = function () {
+            // show the number of value fields as appropriate
+            var i, op, state;
+            op = op_choices.options[op_choices.selectedIndex].innerHTML;
+            state = 'none';
+            for(i=0; i<G_OP_NEEDS_EXTRA_VALUE.length; i++) {
+                if(op === G_OP_NEEDS_EXTRA_VALUE[i]) {
+                    state = 'inline';
+                    extra_value_desc.nodeValue = G_OP_NEEDS_EXTRA_VALUE_DESC[i] + ' = ';
+                    break;
+                }
+            }
+            extra_container.style.display = state;
+        };
+
+        // create a button to delete this condition
+        btnRm = createOrdinaryButton('X');
+        btnRm.onclick = function() { me.remove(); };
+
+        // add each of the new elements to our container
+        container.appendChild(op_choices);
+        container.appendChild(document.createTextNode(' of '));
+        container.appendChild(field_choices);
+        extra_container.appendChild(document.createTextNode(' ('));
+        extra_container.appendChild(extra_value_desc);
+        extra_container.appendChild(extra_value);
+        extra_container.appendChild(document.createTextNode(') '));
+        container.appendChild(extra_container);
+        container.appendChild(btnRm);
+
+        // trigger onchange() for the default selections
+        field_choices.onchange();
+    }
+
+    /** deletes this group (removes it from the DOM and from the Groups list) */
+    Group.prototype.remove = function () {
+        this.container.parentNode.removeChild(this.container);
+        this.parent.group_deleted_callback(this);
+    };
+
+    /** Changes the number of this group (1 is first). */
+    Group.prototype.renumber = function (n) {
+        this.leading_span.style.visibility = ((n === 1) ? 'hidden' : 'visible');
+    };
+
+    /** Sets the group */
+    Group.prototype.set = function (field, op, extra_value) {
+        this.field_choices.selectedIndex = field;
+        this.field_choices.onchange();
+        this.op_choices.selectedIndex = op;
+        this.op_choices.onchange();
+        this.extra_value.value = extra_value;
+    };
+
+    // setup groups
+    function Groups(groups_node) {
+        var me = this;
+
+        // prefix associated with this filter set for form fields
+        this.FORM_PREFIX = prefix + 'group';
+
+        this.container = groups_node;
+
+        this.groups = [];
+
+        // id to use for the next group
+        this.next_group_id = 0;
+
+        this.default_contents = document.createElement('div');
+        this.default_contents.innerHTML = 'No groups have been specified - all data will be in the same group.';
+        this.container.appendChild(this.default_contents);
+
+        this.btnAddGroup = createOrdinaryButton("Add a grouping");
+        this.btnAddGroup.onclick = function () { me.add_group(); };
+        this.container.appendChild(this.btnAddGroup);
+
+        this.populate_from_url();
+    }
+
+    /** adds a new subgroup */
+    Groups.prototype.add_group = function (gname) {
+        var gdiv;
+        if(gname === undefined) {
+            gname = this.FORM_PREFIX + this.next_group_id;
+        }
+        gdiv = document.createElement('div');
+        this.groups.push(new Group(this, gname, gdiv, this.groups.length+1));
+        this.next_group_id += 1;
+        this.container.insertBefore(gdiv, this.btnAddGroup);
+
+        // hide the default contents
+        this.default_contents.style.display = 'none';
+        this.btnAddGroup.innerHTML = 'Add another grouping';
+        return this.groups[this.groups.length - 1];
+    };
+
+    /** Callback to issue when a group is deleted. */
+    Groups.prototype.group_deleted_callback = function (g) {
+        var i;
+        // remove g from groups
+        for(i=0; i<this.groups.length; i++) {
+            if(this.groups[i] === g) {
+                this.groups.splice(i, 1);
+                break;
+            }
+        }
+
+        // renumber the remaining groups
+        for(; i<this.groups.length; i++) {
+            this.groups[i].renumber(i+1);
+        }
+
+        // show the default contents again if there are no groups left
+        if(this.groups.length === 0) {
+            this.default_contents.style.display = 'block';
+            this.btnAddGroup.innerHTML = 'Add a grouping';
+        }
+    };
+
+    /** Creates groups from parsed URL parameters. */
+    Groups.prototype.populate_from_url = function() {
+        var i, field, gprefix, group, num_groups, op, v;
+
+        num_groups = get_url_param(prefix + "num_groups");
+        if(num_groups === null) {
+            return; // no groups
+        }
+
+        for(i=1; i<=num_groups; i++) {
+            gprefix = this.FORM_PREFIX + i + '_';
+
+            field = get_url_param(gprefix + "field");
+            op = get_url_param(gprefix + "op");
+            v = get_url_param(gprefix + "v");
+
+            group = this.add_group();
+            group.set(field, op, v);
+        }
+    };
+
     // create each of the filter sets
     new FilterSet(true, inclusive_node);
     new FilterSet(false, exclusive_node);
+    new Groups(groups_node);
 }
