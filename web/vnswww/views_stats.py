@@ -45,10 +45,10 @@ class SearchDescription():
                              year='is year', month='is month', day='is day')
     STR_TO_SEARCH_OPERATOR_MAPPING = dict([(v,k) for k,v in SEARCH_OPERATOR_TO_STR_MAPPING.iteritems()])
 
-    GROUP_OPERATORS_NUM  = ('distinct', 'fixed # of buckets', 'equi-width buckets', 'log-width buckets')
-    GROUP_OPERATORS_TEXT = ('distinct', 'first characters')
-    GROUP_OPERATORS_DATE = ('distinct', 'day of week', 'day of month', 'day of year', 'hour of day', 'day', 'month', 'year')
-    GROUP_OPERATORS_BOOL = ('distinct',)
+    GROUP_OPERATORS_NUM  = ('distinct values', 'fixed # of buckets', 'equi-width buckets', 'log-width buckets')
+    GROUP_OPERATORS_TEXT = ('distinct values', 'first characters')
+    GROUP_OPERATORS_DATE = ('distinct values', 'day of week', 'day of month', 'day of year', 'hour of day', 'day', 'month', 'year')
+    GROUP_OPERATORS_BOOL = ('distinct values',)
 
     @staticmethod
     def op_to_displayable_str(op):
