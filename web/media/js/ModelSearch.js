@@ -22,14 +22,14 @@
  *                     and an array of operators it can use.
  * @param inclusive_node  DOM element where inclusive form fields should be put
  * @param exclusive_node  DOM element where exclusive form fields should be put
- * @param group_node      DOM element where grouping form fields should be put.
+ * @param groups_node     DOM element where grouping form fields should be put.
  *
  * @author David Underhill (http://www.dound.com)
  */
-function createModelSearch(prefix, gfield_infos, sfield_infos, inclusive_node, exclusive_node, group_node) {
+function createModelSearch(prefix, gfield_infos, sfield_infos, inclusive_node, exclusive_node, groups_node) {
     // constants
-    var S_OP_NEEDS_TWO_VALUES = ['range']
-    var G_OP_NEEDS_EXTRA_VALUE = ['first characters', 'fixed # of buckets', 'equi-width buckets', 'log-width buckets']
+    var S_OP_NEEDS_TWO_VALUES = ['range'];
+    var G_OP_NEEDS_EXTRA_VALUE = ['first characters', 'fixed # of buckets', 'equi-width buckets', 'log-width buckets'];
 
     // build option element html for field options and fields' operator options
     var G_FIELD_OPTIONS, G_OPERATORS_OPTIONS, S_FIELD_OPTIONS, S_OPERATORS_OPTIONS;
@@ -50,7 +50,7 @@ function createModelSearch(prefix, gfield_infos, sfield_infos, inclusive_node, e
             }
             op_options[i] = options;
         }
-        return [field_options, op_options]
+        return [field_options, op_options];
     }
     (function () {
         var pair;
@@ -60,7 +60,7 @@ function createModelSearch(prefix, gfield_infos, sfield_infos, inclusive_node, e
         pair = create_options(sfield_infos);
         S_FIELD_OPTIONS = pair[0];
         S_OPERATORS_OPTIONS = pair[1];
-    }())
+    }());
 
     /** create a textual input field */
     function createValueField(cname, id) {
@@ -101,14 +101,13 @@ function createModelSearch(prefix, gfield_infos, sfield_infos, inclusive_node, e
      * @param n              this condition's number
      */
     function Condition(parent_filter, cname, container, n) {
-        var me, txtNode, field_choices, op_choices, value1, txtBetweenValues, value2, btnRm;
+        var me, field_choices, op_choices, value1, txtBetweenValues, value2, btnRm;
         me = this;
         this.parent_filter = parent_filter;
         this.container = container;
 
-        txtNode = document.createTextNode(' AND ');
         this.leading_span = document.createElement('span');
-        this.leading_span.appendChild(txtNode);
+        this.leading_span.appendChild(document.createTextNode(' AND '));
         container.appendChild(this.leading_span);
         this.renumber(n);
 

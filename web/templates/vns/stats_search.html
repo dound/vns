@@ -35,7 +35,7 @@
     {% for dname, allowed_ops in sfields_list %}
     sfields[{{ forloop.counter0 }}] = ['{{ dname }}', [{% for op in allowed_ops %}'{{ op|safe }}'{% if not forloop.last %}, {% endif %}{% endfor %}]];{% endfor %}
 
-    var in_div, ex_div, ms;
+    var in_div, ex_div, grouping_div, ms;
     in_div = document.getElementById('inclusive_filters');
     ex_div = document.getElementById('exclusive_filters');
     grouping_div = document.getElementById('grouping');
