@@ -37,8 +37,8 @@ function createModelSearch(prefix, gfield_infos, sfield_infos, inclusive_node, e
         var i, j, field_info, field_name, field_ops, field_options, op_name, op_options, options;
         field_options = '';
         op_options = [];
-        for(i=0; i<sfield_infos.length; i++) {
-            field_info = sfield_infos[i];
+        for(i=0; i<infos.length; i++) {
+            field_info = infos[i];
             field_name = field_info[0];
             field_options += "<option value='" + i + "'>" + field_name + "</option>";
 
