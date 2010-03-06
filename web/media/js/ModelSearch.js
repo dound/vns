@@ -178,7 +178,9 @@ function createModelSearch(prefix, gfield_infos, sfield_infos, inclusive_node, e
     /** Sets the condition */
     Condition.prototype.set = function (field, op, v1, v2) {
         this.field_choices.selectedIndex = field;
+        this.field_choices.onchange();
         this.op_choices.selectedIndex = op;
+        this.op_choices.onchange();
         this.value1.value = v1;
         this.value2.value = v2;
     };
