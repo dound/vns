@@ -375,14 +375,14 @@ def stats_search(request):
                     c.set(kind, v)
                 except ValueError:
                     # user has supplied a non-integer field or op index: they didn't use our form
-                    messages.error('Invalid search: please use our search form')
+                    messages.error(request, 'Invalid search: please use our search form')
                     return create_stats_search_page(request)
 
         try:
             data = get_filtered_data(db.UsageStats, ex_filters.values(), in_filters.values())
         except IndexError as e:
             # user has supplied a bad field or operator: they didn't use our form
-            messages.error('Invalid search: ' + str(e))
+            messages.error(request, 'Invalid search: ' + str(e))
             return create_stats_search_page(request)
 
         output = create_output(data)
