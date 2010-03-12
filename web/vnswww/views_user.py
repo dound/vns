@@ -4,6 +4,7 @@ from django import forms
 from django.contrib import messages
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
+from django.db import IntegrityError
 from django.views.generic.simple import direct_to_template
 from django.http import HttpResponseRedirect
 
@@ -115,7 +116,11 @@ def user_create(request):
             pw = form.cleaned_data['pw']
             pos = form.cleaned_data['pos']
 
-            user = User.objects.create_user(username, email, pw)
+            try:
+                user = User.objects.create_user(username, email, pw)
+            except IntegrityError:
+                messages.error(request, "Unable to create the user: the requested username '%s' is already taken" % username)
+                return direct_to_template(request, tn, { 'form': form })
             user.last_name = last_name
             user.first_name = first_name
             user.save()
@@ -141,7 +146,7 @@ class ChangePasswordForm(forms.Form):
     old_pw   = forms.CharField(label='Current Password', widget=forms.PasswordInput(render_value=False))
     new_pw1  = forms.CharField(label='New Password', min_length=6, widget=forms.PasswordInput(render_value=False))
     new_pw2  = forms.CharField(label='New Password (again)', widget=forms.PasswordInput(render_value=False))
-    
+
 def user_change_pw(request, up):
     tn = 'vns/user_change_pw.html'
     is_admin = up.user != request.user
