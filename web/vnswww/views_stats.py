@@ -50,6 +50,8 @@ class SearchDescription():
     GROUP_OPERATORS_DATE = ('distinct values', 'day of week', 'day of month', 'day of year', 'hour of day', 'day', 'month', 'year')
     GROUP_OPERATORS_BOOL = ('distinct values',)
 
+    GROUP_OPERATORS_NEED_EXTRA_VALUE = ('first characters', 'fixed # of buckets', 'equi-width buckets', 'log-width buckets')
+
     @staticmethod
     def op_to_displayable_str(op):
         return SearchDescription.SEARCH_OPERATOR_TO_STR_MAPPING.get(op, op)
@@ -261,6 +263,7 @@ class Condition():
         for n, v, _ in self.searchable_views:
             if field_name_long == v:
                 field_name = n
+                break
         if not field_name:
             raise KeyError('invalid search field')  # shouldn't be able to happen
 
@@ -306,6 +309,67 @@ class Filter():
             overall_query = overall_query | f.make_query_filter()
         return overall_query
 
+class Group():
+    """Stores information about a group.  Data is stored exactly as submitted by
+    the HTML form.
+
+    @param search_desc  The SearchDescription object this group is for.
+    """
+    def __init__(self, search_desc,
+                 field_index=None, op_index=None, extra_value=None):
+        self.groupable_views = search_desc.get_groupable_fields()
+        self.groupable_views_ordered = search_desc.get_groupable_fields_for_view()
+        self.field_index = field_index
+        self.op_index = op_index
+        self.extra_value = extra_value
+
+        self.field_name = None
+        self.op = None
+
+    def set(self, kind, value):
+        """Sets the field specified by kind to the specified value.  ValueError
+        is raised if value is not of the expected type (int for field and op, float o/w)."""
+        if kind == 'field':
+            self.field_index = int(value)
+        elif kind == 'op':
+            self.op_index = int(value)
+        elif kind == 'v':
+            self.field_value1 = float(value)
+        else:
+            raise KeyError("unknown kind '%s' passed to Group.set()" % kind)
+
+    def prepare_for_use(self):
+        """Prepares this object to be used for grouping.
+        IndexError is raised if an invalid search field or operator field choice
+        was made.  It is also raised if any needed field is missing."""
+        if not self.is_complete():
+            raise IndexError('missing group field')
+
+        try:
+            field_name_long, ops = self.groupable_views_ordered[self.field_index]
+        except IndexError:
+            raise IndexError('invalid group field')
+
+        field_name = None
+        for n, v, _ in self.groupable_views:
+            if field_name_long == v:
+                self.field_name = n
+                break
+        if not self.field_name:
+            raise KeyError('invalid group field')  # shouldn't be able to happen
+
+        try:
+            self.op = ops[self.op_index]
+        except IndexError:
+            raise IndexError('invalid operator selection')
+
+        if self.op in SearchDescription.GROUP_OPERATORS_NEED_EXTRA_VALUE:
+            if self.extra_value is None:
+                raise IndexError('missing group field extra value for operator which needs it')
+
+    def is_complete(self):
+        return self.field_index is not None and self.op_index is not None
+
 def get_filtered_data(model, exclusive_filters, inclusive_filters):
     """Returns the QuerySet containing the data from the specified model which
     meets the criteria specified by any of the inclusive filters and none of the
@@ -345,17 +409,18 @@ def create_stats_search_page(request):
     return direct_to_template(request, 'vns/stats_search.html', d)
 
 RE_MODEL_SEARCH_FIELD = re.compile(r'(e|i)(\w+)_(\d+)_((field)|(op)|(v1)|(v2))')
+RE_MODEL_GROUP_FIELD  = re.compile(r'group(\w+)_((field)|(op)|(v))')
 def stats_search(request):
     # make sure the user is logged in
     if not request.user.is_authenticated():
         messages.warning(request, 'You must login before proceeding.')
         return HttpResponseRedirect('/login/?next=%s' % request.path)
 
-
     if request.method == 'POST':
         # extract all of the inclusive and exclusive filters
         in_filters = {}
         ex_filters = {}
+        groups = {}
         for k,v in request.POST.iteritems():
             m = RE_MODEL_SEARCH_FIELD.match(k)
             if m:
@@ -377,12 +442,40 @@ def stats_search(request):
                     # user has supplied a non-integer field or op index: they didn't use our form
                     messages.error(request, 'Invalid search: please use our search form')
                     return create_stats_search_page(request)
+            else:
+                m = RE_MODEL_GROUP_FIELD.match(k)
+                if m:
+                    g_id, kind, _,_,_ = m.groups()
+                    try:
+                        g = groups[g_id]
+                    except KeyError:
+                        g = Group(SD_USAGE_STATS)
+                        groups[g_id] = g
+                    try:
+                        if kind != 'v' or v != '':
+                            g.set(kind, v)
+                    except ValueError:
+                        # user has supplied a non-integer field or op index: they didn't use our form
+                        messages.error(request, 'Invalid group: please use our search form')
+                        return create_stats_search_page(request)
 
         try:
             data = get_filtered_data(db.UsageStats, ex_filters.values(), in_filters.values())
         except IndexError as e:
             # user has supplied a bad field or operator: they didn't use our form
             messages.error(request, 'Invalid search: ' + str(e))
+            return create_stats_search_page(request)
+
+        # put the groupings in order and prepare them for use
+        group_ids = groups.keys()
+        group_ids.sort()
+        groups = [groups[g_id] for g_id in group_ids]
+        try:
+            for g in groups:
+                g.prepare_for_use()
+        except IndexError as e:
+            # user has supplied a bad field or operator: they didn't use our form
+            messages.error(request, 'Invalid grouping: ' + str(e))
             return create_stats_search_page(request)
 
         output = create_output(data)
