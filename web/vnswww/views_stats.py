@@ -1,3 +1,4 @@
+import math
 import re
 
 from django.contrib import messages
@@ -47,7 +48,7 @@ class SearchDescription():
 
     GROUP_OPERATORS_NUM  = ('distinct values', 'fixed # of buckets', 'equi-width buckets', 'log-width buckets')
     GROUP_OPERATORS_TEXT = ('distinct values', 'first characters')
-    GROUP_OPERATORS_DATE = ('distinct values', 'day of week', 'day of month', 'day of year', 'hour of day', 'day', 'month', 'year')
+    GROUP_OPERATORS_DATE = ('distinct values', 'date', 'day of week', 'day of month', 'day of year', 'hour of day', 'month', 'year')
     GROUP_OPERATORS_BOOL = ('distinct values',)
 
     GROUP_OPERATORS_NEED_EXTRA_VALUE = ('first characters', 'fixed # of buckets', 'equi-width buckets', 'log-width buckets')
@@ -350,7 +351,7 @@ class Group():
         except IndexError:
             raise IndexError('invalid group field')
 
-        field_name = None
+        self.field_name = None
         for n, v, _ in self.groupable_views:
             if field_name_long == v:
                 self.field_name = n
@@ -370,6 +371,86 @@ class Group():
     def is_complete(self):
         return self.field_index is not None and self.op_index is not None
 
+    @staticmethod
+    def __to_distinct_buckets(records, f_extract_bucket_key):
+        buckets = {}
+        for r in records:
+            k = f_extract_bucket_key(r)
+            try:
+                buckets[k].append(r)
+            except KeyError:
+                buckets[k] = [r]
+        keys = buckets.keys()
+        keys.sort()
+        return [(k, k, buckets[k]) for k in keys]
+
+    def apply(self, records):
+        """Returns a list of buckets.  Each bucket is a 3-tuple: (min value
+        allowed (inclusive), max value allowed (exclusive), list of items in
+        the bucket).  If the min value and max value are the same then only
+        items with that value will be in the bucket."""
+        if self.field_name is None:
+            self.prepare_for_use()
+
+        # handle buckets which each only contains a distinct value
+        if self.op == 'distinct values':
+            f = lambda r : r.__dict__[self.field_name]
+        elif self.op == 'first characters':
+            f = lambda r : r.__dict__[self.field_name][:self.extra_value]
+        elif self.op == 'date':
+            f = lambda r : r.__dict__[self.field_name].date()
+        elif self.op == 'day of month':
+            f = lambda r : r.__dict__[self.field_name].day
+        elif self.op == 'day of week':
+            f = lambda r : r.__dict__[self.field_name].weekday()
+        elif self.op == 'day of year':
+            f = lambda r : r.__dict__[self.field_name].timetuple().tm_yday
+        elif self.op == 'hour of day':
+            f = lambda r : r.__dict__[self.field_name].hour
+        elif self.op == 'month':
+            f = lambda r : r.__dict__[self.field_name].month
+        elif self.op == 'year':
+            f = lambda r : r.__dict__[self.field_name].year
+        if f:
+            return Group.__to_distinct_buckets(records, f)
+
+        # handle buckets which contain a range of values
+        sorted_kv_list = [(r.__dict__[self.field_name], r) for r in records]
+        sorted_kv_list.sort()
+        min_value = sorted_kv_list[0]
+        max_value = sorted_kv_list[-1]
+        range = float(max_value - min_value)
+        if self.op == 'equi-width buckets':
+            f_bucket_width = lambda i : float(self.extra_value)
+            #num_buckets = math.ceil(range / f_bucket_width())
+        elif self.op == 'fixed # of buckets':
+            num_buckets = int(self.extra_value)
+            if self.extra_value < 1:
+                raise ValueError('There must be at least one bucket.')
+            f_bucket_width = lambda i : range / num_buckets
+        elif self.op == 'log-width buckets':
+            log_base = float(self.extra_value)
+            num_buckets = math.ceil(math.log(max_value, log_base))
+            f_bucket_width = lambda i : math.pow(log_base, i)
+        else:
+            raise ValueError('internal error: unknown grouping operator')
+
+        buckets = []
+        bucket = []
+        bucket_min = min_value
+        bucket_width = f_bucket_width(0)
+        bucket_max = bucket_min + bucket_width
+        buckets.append((bucket_min, bucket_max, bucket))
+        for k, v in sorted_kv_list:
+            while k >= bucket_max:
+                bucket = []
+                bucket_min = bucket_max
+                bucket_width = f_bucket_width(len(buckets) - 1)
+                bucket_max = bucket_min + bucket_width
+                buckets.append((bucket_min, bucket_max, bucket))
+            bucket.append(v)
+        return buckets
+
 def get_filtered_data(model, exclusive_filters, inclusive_filters):
     """Returns the QuerySet containing the data from the specified model which
     meets the criteria specified by any of the inclusive filters and none of the
@@ -388,8 +469,46 @@ def get_filtered_data(model, exclusive_filters, inclusive_filters):
         else:
             return model.objects.exclude(exclusive_q).filter(inclusive_q)
 
-def create_output(groups):
-    return '%d results\n\n' % len(groups) + '\n'.join(str(g) for g in groups)
+class GroupNode():
+    def __init__(self, records, groupings):
+        # if there are no more groupings, then just return the records
+        if not groupings:
+            self.leaf = True
+            self.records = records
+            self.groups = None
+        else:
+            self.leaf = False
+            self.records = None
+            groups_of_records = groupings[0].apply(records)
+            subgroupings = groupings[1:]
+            self.groups = [GroupNode(recs, subgroupings) for bmin, bmax, recs in groups_of_records]
+
+    def is_leaf(self):
+        return self.leaf
+
+    def get_groups(self):
+        return self.groups
+
+    def get_records(self):
+        return self.records
+
+def create_output(group_node, indent_sz=0, group_num=-1, group_range=None):
+    if group_node.is_leaf():
+        txt_indent = ' ' * indent_sz
+        recs = group_node.get_records()
+        if group_range is None:
+            range_txt = ''
+        else:
+            bmin, bmax = group_range
+            if bmin == bmax:
+                range_txt = '(value=%s) ' % bmin
+            else:
+                range_txt = '(values %s to %s) ' % (bmin, bmax)
+        ret = '' if group_num < 0 else '%sGroup %d %s(%d results):\n' % (txt_indent, group_num, range_txt, len(recs))
+        return ret + txt_indent + ('\n%s' % txt_indent).join(str(r) for r in recs) + '\n'
+    else:
+        for i, (bmin, bmax, recs) in enumerate(group_node.get_groups()):
+            create_output(recs, indent_sz + 2, i+1)
 
 class TemplateSearchDesc(SearchDescription):
     model = db.TopologyTemplate
@@ -471,14 +590,13 @@ def stats_search(request):
         group_ids.sort()
         groups = [groups[g_id] for g_id in group_ids]
         try:
-            for g in groups:
-                g.prepare_for_use()
+            grouped_data = GroupNode(data, groups)
         except IndexError as e:
             # user has supplied a bad field or operator: they didn't use our form
             messages.error(request, 'Invalid grouping: ' + str(e))
             return create_stats_search_page(request)
 
-        output = create_output(data)
+        output = create_output(grouped_data)
         return HttpResponse(output, content_type='text/plain')
     else:
         return create_stats_search_page(request)
