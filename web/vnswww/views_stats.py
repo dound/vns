@@ -335,7 +335,7 @@ class Group():
         elif kind == 'op':
             self.op_index = int(value)
         elif kind == 'v':
-            self.field_value1 = float(value)
+            self.extra_value = float(value)
         else:
             raise KeyError("unknown kind '%s' passed to Group.set()" % kind)
 
@@ -384,41 +384,55 @@ class Group():
         keys.sort()
         return [(k, k, buckets[k]) for k in keys]
 
+    @staticmethod
+    def __make_getter(field_name):
+        """Creates a function which takes an instance of a model and retrieves
+        the specified field.  Like Django, '__' may be used to access a field
+        within a field."""
+        fields = field_name.split('__', 1)
+        if len(fields) == 1:
+            return lambda o : o.__getattribute__(fields[0])
+        else:
+            f = Group.__make_getter(fields[1])
+            return lambda o : f(o.__getattribute__(fields[0]))
+
     def apply(self, records):
         """Returns a list of buckets.  Each bucket is a 3-tuple: (min value
-        allowed (inclusive), max value allowed (exclusive), list of items in
-        the bucket).  If the min value and max value are the same then only
-        items with that value will be in the bucket."""
+        allowed (exclusive except for the first bucket), max value allowed
+        (inclusive), list of items in the bucket).  If the min value and max
+        value are the same then only items with that value will be in the bucket."""
         if self.field_name is None:
             self.prepare_for_use()
 
         # handle buckets which each only contains a distinct value
+        f = None
+        get_group_field_value = Group.__make_getter(self.field_name)
         if self.op == 'distinct values':
-            f = lambda r : r.__dict__[self.field_name]
+            f = lambda r : get_group_field_value(r)
         elif self.op == 'first characters':
-            f = lambda r : r.__dict__[self.field_name][:self.extra_value]
+            f = lambda r : get_group_field_value(r)[:self.extra_value]
         elif self.op == 'date':
-            f = lambda r : r.__dict__[self.field_name].date()
+            f = lambda r : get_group_field_value(r).date()
         elif self.op == 'day of month':
-            f = lambda r : r.__dict__[self.field_name].day
+            f = lambda r : get_group_field_value(r).day
         elif self.op == 'day of week':
-            f = lambda r : r.__dict__[self.field_name].weekday()
+            f = lambda r : get_group_field_value(r).weekday()
         elif self.op == 'day of year':
-            f = lambda r : r.__dict__[self.field_name].timetuple().tm_yday
+            f = lambda r : get_group_field_value(r).timetuple().tm_yday
         elif self.op == 'hour of day':
-            f = lambda r : r.__dict__[self.field_name].hour
+            f = lambda r : get_group_field_value(r).hour
         elif self.op == 'month':
-            f = lambda r : r.__dict__[self.field_name].month
+            f = lambda r : get_group_field_value(r).month
         elif self.op == 'year':
-            f = lambda r : r.__dict__[self.field_name].year
+            f = lambda r : get_group_field_value(r).year
         if f:
             return Group.__to_distinct_buckets(records, f)
 
         # handle buckets which contain a range of values
-        sorted_kv_list = [(r.__dict__[self.field_name], r) for r in records]
+        sorted_kv_list = [(get_group_field_value(r), r) for r in records]
         sorted_kv_list.sort()
-        min_value = sorted_kv_list[0]
-        max_value = sorted_kv_list[-1]
+        min_value = sorted_kv_list[0][0]
+        max_value = sorted_kv_list[-1][0]
         range = float(max_value - min_value)
         if self.op == 'equi-width buckets':
             f_bucket_width = lambda i : float(self.extra_value)
@@ -442,7 +456,7 @@ class Group():
         bucket_max = bucket_min + bucket_width
         buckets.append((bucket_min, bucket_max, bucket))
         for k, v in sorted_kv_list:
-            while k >= bucket_max:
+            while k > bucket_max:
                 bucket = []
                 bucket_min = bucket_max
                 bucket_width = f_bucket_width(len(buckets) - 1)
@@ -481,7 +495,7 @@ class GroupNode():
             self.records = None
             groups_of_records = groupings[0].apply(records)
             subgroupings = groupings[1:]
-            self.groups = [GroupNode(recs, subgroupings) for bmin, bmax, recs in groups_of_records]
+            self.groups = [(bmin, bmax, GroupNode(recs, subgroupings)) for bmin, bmax, recs in groups_of_records]
 
     def is_leaf(self):
         return self.leaf
@@ -507,8 +521,7 @@ def create_output(group_node, indent_sz=0, group_num=-1, group_range=None):
         ret = '' if group_num < 0 else '%sGroup %d %s(%d results):\n' % (txt_indent, group_num, range_txt, len(recs))
         return ret + txt_indent + ('\n%s' % txt_indent).join(str(r) for r in recs) + '\n'
     else:
-        for i, (bmin, bmax, recs) in enumerate(group_node.get_groups()):
-            create_output(recs, indent_sz + 2, i+1)
+        return '\n'.join(create_output(sgn, indent_sz+2, i+1, (bmin,bmax)) for i, (bmin, bmax, sgn) in enumerate(group_node.get_groups()))
 
 class TemplateSearchDesc(SearchDescription):
     model = db.TopologyTemplate
