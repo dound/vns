@@ -326,6 +326,7 @@ class Group():
 
         self.field_name = None
         self.op = None
+        self.align_to_0 = True
 
     def set(self, kind, value):
         """Sets the field specified by kind to the specified value.  ValueError
@@ -336,6 +337,8 @@ class Group():
             self.op_index = int(value)
         elif kind == 'v':
             self.extra_value = float(value)
+        elif kind == 'opt':
+            self.align_to_0 = (value == '0')
         else:
             raise KeyError("unknown kind '%s' passed to Group.set()" % kind)
 
@@ -432,6 +435,8 @@ class Group():
         sorted_kv_list = [(get_group_field_value(r), r) for r in records]
         sorted_kv_list.sort()
         min_value = sorted_kv_list[0][0]
+        if min_value > 0 and self.align_to_0:
+            min_value = 0.0
         max_value = sorted_kv_list[-1][0]
         range = float(max_value - min_value)
         if self.op == 'equi-width buckets':
@@ -541,7 +546,7 @@ def create_stats_search_page(request):
     return direct_to_template(request, 'vns/stats_search.html', d)
 
 RE_MODEL_SEARCH_FIELD = re.compile(r'(e|i)(\w+)_(\d+)_((field)|(op)|(v1)|(v2))')
-RE_MODEL_GROUP_FIELD  = re.compile(r'group(\w+)_((field)|(op)|(v))')
+RE_MODEL_GROUP_FIELD  = re.compile(r'group(\w+)_((field)|(opt)|(v)|(op))')
 def stats_search(request):
     # make sure the user is logged in
     if not request.user.is_authenticated():
@@ -577,7 +582,7 @@ def stats_search(request):
             else:
                 m = RE_MODEL_GROUP_FIELD.match(k)
                 if m:
-                    g_id, kind, _,_,_ = m.groups()
+                    g_id, kind, _,_,_,_ = m.groups()
                     try:
                         g = groups[g_id]
                     except KeyError:
@@ -586,10 +591,13 @@ def stats_search(request):
                     try:
                         if kind != 'v' or v != '':
                             g.set(kind, v)
-                    except ValueError:
-                        # user has supplied a non-integer field or op index: they didn't use our form
-                        messages.error(request, 'Invalid group: please use our search form')
-                        return create_stats_search_page(request)
+                    except ValueError as e:
+                        if kind == 'v':
+                            messages.error(request, 'Invalid value supplied: %s' % str(e))
+                        else:
+                            # user has supplied a non-integer field or op index: they didn't use our form
+                            messages.error(request, 'Invalid group: please use our search form')
+                            return create_stats_search_page(request)
 
         try:
             data = get_filtered_data(db.UsageStats, ex_filters.values(), in_filters.values())

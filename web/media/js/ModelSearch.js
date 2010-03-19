@@ -40,6 +40,8 @@ function createModelSearch(prefix, gfield_infos, sfield_infos, inclusive_node, e
     var S_OP_NEEDS_TWO_VALUES = ['range'];
     var G_OP_NEEDS_EXTRA_VALUE = ['first characters', 'fixed # of buckets', 'equi-width buckets', 'log-width buckets'];
     var G_OP_NEEDS_EXTRA_VALUE_DESC = ['# of chars', '# of buckets', 'bucket width', 'log base'];
+    var G_OP_HAS_ALIGN_TO_0_OPT = ['fixed # of buckets', 'equi-width buckets', 'log-width buckets'];
+    var G_ALIGN_TO_0_OPT_OPTIONS = "<option value='0'>Start At 0</option><option value='min'>Start At Min</option>";
 
     // build option element html for field options and fields' operator options
     var G_FIELD_OPTIONS, G_OPERATORS_OPTIONS, S_FIELD_OPTIONS, S_OPERATORS_OPTIONS;
@@ -390,7 +392,7 @@ function createModelSearch(prefix, gfield_infos, sfield_infos, inclusive_node, e
 
     /** Manages a single grouping. */
     function Group(parent, gname, container, n) {
-        var me = this, field_choices, op_choices, extra_container, extra_value, extra_value_desc, btnRm;
+        var me = this, field_choices, op_choices, extra_container, extra_value, extra_value_desc, extra_opt_container, extra_opt, btnRm;
         this.parent = parent;
         this.gname = gname;
         this.container = container;
@@ -408,10 +410,13 @@ function createModelSearch(prefix, gfield_infos, sfield_infos, inclusive_node, e
         extra_value = createValueField(gname, '');
         extra_value.setAttribute('size', 3);
         extra_value_desc = document.createTextNode('');
+        extra_opt_container = document.createElement('span');
+        extra_opt_value = document.createElement('select');
 
         this.field_choices = field_choices;
         this.op_choices = op_choices;
         this.extra_value = extra_value;
+        this.extra_opt_value = extra_opt_value;
 
         // initialize the field choices combo box
         field_choices.setAttribute('name', gname + '_field');
@@ -437,7 +442,19 @@ function createModelSearch(prefix, gfield_infos, sfield_infos, inclusive_node, e
                 }
             }
             extra_container.style.display = state;
+            state = 'none';
+            for(i=0; i<G_OP_HAS_ALIGN_TO_0_OPT.length; i++) {
+                if(op === G_OP_HAS_ALIGN_TO_0_OPT[i]) {
+                    state = 'inline';
+                    break;
+                }
+            }
+            extra_opt_container.style.display = state;
         };
+
+        // initialize the optional dropdown
+        extra_opt_value.setAttribute('name', gname + '_opt');
+        extra_opt_value.innerHTML = G_ALIGN_TO_0_OPT_OPTIONS;
 
         // create a button to delete this condition
         btnRm = createOrdinaryButton('X');
@@ -452,6 +469,8 @@ function createModelSearch(prefix, gfield_infos, sfield_infos, inclusive_node, e
         extra_container.appendChild(extra_value);
         extra_container.appendChild(document.createTextNode(') '));
         container.appendChild(extra_container);
+        extra_opt_container.appendChild(extra_opt_value);
+        container.appendChild(extra_opt_container);
         container.appendChild(btnRm);
 
         // trigger onchange() for the default selections
@@ -470,12 +489,13 @@ function createModelSearch(prefix, gfield_infos, sfield_infos, inclusive_node, e
     };
 
     /** Sets the group */
-    Group.prototype.set = function (field, op, extra_value) {
+    Group.prototype.set = function (field, op, extra_value, extra_opt_value) {
         this.field_choices.selectedIndex = field;
         this.field_choices.onchange();
         this.op_choices.selectedIndex = op;
         this.op_choices.onchange();
         this.extra_value.value = extra_value;
+        this.extra_opt_value.value = extra_opt_value;
     };
 
     // setup groups
@@ -545,7 +565,7 @@ function createModelSearch(prefix, gfield_infos, sfield_infos, inclusive_node, e
 
     /** Creates groups from parsed URL parameters. */
     Groups.prototype.populate_from_url = function() {
-        var i, field, gprefix, group, num_groups, op, v;
+        var i, field, gprefix, group, num_groups, op, v, ov;
 
         num_groups = get_url_param(prefix + "num_groups");
         if(num_groups === null) {
@@ -558,9 +578,10 @@ function createModelSearch(prefix, gfield_infos, sfield_infos, inclusive_node, e
             field = get_url_param(gprefix + "field");
             op = get_url_param(gprefix + "op");
             v = get_url_param(gprefix + "v");
+            ov = get_url_param(gprefix + "opt");
 
             group = this.add_group();
-            group.set(field, op, v);
+            group.set(field, op, v, ov);
         }
     };
 
