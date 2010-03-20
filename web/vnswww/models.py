@@ -44,7 +44,7 @@ class Simulator(Model):
 
 class Organization(Model):
     """An institution to which a group of users belong (or a sub-group)."""
-    name = CharField(max_length=30, unique=True)
+    name = CharField(max_length=30, unique=True, verbose_name="Name")
     parentOrg = ForeignKey('self', null=True, blank=True)
     boss = ForeignKey(User, related_name='org_boss_id',
                       help_text='User with complete control of this organization.')
@@ -70,9 +70,9 @@ class UserProfile(Model):
 
     SIM_KEY_SZ = 64 # size in bytes
 
-    user = ForeignKey(User, unique=True)
-    org  = ForeignKey(Organization)
-    pos  = IntegerField(choices=POSITION_CHOICES)
+    user = ForeignKey(User, unique=True, verbose_name="")
+    org  = ForeignKey(Organization, verbose_name="Organization")
+    pos  = IntegerField(choices=POSITION_CHOICES, verbose_name="Position")
     sim_key = CharField(max_length=SIM_KEY_SZ,
                         help_text="The ASCII string (system-generated) "+
                                   "which the user uses to authenticate with the simulator.")
