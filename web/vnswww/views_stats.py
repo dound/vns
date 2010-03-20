@@ -64,22 +64,22 @@ class SearchDescription():
         # maps field name to a 2-tuple of (display name, search operators)
         self.searchable_fields = {}
         self.groupable_fields = {}
-        for field in msd.__dict__.get('groupable_fields', []):
+        for field in msd.groupable_fields:
             self.enable_grouping(field)
-        for field in msd.__dict__.get('searchable_fields', []):
+        for field in msd.searchable_fields:
             self.enable_searching(field)
-        for field in msd.__dict__.get('groupable_and_searchable_fields', []):
+        for field in msd.groupable_and_searchable_fields:
             self.enable_field(field)
 
         # maps field name to a 2-tuple of (display name, SearchDescription which
         # contains subfields which can be searched)
         self.searchable_foreign_key_fields = {}
         self.groupable_foreign_key_fields = {}
-        for fk_field, sd in msd.__dict__.get('groupable_foreign_key_fields', []):
+        for fk_field, sd in msd.groupable_foreign_key_fields:
             self.enable_foreign_key_grouping(fk_field, sd)
-        for fk_field, sd in msd.__dict__.get('searchable_foreign_key_fields', []):
+        for fk_field, sd in msd.searchable_foreign_key_fields:
             self.enable_foreign_key_searching(fk_field, sd)
-        for fk_field, sd in msd.__dict__.get('groupable_and_searchable_foreign_key_fields', []):
+        for fk_field, sd in msd.groupable_and_searchable_foreign_key_fields:
             self.enable_foreign_key_field(fk_field, sd)
 
         # memoization vars
@@ -528,13 +528,12 @@ def create_output(group_node, indent_sz=0, group_num=-1, group_range=None):
     else:
         return '\n'.join(create_output(sgn, indent_sz+2, i+1, (bmin,bmax)) for i, (bmin, bmax, sgn) in enumerate(group_node.get_groups()))
 
-class TemplateSearchDesc(SearchDescription):
+class TemplateSearchDesc(ModelSearchDescription):
     model = db.TopologyTemplate
     groupable_and_searchable_fields = ('name',)
-    groupable_and_searchable_foreign_key_fields = ()
 SD_TEMPLATE = SearchDescription(TemplateSearchDesc)
 
-class UsageStatsSearchDesc(SearchDescription):
+class UsageStatsSearchDesc(ModelSearchDescription):
     model = db.UsageStats
     groupable_and_searchable_fields = ('topo_uuid', 'time_connected', 'num_pkts_to_topo')
     groupable_and_searchable_foreign_key_fields = ( ('template',SD_TEMPLATE), )
