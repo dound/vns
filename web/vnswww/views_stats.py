@@ -578,25 +578,27 @@ def stats_search(request):
                     # user has supplied a non-integer field or op index: they didn't use our form
                     messages.error(request, 'Invalid search: please use our search form')
                     return create_stats_search_page(request)
-            else:
-                m = RE_MODEL_GROUP_FIELD.match(k)
-                if m:
-                    g_id, kind, _,_,_,_ = m.groups()
-                    try:
-                        g = groups[g_id]
-                    except KeyError:
-                        g = Group(SD_USAGE_STATS)
-                        groups[g_id] = g
-                    try:
-                        if kind != 'v' or v != '':
-                            g.set(kind, v)
-                    except ValueError as e:
-                        if kind == 'v':
-                            messages.error(request, 'Invalid value supplied: %s' % str(e))
-                        else:
-                            # user has supplied a non-integer field or op index: they didn't use our form
-                            messages.error(request, 'Invalid group: please use our search form')
-                            return create_stats_search_page(request)
+                continue
+
+            m = RE_MODEL_GROUP_FIELD.match(k)
+            if m:
+                g_id, kind, _,_,_,_ = m.groups()
+                try:
+                    g = groups[g_id]
+                except KeyError:
+                    g = Group(SD_USAGE_STATS)
+                    groups[g_id] = g
+                try:
+                    if kind != 'v' or v != '':
+                        g.set(kind, v)
+                except ValueError as e:
+                    if kind == 'v':
+                        messages.error(request, 'Invalid value supplied: %s' % str(e))
+                    else:
+                        # user has supplied a non-integer field or op index: they didn't use our form
+                        messages.error(request, 'Invalid group: please use our search form')
+                        return create_stats_search_page(request)
+                continue
 
         try:
             data = get_filtered_data(db.UsageStats, ex_filters.values(), in_filters.values())
