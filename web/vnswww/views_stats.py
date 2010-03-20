@@ -14,6 +14,17 @@ import models as db
 def str_modcls(obj):
     return '%s.%s' % (obj.__module__, obj.__class__)
 
+def make_getter(field_name):
+    """Creates a function which takes an instance of a model and retrieves
+    the specified field.  Like Django, '__' may be used to access a field
+    within a field."""
+    fields = field_name.split('__', 1)
+    if len(fields) == 1:
+        return lambda o : o.__getattribute__(fields[0])
+    else:
+        f = make_getter(fields[1])
+        return lambda o : f(o.__getattribute__(fields[0]))
+
 class ModelSearchDescription():
     """Override this class and the model, fields, and foreign_key_fields values
     and then this object can be used to initialize SearchDescription."""
@@ -387,18 +398,6 @@ class Group():
         keys.sort()
         return [(k, k, buckets[k]) for k in keys]
 
-    @staticmethod
-    def __make_getter(field_name):
-        """Creates a function which takes an instance of a model and retrieves
-        the specified field.  Like Django, '__' may be used to access a field
-        within a field."""
-        fields = field_name.split('__', 1)
-        if len(fields) == 1:
-            return lambda o : o.__getattribute__(fields[0])
-        else:
-            f = Group.__make_getter(fields[1])
-            return lambda o : f(o.__getattribute__(fields[0]))
-
     def apply(self, records):
         """Returns a list of buckets.  Each bucket is a 3-tuple: (min value
         allowed (exclusive except for the first bucket), max value allowed
@@ -409,7 +408,7 @@ class Group():
 
         # handle buckets which each only contains a distinct value
         f = None
-        get_group_field_value = Group.__make_getter(self.field_name)
+        get_group_field_value = make_getter(self.field_name)
         if self.op == 'distinct values':
             f = lambda r : get_group_field_value(r)
         elif self.op == 'first characters':
