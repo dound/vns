@@ -2,6 +2,7 @@ import math
 import re
 
 from django.contrib import messages
+from django.contrib.auth.models import User
 from django.core.exceptions import FieldError
 from django.http import HttpResponse, HttpResponseRedirect
 from django.db.models import AutoField, BooleanField, CharField, DateField, \
@@ -604,10 +605,26 @@ class TemplateSearchDesc(ModelSearchDescription):
     groupable_and_searchable_fields = ('name',)
 SD_TEMPLATE = SearchDescription(TemplateSearchDesc)
 
+class UserSearchDesc(ModelSearchDescription):
+    model = User
+    groupable_and_searchable_fields = ('username',)
+SD_USER = SearchDescription(UserSearchDesc)
+
+class OrganizationSearchDesc(ModelSearchDescription):
+    model = db.Organization
+    groupable_and_searchable_fields = ('name', )
+SD_ORG = SearchDescription(OrganizationSearchDesc)
+
+class UserProfileSearchDesc(ModelSearchDescription):
+    model = db.UserProfile
+    groupable_and_searchable_fields = ('pos', 'retired')
+    groupable_and_searchable_foreign_key_fields = ( ('user', SD_USER), ('org', SD_ORG) )
+SD_USERPROFILE = SearchDescription(UserProfileSearchDesc)
+
 class UsageStatsSearchDesc(ModelSearchDescription):
     model = db.UsageStats
     groupable_and_searchable_fields = ('topo_uuid', 'time_connected', 'num_pkts_to_topo')
-    groupable_and_searchable_foreign_key_fields = ( ('template',SD_TEMPLATE), )
+    groupable_and_searchable_foreign_key_fields = ( ('template',SD_TEMPLATE), ('userprof', SD_USERPROFILE) )
     aggregatable_items = (('Total Time Connected', 'total_time_connected_sec'),
                           ('Total Bytes Transferred', 'total_bytes'),
                           ('Total Packets Transferred', 'total_packets'))
