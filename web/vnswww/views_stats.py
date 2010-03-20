@@ -205,12 +205,16 @@ class SearchDescription():
                 else:
                     raise FieldError("Don't know how to enable search/grouping for field of type %s.%s" % (cls.__module__, cls.__name__))
 
+                # if verbose name is not a string, then just use the base name
+                # as the verbose name
+                verbose_name = field.verbose_name if type(field.verbose_name)==str else field.name
+
                 if for_grouping:
                     self.group_up_to_date = False
-                    self.groupable_fields[field.name] = (field.verbose_name, gops)
+                    self.groupable_fields[field.name] = (verbose_name, gops)
                 if for_searching:
                     self.search_up_to_date = False
-                    self.searchable_fields[field.name] = (field.verbose_name, sops)
+                    self.searchable_fields[field.name] = (verbose_name, sops)
                 return
         raise FieldError('%s is not a field on %s' % (field_name, str_modcls(self.model)))
 
