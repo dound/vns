@@ -649,8 +649,29 @@ class UsageStats(Model):
             return True
         return False
 
-    def total_num_packets(self):
-        return self.num_pkts_from_client + self.num_pkts_from_topo + self.num_pkts_to_client + self.num_pkts_to_topo
+    @property
+    def total_client_bytes(self):
+        return self.num_bytes_from_client + self.num_bytes_to_client
+
+    @property
+    def total_topo_bytes(self):
+        return self.num_bytes_from_topo + self.num_bytes_to_topo
+
+    @property
+    def total_bytes(self):
+        return self.total_client_bytes + self.total_topo_bytes
+
+    @property
+    def total_client_packets(self):
+        return self.num_pkts_from_client + self.num_pkts_to_client
+
+    @property
+    def total_topo_packets(self):
+        return self.num_pkts_from_topo + self.num_pkts_to_topo
+
+    @property
+    def total_packets(self):
+        return self.total_client_packets + self.total_topo_packets
 
     def __unicode__(self):
         return (u'Template %s stats: ' % self.template.name) + \

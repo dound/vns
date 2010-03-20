@@ -22,7 +22,7 @@
             <td>{{ ts.user.username }}</td><td>{{ ts.client_ip }}</td>
             <td>{{ ts.time_connected|date:"D d-M \a\t H:n:s" }}</td>
             <td>{{ ts.get_num_sec_connected|durationf }}</td>
-            <td>{{ ts.total_num_packets }}</td>
+            <td>{{ ts.total_packets }}</td>
             <td>{{ ts.get_idle_time_sec|durationfr }}</td>
         </tr>
     {% empty %}
