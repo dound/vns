@@ -26,8 +26,10 @@ def make_getter(field_name):
         return lambda o : f(o.__getattribute__(fields[0]))
 
 class ModelSearchDescription():
-    """Override this class and the model, fields, and foreign_key_fields values
-    and then this object can be used to initialize SearchDescription."""
+    """Override this class and its field to specify which fields for a given
+    model may be searched, grouped, and aggregated.  Only numeric fields may
+    be aggregated.  Numeric fields may be properties instead of true fields on
+    the model."""
     # the model this search description is for
     model = None
 
@@ -41,6 +43,12 @@ class ModelSearchDescription():
     groupable_foreign_key_fields = ()
     searchable_foreign_key_fields = ()
     groupable_and_searchable_foreign_key_fields = ()
+
+    # Should hold 2-tuples describing which fields may be aggregated.  The tuple
+    # contains (verbose name, field name).  The verbose name is what will be
+    # shown to the user while the field name may be a field or property.  Like
+    # Django, '__' may be used to access a field within a field. (e.g., x__y).
+    aggregatable_items = ()
 
 class SearchDescription():
     """Describes what kind of searches can be done on a particular model and how
@@ -93,6 +101,10 @@ class SearchDescription():
         for fk_field, sd in msd.groupable_and_searchable_foreign_key_fields:
             self.enable_foreign_key_field(fk_field, sd)
 
+        self.aggregatable_items = []
+        for ai in msd.aggregatable_items:
+            self.aggregatable_items.append(ai)
+
         # memoization vars
         self.group_up_to_date = False
         self.search_up_to_date = False
@@ -100,6 +112,12 @@ class SearchDescription():
         self.processed_groupable_fields_for_view = None
         self.processed_searchable_fields = None
         self.processed_searchable_fields_for_view = None
+
+    def get_aggregatable_fields(self):
+        return [fn for vn, fn in self.aggregatable_items]
+
+    def get_aggregatable_fields_for_view(self):
+        return [vn for vn, fn in self.aggregatable_items]
 
     def get_groupable_fields(self):
         """Returns all groupable fields on the associated model as a 3-tuple
@@ -228,6 +246,11 @@ class SearchDescription():
                 else:
                     raise FieldError('%s is not a ForeignKey field on %s' % (field_name, str_modcls(self.model)))
         raise FieldError('%s is not a field on %s' % (field_name, str_modcls(self.model)))
+
+    def enable_aggregation(self, verbose_name, field_name):
+        """Enable aggregation on the specified field.  The verbose name may be
+        shown to the user."""
+        self.aggregatable_items.append((verbose_name, field_name))
 
 class Condition():
     """Stores information about a single condition.  Data is stored exactly as
@@ -488,18 +511,60 @@ def get_filtered_data(model, exclusive_filters, inclusive_filters):
             return model.objects.exclude(exclusive_q).filter(inclusive_q)
 
 class GroupNode():
-    def __init__(self, records, groupings):
+    def __init__(self, records, groupings, aggr_op, aggr_field):
         # if there are no more groupings, then just return the records
         if not groupings:
             self.leaf = True
             self.records = records
             self.groups = None
+            self.aggregated_value = self.__aggregate(aggr_op, aggr_field)
         else:
             self.leaf = False
             self.records = None
             groups_of_records = groupings[0].apply(records)
             subgroupings = groupings[1:]
-            self.groups = [(bmin, bmax, GroupNode(recs, subgroupings)) for bmin, bmax, recs in groups_of_records]
+            self.groups = [(bmin, bmax, GroupNode(recs, subgroupings, aggr_op, aggr_field)) for bmin, bmax, recs in groups_of_records]
+            self.aggregated_value = None
+
+    def __aggregate(self, how, field_name=None):
+        """Aggregates the records in this group into a representative value
+        Raises KeyError if an unknown operator is specified.  Raises AttributeError
+        if the specified field cannot be accessed.
+
+        @param how  the operator to use to combine the records (count,min,max,sum,average, or median)
+        @param field_name  the field to apply the operator (not needed if how is count)
+        """
+        if not how:
+            return None
+        elif how == 'count':
+            return len(self.records)
+
+        get_group_field_value = make_getter(field_name)
+        vals = (get_group_field_value(r) for r in self.records)
+        if how == 'min':
+            return min(vals)
+        elif how == 'max':
+            return max(vals)
+        elif how == 'sum':
+            return sum(vals)
+        elif how == 'average':
+            if len(self.records):
+                return sum(vals) / float(len(self.records))
+            else:
+                return None # undefined
+        elif how == 'median':
+            vals_list = [v for v in vals]
+            vals_list.sort()
+            mid_index = len(vals_list) / 2
+            if mid_index == len(vals_list)/2.0: # is the list even length?
+                return (vals_list[mid_index] + vals_list[mid_index+1]) / 2.0
+            else:
+                return vals_list[mid_index]
+        else:
+            raise KeyError('unknown aggregation operator: %s' % how)
+
+    def get_aggregation_value(self):
+        return self.aggregated_value
 
     def is_leaf(self):
         return self.leaf
@@ -510,10 +575,13 @@ class GroupNode():
     def get_records(self):
         return self.records
 
+
 def create_output(group_node, indent_sz=0, group_num=-1, group_range=None):
     if group_node.is_leaf():
         txt_indent = ' ' * indent_sz
         recs = group_node.get_records()
+        aggr_val = group_node.get_aggregation_value()
+        aggr_txt = 'n/a' if aggr_val is None else '%.2f' % aggr_val
         if group_range is None:
             range_txt = ''
         else:
@@ -522,7 +590,7 @@ def create_output(group_node, indent_sz=0, group_num=-1, group_range=None):
                 range_txt = '(value=%s) ' % bmin
             else:
                 range_txt = '(values %s to %s) ' % (bmin, bmax)
-        ret = '' if group_num < 0 else '%sGroup %d %s(%d results):\n' % (txt_indent, group_num, range_txt, len(recs))
+        ret = '' if group_num < 0 else '%sGroup %d %s(%d results) (aggr val=%s):\n' % (txt_indent, group_num, range_txt, len(recs), aggr_txt)
         return ret + txt_indent + ('\n%s' % txt_indent).join(str(r) for r in recs) + '\n'
     else:
         return '\n'.join(create_output(sgn, indent_sz+2, i+1, (bmin,bmax)) for i, (bmin, bmax, sgn) in enumerate(group_node.get_groups()))
@@ -536,11 +604,15 @@ class UsageStatsSearchDesc(ModelSearchDescription):
     model = db.UsageStats
     groupable_and_searchable_fields = ('topo_uuid', 'time_connected', 'num_pkts_to_topo')
     groupable_and_searchable_foreign_key_fields = ( ('template',SD_TEMPLATE), )
+    aggregatable_items = (('Total Time Connected', 'total_time_connected_sec'),
+                          ('Total Bytes Transferred', 'total_bytes'),
+                          ('Total Packets Transferred', 'total_packets'))
 SD_USAGE_STATS = SearchDescription(UsageStatsSearchDesc)
 
 def create_stats_search_page(request):
     d = {'gfields_list': SD_USAGE_STATS.get_groupable_fields_for_view(),
-         'sfields_list': SD_USAGE_STATS.get_searchable_fields_for_view()}
+         'sfields_list': SD_USAGE_STATS.get_searchable_fields_for_view(),
+         'afields_list': SD_USAGE_STATS.get_aggregatable_fields_for_view()}
     return direct_to_template(request, 'vns/stats_search.html', d)
 
 RE_MODEL_SEARCH_FIELD = re.compile(r'(e|i)(\w+)_(\d+)_((field)|(op)|(v1)|(v2))')
@@ -600,6 +672,14 @@ def stats_search(request):
                 continue
 
         try:
+            aggr_op = request.POST['aggr_op']
+            aggr_field_index = int(request.POST['aggr_field'])
+            aggr_field = SD_USAGE_STATS.get_aggregatable_fields()[aggr_field_index]
+        except (KeyError, IndexError, ValueError):
+            messages.error(request, 'Missing or invalid aggregation operator info: please use our search form')
+            return create_stats_search_page(request)
+
+        try:
             data = get_filtered_data(db.UsageStats, ex_filters.values(), in_filters.values())
         except IndexError as e:
             # user has supplied a bad field or operator: they didn't use our form
@@ -611,10 +691,13 @@ def stats_search(request):
         group_ids.sort()
         groups = [groups[g_id] for g_id in group_ids]
         try:
-            grouped_data = GroupNode(data, groups)
+            grouped_data = GroupNode(data, groups, aggr_op, aggr_field)
         except IndexError as e:
             # user has supplied a bad field or operator: they didn't use our form
             messages.error(request, 'Invalid grouping: ' + str(e))
+            return create_stats_search_page(request)
+        except (KeyError, AttributeError):
+            messages.error(request, 'Invalid aggregation operator or field')
             return create_stats_search_page(request)
 
         output = create_output(grouped_data)

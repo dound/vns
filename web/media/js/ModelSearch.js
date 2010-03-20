@@ -12,6 +12,11 @@
  * where <field> is "field", "op", or "v" (specifies a value associated with op,
  * if needed, e.g., bucket width).
  *
+ * Form elements are also posted which indicate how to aggregate each group and
+ * on what field to do aggregation.  <prefix>aggr_op specifies how and is one of
+ * AGGR_OPS_* and <prefix>aggr_field specifies what field the operator is
+ * performed on (if applicable).
+ *
  * URL parameters can be used to initialize the filters.  To have filters
  * automatically created pass the following parameters:
  *     <prefix><type>_num_filters - number of filters to create
@@ -23,29 +28,36 @@
  *     <prefix>num_groups
  *     <prefix>group<group#>_<field>
  *
+ * Aggregate form fields can also be initialized from URL paramters:
+ *     <prefix>aggr_field
+ *     <prefix>aggr_op
+ *
  * @param prefix       Text to prefix each input field with
  * @param gfield_infos An of information about groupable fields.  Same structure
  *                     as sfield_infos.
  * @param sfield_infos An array of information about searchable fields.  Each
  *                     element is an array of two items: the name of the field
  *                     and an array of operators it can use.
+ * @param afield_infos An array of fields which may be aggregated on.
  * @param inclusive_node  DOM element where inclusive form fields should be put
  * @param exclusive_node  DOM element where exclusive form fields should be put
  * @param groups_node     DOM element where grouping form fields should be put.
  *
  * @author David Underhill (http://www.dound.com)
  */
-function createModelSearch(prefix, gfield_infos, sfield_infos, inclusive_node, exclusive_node, groups_node) {
+function createModelSearch(prefix, gfield_infos, sfield_infos, afield_infos, inclusive_node, exclusive_node, groups_node) {
     // constants
     var S_OP_NEEDS_TWO_VALUES = ['range'];
     var G_OP_NEEDS_EXTRA_VALUE = ['first characters', 'fixed # of buckets', 'equi-width buckets', 'log-width buckets'];
     var G_OP_NEEDS_EXTRA_VALUE_DESC = ['# of chars', '# of buckets', 'bucket width', 'log base'];
     var G_OP_HAS_ALIGN_TO_0_OPT = ['fixed # of buckets', 'equi-width buckets', 'log-width buckets'];
     var G_ALIGN_TO_0_OPT_OPTIONS = "<option value='0'>Start At 0</option><option value='min'>Start At Min</option>";
+    var AGGR_OPS_NULLARY = ['count'];
+    var AGGR_OPS_UNARY = ['average', 'max', 'median', 'min', 'sum'];
 
     // build option element html for field options and fields' operator options
-    var G_FIELD_OPTIONS, G_OPERATORS_OPTIONS, S_FIELD_OPTIONS, S_OPERATORS_OPTIONS;
-    function create_options(infos) {
+    var G_FIELD_OPTIONS, G_OPERATORS_OPTIONS, S_FIELD_OPTIONS, S_OPERATORS_OPTIONS, A_FIELD_OPTIONS, A_OPERATORS_OPTIONS;
+    function create_options(infos, has_options) {
         var i, j, field_info, field_name, field_ops, field_options, op_name, op_options, options;
         field_options = '';
         op_options = [];
@@ -54,24 +66,41 @@ function createModelSearch(prefix, gfield_infos, sfield_infos, inclusive_node, e
             field_name = field_info[0];
             field_options += "<option value='" + i + "'>" + field_name + "</option>";
 
-            field_ops = field_info[1];
-            options = '';
-            for(j=0; j<field_ops.length; j++) {
-                op_name = field_ops[j];
-                options += "<option value ='" + j + "'>" + op_name + "</option";
+            if(has_options === true) {
+                field_ops = field_info[1];
+                options = '';
+                for(j=0; j<field_ops.length; j++) {
+                    op_name = field_ops[j];
+                    options += "<option value ='" + j + "'>" + op_name + "</option";
+                }
+                op_options[i] = options;
             }
-            op_options[i] = options;
         }
         return [field_options, op_options];
     }
     (function () {
         var pair;
-        pair = create_options(gfield_infos);
+        pair = create_options(gfield_infos, true);
         G_FIELD_OPTIONS = pair[0];
         G_OPERATORS_OPTIONS = pair[1];
-        pair = create_options(sfield_infos);
+        pair = create_options(sfield_infos, true);
         S_FIELD_OPTIONS = pair[0];
         S_OPERATORS_OPTIONS = pair[1];
+        pair = create_options(afield_infos, false);
+        A_FIELD_OPTIONS = pair[0];
+    }());
+    (function () {
+        var i, options, op;
+        options = '';
+        for(i=0; i<AGGR_OPS_NULLARY.length; i++) {
+            op = AGGR_OPS_NULLARY[i];
+            options += "<option value='" + op + "'>" + op + "</option>";
+        }
+        for(i=0; i<AGGR_OPS_UNARY.length; i++) {
+            op = AGGR_OPS_UNARY[i];
+            options += "<option value='" + op + "'>" + op + "</option>";
+        }
+        A_OPERATORS_OPTIONS = options;
     }());
 
     /** create a textual input field */
@@ -500,7 +529,7 @@ function createModelSearch(prefix, gfield_infos, sfield_infos, inclusive_node, e
 
     // setup groups
     function Groups(groups_node) {
-        var me = this;
+        var me = this, aggr_field, aggr_op, aggr_container, aggr_extra_container;
 
         // prefix associated with this filter set for form fields
         this.FORM_PREFIX = prefix + 'group';
@@ -519,6 +548,41 @@ function createModelSearch(prefix, gfield_infos, sfield_infos, inclusive_node, e
         this.btnAddGroup = createOrdinaryButton("Add a grouping");
         this.btnAddGroup.onclick = function () { me.add_group(); };
         this.container.appendChild(this.btnAddGroup);
+
+        // setup aggregation form elements
+        aggr_container = document.createElement('div');
+        aggr_container.setAttribute('name', 'aggr_container');
+        aggr_container.innerHTML = '<b>How to aggregate</b>: ';
+
+        aggr_extra_container = document.createElement('span');
+        aggr_extra_container.appendChild(document.createTextNode(' of '));
+        aggr_field = document.createElement('select');
+        aggr_field.setAttribute('name', 'aggr_field');
+        aggr_field.innerHTML = A_FIELD_OPTIONS;
+        aggr_extra_container.appendChild(aggr_field);
+
+        aggr_op = document.createElement('select');
+        aggr_op.setAttribute('name', 'aggr_op');
+        aggr_op.innerHTML = A_OPERATORS_OPTIONS;
+        aggr_op.onchange = function () {
+            // show the number of value fields as appropriate
+            var i, op, state;
+            op = aggr_op.options[aggr_op.selectedIndex].innerHTML;
+            state = 'inline';
+            for(i=0; i<AGGR_OPS_NULLARY.length; i++) {
+                if(op === AGGR_OPS_NULLARY[i]) {
+                    state = 'none';
+                    break;
+                }
+            }
+            aggr_extra_container.style.display = state;
+        };
+
+        aggr_container.appendChild(aggr_op);
+        aggr_container.appendChild(aggr_extra_container);
+        this.container.appendChild(aggr_container);
+        this.aggr_op = aggr_op;
+        this.aggr_field = aggr_field;
 
         this.populate_from_url();
     }
@@ -563,9 +627,14 @@ function createModelSearch(prefix, gfield_infos, sfield_infos, inclusive_node, e
         }
     };
 
-    /** Creates groups from parsed URL parameters. */
+    /** Creates groups and aggregation op from parsed URL parameters. */
     Groups.prototype.populate_from_url = function() {
         var i, field, gprefix, group, num_groups, op, v, ov;
+
+        // handle aggregation
+        this.aggr_op.value = get_url_param("aggr_op");
+        this.aggr_field.selectedIndex = get_url_param("aggr_field");
+        this.aggr_op.onchange();
 
         num_groups = get_url_param(prefix + "num_groups");
         if(num_groups === null) {
@@ -584,6 +653,8 @@ function createModelSearch(prefix, gfield_infos, sfield_infos, inclusive_node, e
             group.set(field, op, v, ov);
         }
     };
+
+    /** TODO: manage aggregation form elements */
 
     // create each of the filter sets
     new FilterSet(true, inclusive_node);
