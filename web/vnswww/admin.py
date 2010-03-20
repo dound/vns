@@ -96,9 +96,9 @@ class RecentIPBlockAllocationAdmin(admin.ModelAdmin):
     search_fields = ('user.username', 'template.name', 'start_addr')
 
 class UsageStatsAdmin(admin.ModelAdmin):
-    list_display = ('template', 'user', 'client_ip', 'time_connected', 'total_time_connected_sec', 'num_pkts_to_topo', 'num_pkts_from_topo', 'num_pkts_to_client', 'num_pkts_from_client', 'active', 'topo_uuid')
+    list_display = ('template', 'userprof', 'client_ip', 'time_connected', 'total_time_connected_sec', 'num_pkts_to_topo', 'num_pkts_from_topo', 'num_pkts_to_client', 'num_pkts_from_client', 'active', 'topo_uuid')
     ordering = ('time_connected',)
-    search_fields = ('template__name', 'user__username', 'client_ip', 'uuid')
+    search_fields = ('template__name', 'userprof__user__username', 'client_ip', 'uuid')
 
 class SystemInfoAdmin(admin.ModelAdmin):
     list_display = ('name', 'value')

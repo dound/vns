@@ -578,7 +578,7 @@ class UsageStats(Model):
     topo_uuid = CharField("Topology UUID", max_length=32)
     template = ForeignKey(TopologyTemplate, verbose_name="Template")
     client_ip = IPAddressField("Client IP", help_text='IP address of the first client to connect to the topology')
-    user = ForeignKey(User, verbose_name="User")
+    userprof = ForeignKey(UserProfile, verbose_name="User")
     time_connected = DateTimeField("Date/Time Connected", auto_now_add=True)
     time_last_changed = DateTimeField("Time Last Changed", auto_now_add=True)
     total_time_connected_sec = IntegerField("Total Time Connected (sec)", default=0)
@@ -596,7 +596,7 @@ class UsageStats(Model):
         self.topo_uuid = topo.uuid
         self.template = topo.template
         self.client_ip = client_ip
-        self.user = user
+        self.userprof = user.get_profile()
         self.time_last_changed = datetime.datetime.now()
         self.changed = False
 
@@ -675,7 +675,7 @@ class UsageStats(Model):
 
     def __unicode__(self):
         return (u'Template %s stats: ' % self.template.name) + \
-               (u'Started by client %s at %s; ' % (self.user.username, self.client_ip)) + \
+               (u'Started by client %s at %s; ' % (self.userprof.user.username, self.client_ip)) + \
                (u'Active for %dsec; ' % self.total_time_connected_sec) + \
                (u'# Packets [Topo to=%d from=%d] ' % (self.num_pkts_to_topo, self.num_pkts_from_topo)) + \
                (u'[User to=%d from=%d]' % (self.num_pkts_to_client, self.num_pkts_from_client))

@@ -19,7 +19,7 @@
     {% for ts in stats_list %}
         <tr>
             <td>{{ ts.template.name }}</td>
-            <td>{{ ts.user.username }}</td><td>{{ ts.client_ip }}</td>
+            <td>{{ ts.userprof.user.username }}</td><td>{{ ts.client_ip }}</td>
             <td>{{ ts.time_connected|date:"D d-M \a\t H:n:s" }}</td>
             <td>{{ ts.get_num_sec_connected|durationf }}</td>
             <td>{{ ts.total_packets }}</td>
