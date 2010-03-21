@@ -721,6 +721,19 @@ def stats_search(request):
             messages.error(request, 'Invalid aggregation operator or field')
             return create_stats_search_page(request)
 
+        # determine the group divider indices
+        try:
+            chart_div_gindex = int(request.POST.get('chart_div_gindex', 0));
+            if chart_div_gindex < 0 or chart_div_gindex > len(groups):
+                raise ValueError
+
+            table_div_gindex = int(request.POST.get('table_div_gindex', 0));
+            if table_div_gindex < -1 or table_div_gindex > len(groups):
+                raise ValueError
+        except (KeyError, ValueError):
+            messages.error(request, 'Invalid divider value: please use our search form')
+            return create_stats_search_page(request)
+
         output = create_output(grouped_data)
         return HttpResponse(output, content_type='text/plain')
     else:

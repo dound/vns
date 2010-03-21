@@ -17,6 +17,12 @@
  * AGGR_OPS_* and <prefix>aggr_field specifies what field the operator is
  * performed on (if applicable).
  *
+ * Fields which control output are also posted.  <prefix>chart_div_gindex and
+ * <prefix>table_div_gindex indicate where to split groupings between domain
+ * and series lines (for charts) and between columns and rows (for tables).
+ * These two values are not included when there is only one choice as to where
+ * the divider may be positioned.
+ *
  * URL parameters can be used to initialize the filters.  To have filters
  * automatically created pass the following parameters:
  *     <prefix><type>_num_filters - number of filters to create
@@ -28,9 +34,11 @@
  *     <prefix>num_groups
  *     <prefix>group<group#>_<field>
  *
- * Aggregate form fields can also be initialized from URL paramters:
+ * Aggregate and divider form fields can also be initialized from URL paramters:
  *     <prefix>aggr_field
  *     <prefix>aggr_op
+ *     <prefix>chart_div_gindex
+ *     <prefix>table_div_gindex
  *
  * @param prefix       Text to prefix each input field with
  * @param gfield_infos An of information about groupable fields.  Same structure
@@ -527,6 +535,90 @@ function createModelSearch(prefix, gfield_infos, sfield_infos, afield_infos, inc
         this.extra_opt_value.value = extra_opt_value;
     };
 
+    /** A divider which records its position between groups. */
+    function Divider(parent, min_pos, name, bgcolor, title, caption) {
+        var me = this, spanTxt;
+        this.parent = parent;
+        this.min_pos = min_pos;
+        this.after_group_index = 0;
+
+        this.container = document.createElement('div');
+        this.container.style.backgroundColor = bgcolor;
+
+        this.btnUp = createOrdinaryButton("/\\");
+        this.btnUp.onclick = function () { me.move_up(); };
+        this.container.appendChild(this.btnUp);
+
+        this.btnDown = createOrdinaryButton("\\/");
+        this.btnDown.onclick = function () { me.move_down(); };
+        this.container.appendChild(this.btnDown);
+
+        spanTxt = document.createElement('span');
+        spanTxt.innerHTML = '<b>' + title + '</b>: <span style="font-size:0.8em;">' + caption + "</span>";
+        this.container.appendChild(spanTxt);
+
+        this.hiddenInput = document.createElement('input');
+        this.hiddenInput.setAttribute('name', name);
+        this.hiddenInput.setAttribute('type', 'hidden');
+        this.hiddenInput.value = this.after_group_index;
+        this.container.appendChild(this.hiddenInput);
+    }
+
+    /** moves the divider down one, if possible */
+    Divider.prototype.move_down = function () {
+        this.set_after_group_index(this.after_group_index + 1);
+    };
+
+    /** moves the divider up one, if possible */
+    Divider.prototype.move_up = function () {
+        this.set_after_group_index(this.after_group_index - 1);
+    };
+
+    /** Refresh the location and state of this divider. */
+    Divider.prototype.refresh_ui = function () {
+        var group_container;
+
+        // show the divider in the correct position
+        this.remove_from_ui();
+        if(this.parent.groups.length - 1 <= this.min_pos) {
+            return; // don't show the divider if there is no choice about where to put it
+        }
+        else if(this.after_group_index < 0) {
+            group_container = this.parent.groups[0].container;
+            group_container.insertBefore(this.container, group_container.firstChild);
+        }
+        else {
+            group_container = this.parent.groups[this.after_group_index].container;
+            group_container.appendChild(this.container);
+        }
+
+        // enable the buttons which can be used now
+        this.btnUp.disabled = (this.after_group_index == this.min_pos);
+        this.btnDown.disabled = (this.after_group_index == this.parent.groups.length-1);
+    };
+
+    /** removes the divider from the UI, if present */
+    Divider.prototype.remove_from_ui = function () {
+        if(this.container.parentNode) {
+            this.container.parentNode.removeChild(this.container);
+        }
+    };
+
+    /** Sets the index of the group this divider appears after. */
+    Divider.prototype.set_after_group_index = function (i) {
+        if(this.parent.groups.length <= this.min_pos || i < this.min_pos) {
+            this.after_group_index = this.min_pos;
+        }
+        else if(i >= this.parent.groups.length) {
+            this.after_group_index = this.parent.groups.length - 1;
+        }
+        else {
+            this.after_group_index = i;
+        }
+        this.hiddenInput.value = this.after_group_index;
+        this.refresh_ui();
+    };
+
     // setup groups
     function Groups(groups_node) {
         var me = this, aggr_field, aggr_op, aggr_container, aggr_extra_container;
@@ -584,6 +676,10 @@ function createModelSearch(prefix, gfield_infos, sfield_infos, afield_infos, inc
         this.aggr_op = aggr_op;
         this.aggr_field = aggr_field;
 
+        // setup dividers
+        this.chart_divider = new Divider(me, 0, prefix + 'chart_div_gindex', '#CCCCFF', 'Chart Output Divider', "groups above this will appear as part x-axis domain.  Groups below will appear as lines on the plot.");
+        this.table_divider = new Divider(me, -1, prefix + 'table_div_gindex', '#CCFFCC', 'Table Output Divider', "groups above this will get their own column.  Groups below will appear as sub-columns within their parent group's column.");
+
         this.populate_from_url();
     }
 
@@ -601,6 +697,7 @@ function createModelSearch(prefix, gfield_infos, sfield_infos, afield_infos, inc
         // hide the default contents
         this.default_contents.style.display = 'none';
         this.btnAddGroup.innerHTML = 'Add another grouping';
+        this.refresh_dividers();
         return this.groups[this.groups.length - 1];
     };
 
@@ -625,6 +722,8 @@ function createModelSearch(prefix, gfield_infos, sfield_infos, afield_infos, inc
             this.default_contents.style.display = 'block';
             this.btnAddGroup.innerHTML = 'Add a grouping';
         }
+
+        this.refresh_dividers();
     };
 
     /** Creates groups and aggregation op from parsed URL parameters. */
@@ -652,8 +751,23 @@ function createModelSearch(prefix, gfield_infos, sfield_infos, afield_infos, inc
             group = this.add_group();
             group.set(field, op, v, ov);
         }
+
+        // handle dividers
+        i = get_url_param(prefix + "chart_div_gindex");
+        if(i !== null) {
+            this.chart_divider.set_after_group_index(i);
+        }
+        i = get_url_param(prefix + "table_div_gindex");
+        if(i !== null) {
+            this.table_divider.set_after_group_index(i);
+        }
+        this.refresh_dividers();
     };
 
+    Groups.prototype.refresh_dividers = function (gname) {
+        this.chart_divider.refresh_ui();
+        this.table_divider.refresh_ui();
+    };
 
     // create each of the filter sets
     new FilterSet(true, inclusive_node);
