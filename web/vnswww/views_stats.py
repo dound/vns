@@ -363,9 +363,13 @@ class Group():
         self.op_index = op_index
         self.extra_value = extra_value
 
+        self.field_name_long = None
         self.field_name = None
         self.op = None
         self.align_to_0 = True
+
+    def get_field_name_long(self):
+        return self.field_name_long
 
     def set(self, kind, value):
         """Sets the field specified by kind to the specified value.  ValueError
@@ -389,13 +393,13 @@ class Group():
             raise IndexError('missing group field')
 
         try:
-            field_name_long, ops = self.groupable_views_ordered[self.field_index]
+            self.field_name_long, ops = self.groupable_views_ordered[self.field_index]
         except IndexError:
             raise IndexError('invalid group field')
 
         self.field_name = None
         for n, v, _ in self.groupable_views:
-            if field_name_long == v:
+            if self.field_name_long == v:
                 self.field_name = n
                 break
         if not self.field_name:
