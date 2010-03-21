@@ -440,7 +440,7 @@ class Group():
         if self.op == 'distinct values':
             f = lambda r : get_group_field_value(r)
         elif self.op == 'first characters':
-            f = lambda r : get_group_field_value(r)[:self.extra_value]
+            f = lambda r : get_group_field_value(r)[:int(self.extra_value)]
         elif self.op == 'date':
             f = lambda r : get_group_field_value(r).date()
         elif self.op == 'day of month':
@@ -467,7 +467,7 @@ class Group():
         max_value = sorted_kv_list[-1][0]
         range = float(max_value - min_value)
         if self.op == 'equi-width buckets':
-            f_bucket_width = lambda i : float(self.extra_value)
+            f_bucket_width = lambda i : self.extra_value
             #num_buckets = math.ceil(range / f_bucket_width())
         elif self.op == 'fixed # of buckets':
             num_buckets = int(self.extra_value)
@@ -475,7 +475,7 @@ class Group():
                 raise ValueError('There must be at least one bucket.')
             f_bucket_width = lambda i : range / num_buckets
         elif self.op == 'log-width buckets':
-            log_base = float(self.extra_value)
+            log_base = self.extra_value
             num_buckets = math.ceil(math.log(max_value, log_base))
             f_bucket_width = lambda i : math.pow(log_base, i)
         else:
