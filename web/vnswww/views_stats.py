@@ -520,19 +520,22 @@ def get_filtered_data(model, exclusive_filters, inclusive_filters):
             return model.objects.exclude(exclusive_q).filter(inclusive_q)
 
 class GroupNode():
-    def __init__(self, records, groupings, aggr_op, aggr_field):
+    def __init__(self, records, groupings, aggr_op, aggr_field, bmin=None, bmax=None):
+        self.bmin = bmin
+        self.bmax = bmax
+
         # if there are no more groupings, then just return the records
         if not groupings:
-            self.leaf = True
             self.records = records
             self.groups = None
             self.aggregated_value = self.__aggregate(aggr_op, aggr_field)
+            self.field_on = aggr_field
         else:
-            self.leaf = False
             self.records = None
             groups_of_records = groupings[0].apply(records)
+            self.field_on = groupings[0].get_field_name_long()
             subgroupings = groupings[1:]
-            self.groups = [(bmin, bmax, GroupNode(recs, subgroupings, aggr_op, aggr_field)) for bmin, bmax, recs in groups_of_records]
+            self.groups = [GroupNode(recs, subgroupings, aggr_op, aggr_field, bmin, bmax) for bmin, bmax, recs in groups_of_records]
             self.aggregated_value = None
 
     def __aggregate(self, how, field_name=None):
@@ -575,8 +578,11 @@ class GroupNode():
     def get_aggregation_value(self):
         return self.aggregated_value
 
+    def get_field_on(self):
+        return self.field_on
+
     def is_leaf(self):
-        return self.leaf
+        return self.groups is None
 
     def get_groups(self):
         return self.groups
@@ -602,7 +608,7 @@ def create_output(group_node, indent_sz=0, group_num=-1, group_range=None):
         ret = '' if group_num < 0 else '%sGroup %d %s(%d results) (aggr val=%s):\n' % (txt_indent, group_num, range_txt, len(recs), aggr_txt)
         return ret + txt_indent + ('\n%s' % txt_indent).join(str(r) for r in recs) + '\n'
     else:
-        return '\n'.join(create_output(sgn, indent_sz+2, i+1, (bmin,bmax)) for i, (bmin, bmax, sgn) in enumerate(group_node.get_groups()))
+        return '\n'.join(create_output(sgn, indent_sz+2, i+1, (sgn.bmin,sgn.bmax)) for i, sgn in enumerate(group_node.get_groups()))
 
 class TemplateSearchDesc(ModelSearchDescription):
     model = db.TopologyTemplate
