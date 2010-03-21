@@ -429,7 +429,7 @@ function createModelSearch(prefix, gfield_infos, sfield_infos, afield_infos, inc
 
     /** Manages a single grouping. */
     function Group(parent, gname, container, n) {
-        var me = this, field_choices, op_choices, extra_container, extra_value, extra_value_desc, extra_opt_container, extra_opt, btnRm;
+        var me = this, field_choices, op_choices, extra_container, extra_value, extra_value_desc, extra_opt_container, extra_opt_value, btnRm;
         this.parent = parent;
         this.gname = gname;
         this.container = container;
