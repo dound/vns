@@ -557,12 +557,12 @@ function createModelSearch(prefix, gfield_infos, sfield_infos, afield_infos, inc
         aggr_extra_container = document.createElement('span');
         aggr_extra_container.appendChild(document.createTextNode(' of '));
         aggr_field = document.createElement('select');
-        aggr_field.setAttribute('name', 'aggr_field');
+        aggr_field.setAttribute('name', prefix + 'aggr_field');
         aggr_field.innerHTML = A_FIELD_OPTIONS;
         aggr_extra_container.appendChild(aggr_field);
 
         aggr_op = document.createElement('select');
-        aggr_op.setAttribute('name', 'aggr_op');
+        aggr_op.setAttribute('name', prefix + 'aggr_op');
         aggr_op.innerHTML = A_OPERATORS_OPTIONS;
         aggr_op.onchange = function () {
             // show the number of value fields as appropriate
@@ -632,8 +632,8 @@ function createModelSearch(prefix, gfield_infos, sfield_infos, afield_infos, inc
         var i, field, gprefix, group, num_groups, op, v, ov;
 
         // handle aggregation
-        this.aggr_op.value = get_url_param("aggr_op");
-        this.aggr_field.selectedIndex = get_url_param("aggr_field");
+        this.aggr_op.value = get_url_param(prefix + "aggr_op");
+        this.aggr_field.selectedIndex = get_url_param(prefix + "aggr_field");
         this.aggr_op.onchange();
 
         num_groups = get_url_param(prefix + "num_groups");
@@ -654,7 +654,6 @@ function createModelSearch(prefix, gfield_infos, sfield_infos, afield_infos, inc
         }
     };
 
-    /** TODO: manage aggregation form elements */
 
     // create each of the filter sets
     new FilterSet(true, inclusive_node);
