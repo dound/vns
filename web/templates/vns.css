@@ -47,7 +47,8 @@ table.vert th {
     min-height:500px;
     padding-top: 1px;
     padding-left: 10px;
-    width: 845px;
+    padding-right: 10px;
+    width: 835px;
     color: #000000;
     border-left: thin solid black;
     background-color: #FFFFFF;
