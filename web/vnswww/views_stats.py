@@ -369,6 +369,8 @@ class Group():
         self.align_to_0 = True
 
     def get_field_name_long(self):
+        if self.field_name_long is None:
+            self.prepare_for_use()
         return self.field_name_long
 
     def set(self, kind, value):
@@ -520,7 +522,7 @@ def get_filtered_data(model, exclusive_filters, inclusive_filters):
             return model.objects.exclude(exclusive_q).filter(inclusive_q)
 
 class GroupNode():
-    def __init__(self, records, groupings, aggr_op, aggr_field, bmin=None, bmax=None):
+    def __init__(self, records, groupings, aggr_op, aggr_field, aggr_field_view_name, bmin=None, bmax=None):
         self.bmin = bmin
         self.bmax = bmax
 
@@ -529,14 +531,19 @@ class GroupNode():
             self.records = records
             self.groups = None
             self.aggregated_value = self.__aggregate(aggr_op, aggr_field)
-            self.field_on = aggr_field
+            self.field_on = aggr_field_view_name
         else:
             self.records = None
             groups_of_records = groupings[0].apply(records)
             self.field_on = groupings[0].get_field_name_long()
             subgroupings = groupings[1:]
-            self.groups = [GroupNode(recs, subgroupings, aggr_op, aggr_field, bmin, bmax) for bmin, bmax, recs in groups_of_records]
+            self.groups = [GroupNode(recs, subgroupings, aggr_op, aggr_field, aggr_field_view_name, bmin, bmax) for bmin, bmax, recs in groups_of_records]
             self.aggregated_value = None
+
+        if self.bmin == self.bmax:
+            self.range_str = str(self.bmin)
+        else:
+            self.range_str = '%s-%s' % (self.bmin, self.bmax)
 
     def __aggregate(self, how, field_name=None):
         """Aggregates the records in this group into a representative value
@@ -575,6 +582,12 @@ class GroupNode():
         else:
             raise KeyError('unknown aggregation operator: %s' % how)
 
+    def get_leftmost(self):
+        if self.leaf():
+            return self
+        else:
+            return self.groups[0]
+
     def get_aggregation_value(self):
         return self.aggregated_value
 
@@ -587,11 +600,55 @@ class GroupNode():
     def get_groups(self):
         return self.groups
 
+    def get_range_str(self):
+        return self.range_str
+
     def get_records(self):
         return self.records
 
+    def get_range_tuples(self, min_depth, max_depth, depth=0, prefix=()):
+        """Gets every "range tuple" from min_depth (inclusive) to max_depth (exclusive)."""
+        if depth >= min_depth+1:
+            my_prefix = tuple(list(prefix) + [self.get_range_str()])
+        else:
+            my_prefix = ()
 
-def create_output(group_node, indent_sz=0, group_num=-1, group_range=None):
+        if depth >= max_depth:
+            return [my_prefix] if len(my_prefix)>0 else []
+        else:
+            ret = []
+            if self.groups:
+                for gn in self.groups:
+                    ret.extend(gn.get_range_tuples(min_depth, max_depth, depth+1, my_prefix))
+            return ret
+
+    def yield_data(self, min_depth, max_depth, depth=0, prefix=()):
+        """Yields a 3-tuple for every record contain (range tuple from min to
+        max depth, range tuple for the remaining depths, aggregate value)."""
+        if depth >= min_depth+1:
+            my_prefix = tuple(list(prefix) + [self.get_range_str()])
+        else:
+            my_prefix = ()
+
+        if depth >= max_depth:
+            for gn in self.groups:
+                for d in gn.__yield_data_only(my_prefix, ()):
+                    yield d
+        else:
+            for gn in self.groups:
+                for d in gn.yield_data(min_depth, max_depth, depth+1, my_prefix):
+                    yield d
+
+    def __yield_data_only(self, prefix1, prefix2):
+        my_prefix = tuple(list(prefix2) + [self.get_range_str()])
+        if self.is_leaf():
+            yield (prefix1, my_prefix, self.get_aggregation_value())
+        else:
+            for gn in self.groups:
+                for d in gn.__yield_data_only(prefix1, my_prefix):
+                    yield d
+
+def create_output_dump(group_node, indent_sz=0, group_num=-1, group_range=None):
     if group_node.is_leaf():
         txt_indent = ' ' * indent_sz
         recs = group_node.get_records()
@@ -608,7 +665,101 @@ def create_output(group_node, indent_sz=0, group_num=-1, group_range=None):
         ret = '' if group_num < 0 else '%sGroup %d %s(%d results) (aggr val=%s):\n' % (txt_indent, group_num, range_txt, len(recs), aggr_txt)
         return ret + txt_indent + ('\n%s' % txt_indent).join(str(r) for r in recs) + '\n'
     else:
-        return '\n'.join(create_output(sgn, indent_sz+2, i+1, (sgn.bmin,sgn.bmax)) for i, sgn in enumerate(group_node.get_groups()))
+        return '\n'.join(create_output_dump(sgn, indent_sz+2, i+1, (sgn.bmin,sgn.bmax)) for i, sgn in enumerate(group_node.get_groups()))
+
+def create_table_output(group_fields_for_view, aggr_field_for_view, group_node, div_index):
+    h = len(group_fields_for_view) + 1
+    num_row_groups = div_index + 1       # 1 row per value in each row group
+    num_col_groups = h - num_row_groups - 1  # 1 col per value in each col group
+
+    num_hdr_rows = num_col_groups + 1
+    num_hdr_cols = num_row_groups
+
+    row_combos = list(set(group_node.get_range_tuples(0, num_row_groups)))
+    row_combos.sort()
+    col_combos = list(set(group_node.get_range_tuples(num_row_groups, h - 1)))
+    col_combos.sort()
+    txt = ''
+    txt += '\nRCs: %s' % ' ;; '.join([str(t) for t in row_combos])
+    txt += '\nCCs: %s' % ' ;; '.join([str(t) for t in col_combos])
+
+    num_col_combos = len(col_combos)
+    num_row_combos = len(row_combos)
+
+    # build the first row
+    fmt = '<th class="tbl_hdr_rowgrp"%s>%%s</th>' % ('' if num_hdr_rows == 1 else ' rowspan="%d"' % num_hdr_rows)
+    hdr_row1_cols = '\n'.join(fmt % gfn for gfn in group_fields_for_view[:num_row_groups])
+    hdr_row1_cols += '\n\t\t<th class="tbl_hdr_aggr" colspan="%d">%s</th>' % (num_col_combos, aggr_field_for_view)
+
+    # build other header cells (for header rows at the top)
+    header_cells = [[None]*num_col_combos for _ in range(num_col_groups)]
+    col_map = {}  # maps a tuple of col groups to the column index it is in
+    for i, cc in enumerate(col_combos):
+        col_map[cc] = i + num_row_groups
+        for j, v in enumerate(cc):
+            header_cells[j][i] = v
+
+    # create the actual header rows, merging cells which contain equivalent
+    # values in adjacent columns
+    cols_for_hdr_rows = [hdr_row1_cols]
+    for row in header_cells:
+        hdr_row = ''
+        for i, v in enumerate(row):
+            if v is not None:
+                colspan = 1
+                for j in xrange(i+1, num_col_combos):
+                    if v == row[j]:
+                        row[j] = None
+                        colspan += 1
+                    else:
+                        break
+                colspan_txt = '' if colspan==1 else ' colspan="%d"' % colspan
+                hdr_row += '\n\t\t<th class="tbl_hdr_colgrp"%s>%s</th>' % (colspan_txt, v)
+        cols_for_hdr_rows.append(hdr_row)
+    hdr_rows = '\n'.join('\t<tr>\n\t\t%s\n\t</tr>' % cols for cols in cols_for_hdr_rows)
+
+    # create a matrix to hold the rest of the table's data
+    data_cells = [[None]*(num_row_groups+num_col_combos) for _ in range(num_row_combos)]
+
+    # build other header cells (for header cols on the left)
+    row_map = {}
+    for i in xrange(num_row_combos):
+        row_combo = row_combos[i]
+        row_map[row_combo] = i
+        for j in xrange(num_row_groups):
+            data_cells[i][j] = row_combo[j]
+
+    # collect each row of data (key = row range tuple)
+    row_on = last_row = None
+    debug_txt = ''
+    for row_prefix, col_prefix, aggr_val in group_node.yield_data(0, num_row_groups):
+        debug_txt += '<br/>  %s ;; %s ;;=> %s\n' % (row_prefix, col_prefix, aggr_val)
+        col_on = col_map[col_prefix]
+        if last_row != row_prefix:
+            row_on = row_map[row_prefix] # usually row_on will be increasing sequentially, but only if records naturally appear in "order"
+            last_row = row_prefix
+        data_cells[row_on][col_on] = aggr_val
+
+    # create the header cells text, merging where possible
+    data_rows = ''
+    for row_on, row in enumerate(data_cells):
+        hdr_txt = ''
+        for col_on in xrange(num_row_groups):
+            v = row[col_on]
+            if v is not None:
+                rowspan = 1
+                for r in xrange(row_on, len(data_cells)):
+                    if data_cells[r][col_on] is None:
+                        rowspan += 1
+                    else:
+                        break
+                rowspan_txt = '' if rowspan==1 else ' rowspan="%d"' % rowspan
+                hdr_txt += '<th%s>%s</th>' % (rowspan_txt, v)
+            else:
+                pass # merged into another cell
+        data_rows += '\n\t<tr>' + hdr_txt + ''.join('<td>%s</td>' % ('&nbsp;' if c is None else c) for c in row[num_row_groups:]) + '</tr>'
+
+    return '<table class="tbl_results" border="1px">\n' + hdr_rows + '\n' + data_rows + '\n</table>' + '\n\n' + txt + '\n\n' + debug_txt
 
 class TemplateSearchDesc(ModelSearchDescription):
     model = db.TopologyTemplate
@@ -706,6 +857,10 @@ def stats_search(request):
             aggr_op = request.POST['aggr_op']
             aggr_field_index = int(request.POST['aggr_field'])
             aggr_field = SD_USAGE_STATS.get_aggregatable_fields()[aggr_field_index]
+            if aggr_op == 'count':
+                aggr_field_for_view = 'Count'
+            else:
+                aggr_field_for_view = SD_USAGE_STATS.get_aggregatable_fields_for_view()[aggr_field_index]
         except (KeyError, IndexError, ValueError):
             messages.error(request, 'Missing or invalid aggregation operator info: please use our search form')
             return create_stats_search_page(request)
@@ -721,8 +876,9 @@ def stats_search(request):
         group_ids = groups.keys()
         group_ids.sort()
         groups = [groups[g_id] for g_id in group_ids]
+        group_field_names_long = [g.get_field_name_long() for g in groups]
         try:
-            grouped_data = GroupNode(data, groups, aggr_op, aggr_field)
+            grouped_data = GroupNode(data, groups, aggr_op, aggr_field, aggr_field_for_view)
         except IndexError as e:
             # user has supplied a bad field or operator: they didn't use our form
             messages.error(request, 'Invalid grouping: ' + str(e))
@@ -744,7 +900,16 @@ def stats_search(request):
             messages.error(request, 'Invalid divider value: please use our search form')
             return create_stats_search_page(request)
 
+        if len(group_ids) == 0:
+            # no groups => aggregates into just a single value
+            val = grouped_data.get_aggregation_value()
+            output = '%s = %s' % (aggr_field_for_view, val)
+            return HttpResponse(output, content_type='text/plain')
+
         output = create_output(grouped_data)
-        return HttpResponse(output, content_type='text/plain')
+        #return HttpResponse(output, content_type='text/plain')
+
+        table_output = create_table_output(group_field_names_long, aggr_field_for_view, grouped_data, table_div_gindex)
+        return HttpResponse(table_output, content_type='text/html')
     else:
         return create_stats_search_page(request)
