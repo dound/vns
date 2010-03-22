@@ -561,6 +561,9 @@ class GroupNode():
 
         get_group_field_value = make_getter(field_name)
         vals = (get_group_field_value(r) for r in self.records)
+        if how == 'unique count':
+            return len(set(vals))
+
         # all of the remaining operators require at least one record
         if len(self.records) == 0:
             return None
@@ -581,6 +584,25 @@ class GroupNode():
                 return (vals_list[mid_index] + vals_list[mid_index+1]) / 2.0
             else:
                 return vals_list[mid_index]
+        elif how == 'mode':
+            counts = {}
+            for v in vals:
+                try:
+                    counts[v] += 1
+                except KeyError:
+                    counts[v] = 1
+            maxks = []
+            maxv = 0
+            for k, v in counts.iteritems():
+                if v > maxv:
+                    maxv = v
+                    maxks = [k]
+                elif v == maxv:
+                    maxks.append(k)
+            if len(maxks) == 1:
+                return maxks[0]
+            else:
+                return '[%s]' % ','.join(str(k) for k in maxks)
         else:
             raise KeyError('unknown aggregation operator: %s' % how)
 

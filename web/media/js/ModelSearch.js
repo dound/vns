@@ -61,7 +61,7 @@ function createModelSearch(prefix, gfield_infos, sfield_infos, afield_infos, inc
     var G_OP_HAS_ALIGN_TO_0_OPT = ['fixed # of buckets', 'equi-width buckets', 'log-width buckets'];
     var G_ALIGN_TO_0_OPT_OPTIONS = "<option value='0'>Start At 0</option><option value='min'>Start At Min</option>";
     var AGGR_OPS_NULLARY = ['count'];
-    var AGGR_OPS_UNARY = ['average', 'max', 'median', 'min', 'sum'];
+    var AGGR_OPS_UNARY = ['average', 'unique count', 'max', 'median', 'min', 'mode', 'sum'];
 
     // build option element html for field options and fields' operator options
     var G_FIELD_OPTIONS, G_OPERATORS_OPTIONS, S_FIELD_OPTIONS, S_OPERATORS_OPTIONS, A_FIELD_OPTIONS, A_OPERATORS_OPTIONS;
