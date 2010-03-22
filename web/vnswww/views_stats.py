@@ -714,22 +714,15 @@ def prepare_combos(combos):
     deco.sort()
     return [t for _,t in deco]
 
-def create_table_output(group_fields_for_view, aggr_field_for_view, group_node, div_index):
+def __compile_data_for_output(group_fields_for_view, group_node, div_index):
     h = len(group_fields_for_view) + 1
     num_row_groups = div_index + 1       # 1 row per value in each row group
     num_col_groups = h - num_row_groups - 1  # 1 col per value in each col group
-
-    num_hdr_rows = num_col_groups + 1
 
     row_combos = prepare_combos(group_node.get_range_tuples(0, num_row_groups))
     col_combos = prepare_combos(group_node.get_range_tuples(num_row_groups, h - 1))
     num_col_combos = len(col_combos)
     num_row_combos = len(row_combos)
-
-    # build the first row
-    fmt = '<th class="tbl_hdr_rowgrp"%s>%%s</th>' % ('' if num_hdr_rows == 1 else ' rowspan="%d"' % num_hdr_rows)
-    hdr_row1_cols = '\n'.join(fmt % gfn for gfn in group_fields_for_view[:num_row_groups])
-    hdr_row1_cols += '\n\t\t<th class="tbl_hdr_aggr" colspan="%d">%s</th>' % (num_col_combos, aggr_field_for_view)
 
     # build other header cells (for header rows at the top)
     header_cells = [[None]*num_col_combos for _ in range(num_col_groups)]
@@ -738,6 +731,38 @@ def create_table_output(group_fields_for_view, aggr_field_for_view, group_node, 
         col_map[cc] = i + num_row_groups
         for j, v in enumerate(cc):
             header_cells[j][i] = v
+
+    # create a matrix to hold the rest of the table's data
+    data_cells = [[None]*(num_row_groups+num_col_combos) for _ in range(num_row_combos)]
+
+    # build other header cells (for header cols on the left)
+    row_map = {}
+    for i in xrange(num_row_combos):
+        row_combo = row_combos[i]
+        row_map[row_combo] = i
+        for j in xrange(num_row_groups):
+            data_cells[i][j] = row_combo[j]
+
+    # collect each row of data (key = row range tuple)
+    row_on = None
+    for row_prefix, col_prefix, aggr_val in group_node.yield_data(0, num_row_groups):
+        col_on = col_map[col_prefix]
+        row_on = row_map[row_prefix] # usually row_on will be increasing sequentially, but only if records naturally appear in "order"
+        data_cells[row_on][col_on] = aggr_val
+
+    return (row_combos, col_combos, header_cells, data_cells)
+
+def create_table_output(group_fields_for_view, aggr_field_for_view, group_node, div_index):
+    compiled_data = __compile_data_for_output(group_fields_for_view, group_node, div_index)
+    _, col_combos, header_cells, data_cells = compiled_data
+    num_col_combos = len(col_combos)
+    num_row_groups = div_index + 1       # 1 row per value in each row group
+
+    # build the first row
+    num_hdr_rows = len(group_fields_for_view) - num_row_groups + 1
+    fmt = '<th class="tbl_hdr_rowgrp"%s>%%s</th>' % ('' if num_hdr_rows == 1 else ' rowspan="%d"' % num_hdr_rows)
+    hdr_row1_cols = '\n'.join(fmt % gfn for gfn in group_fields_for_view[:num_row_groups])
+    hdr_row1_cols += '\n\t\t<th class="tbl_hdr_aggr" colspan="%d">%s</th>' % (num_col_combos, aggr_field_for_view)
 
     # create the actual header rows, merging cells which contain equivalent
     # values in adjacent columns
@@ -757,24 +782,6 @@ def create_table_output(group_fields_for_view, aggr_field_for_view, group_node, 
                 hdr_row += '\n\t\t<th class="tbl_hdr_colgrp"%s>%s</th>' % (colspan_txt, v)
         cols_for_hdr_rows.append(hdr_row)
     hdr_rows = '\n'.join('\t<tr>\n\t\t%s\n\t</tr>' % cols for cols in cols_for_hdr_rows)
-
-    # create a matrix to hold the rest of the table's data
-    data_cells = [[None]*(num_row_groups+num_col_combos) for _ in range(num_row_combos)]
-
-    # build other header cells (for header cols on the left)
-    row_map = {}
-    for i in xrange(num_row_combos):
-        row_combo = row_combos[i]
-        row_map[row_combo] = i
-        for j in xrange(num_row_groups):
-            data_cells[i][j] = row_combo[j]
-
-    # collect each row of data (key = row range tuple)
-    row_on = None
-    for row_prefix, col_prefix, aggr_val in group_node.yield_data(0, num_row_groups):
-        col_on = col_map[col_prefix]
-        row_on = row_map[row_prefix] # usually row_on will be increasing sequentially, but only if records naturally appear in "order"
-        data_cells[row_on][col_on] = aggr_val
 
     # create the header cells text, merging where possible
     data_rows = ''
