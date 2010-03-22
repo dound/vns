@@ -667,22 +667,22 @@ def create_output_dump(group_node, indent_sz=0, group_num=-1, group_range=None):
     else:
         return '\n'.join(create_output_dump(sgn, indent_sz+2, i+1, (sgn.bmin,sgn.bmax)) for i, sgn in enumerate(group_node.get_groups()))
 
+def prepare_combos(combos):
+    """Returns combos sorted in a case-insensitive order and removes duplicates."""
+    f = lambda x : x.lower() if isinstance(x,basestring) else x
+    deco = [(tuple(f(e) for e in t), t) for t in set(combos)]
+    deco.sort()
+    return [t for _,t in deco]
+
 def create_table_output(group_fields_for_view, aggr_field_for_view, group_node, div_index):
     h = len(group_fields_for_view) + 1
     num_row_groups = div_index + 1       # 1 row per value in each row group
     num_col_groups = h - num_row_groups - 1  # 1 col per value in each col group
 
     num_hdr_rows = num_col_groups + 1
-    num_hdr_cols = num_row_groups
 
-    row_combos = list(set(group_node.get_range_tuples(0, num_row_groups)))
-    row_combos.sort()
-    col_combos = list(set(group_node.get_range_tuples(num_row_groups, h - 1)))
-    col_combos.sort()
-    txt = ''
-    txt += '\nRCs: %s' % ' ;; '.join([str(t) for t in row_combos])
-    txt += '\nCCs: %s' % ' ;; '.join([str(t) for t in col_combos])
-
+    row_combos = prepare_combos(group_node.get_range_tuples(0, num_row_groups))
+    col_combos = prepare_combos(group_node.get_range_tuples(num_row_groups, h - 1))
     num_col_combos = len(col_combos)
     num_row_combos = len(row_combos)
 
@@ -730,36 +730,43 @@ def create_table_output(group_fields_for_view, aggr_field_for_view, group_node, 
             data_cells[i][j] = row_combo[j]
 
     # collect each row of data (key = row range tuple)
-    row_on = last_row = None
-    debug_txt = ''
+    row_on = None
     for row_prefix, col_prefix, aggr_val in group_node.yield_data(0, num_row_groups):
-        debug_txt += '<br/>  %s ;; %s ;;=> %s\n' % (row_prefix, col_prefix, aggr_val)
         col_on = col_map[col_prefix]
-        if last_row != row_prefix:
-            row_on = row_map[row_prefix] # usually row_on will be increasing sequentially, but only if records naturally appear in "order"
-            last_row = row_prefix
+        row_on = row_map[row_prefix] # usually row_on will be increasing sequentially, but only if records naturally appear in "order"
         data_cells[row_on][col_on] = aggr_val
 
     # create the header cells text, merging where possible
     data_rows = ''
+    merged_flag = object()
     for row_on, row in enumerate(data_cells):
         hdr_txt = ''
         for col_on in xrange(num_row_groups):
             v = row[col_on]
-            if v is not None:
+            if v is not None and v is not merged_flag:
                 rowspan = 1
-                for r in xrange(row_on, len(data_cells)):
-                    if data_cells[r][col_on] is None:
-                        rowspan += 1
+                for r in xrange(row_on+1, len(data_cells)):
+                    if data_cells[r][col_on] == v:
+                        all_cells_left_are_merged = True
+                        for k in xrange(col_on):
+                            if data_cells[r][k] != merged_flag:
+                                all_cells_left_are_merged = False
+                                break
+                        if all_cells_left_are_merged:
+                            data_cells[r][col_on] = merged_flag
+                            rowspan += 1
+                        else:
+                            break
                     else:
                         break
                 rowspan_txt = '' if rowspan==1 else ' rowspan="%d"' % rowspan
                 hdr_txt += '<th%s>%s</th>' % (rowspan_txt, v)
             else:
                 pass # merged into another cell
+
         data_rows += '\n\t<tr>' + hdr_txt + ''.join('<td>%s</td>' % ('&nbsp;' if c is None else c) for c in row[num_row_groups:]) + '</tr>'
 
-    return '<table class="tbl_results" border="1px">\n' + hdr_rows + '\n' + data_rows + '\n</table>' + '\n\n' + txt + '\n\n' + debug_txt
+    return '<table class="tbl_results" border="1px">\n' + hdr_rows + '\n' + data_rows + '\n</table>'
 
 class TemplateSearchDesc(ModelSearchDescription):
     model = db.TopologyTemplate
@@ -860,7 +867,7 @@ def stats_search(request):
             if aggr_op == 'count':
                 aggr_field_for_view = 'Count'
             else:
-                aggr_field_for_view = SD_USAGE_STATS.get_aggregatable_fields_for_view()[aggr_field_index]
+                aggr_field_for_view = '%s of %s' % (aggr_op, SD_USAGE_STATS.get_aggregatable_fields_for_view()[aggr_field_index])
         except (KeyError, IndexError, ValueError):
             messages.error(request, 'Missing or invalid aggregation operator info: please use our search form')
             return create_stats_search_page(request)
@@ -906,10 +913,7 @@ def stats_search(request):
             output = '%s = %s' % (aggr_field_for_view, val)
             return HttpResponse(output, content_type='text/plain')
 
-        output = create_output(grouped_data)
-        #return HttpResponse(output, content_type='text/plain')
-
         table_output = create_table_output(group_field_names_long, aggr_field_for_view, grouped_data, table_div_gindex)
-        return HttpResponse(table_output, content_type='text/html')
+        return direct_to_template(request, 'vns/search_results.html', {'table':table_output})
     else:
         return create_stats_search_page(request)

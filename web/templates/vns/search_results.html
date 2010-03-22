@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% load custom_filters %}
+
+{% block titlebar %}Search Results for Usage Statistics{% endblock %}
+{% block title %}Search Results for Usage Statistics{% endblock %}
+{% block head %}
+<style type="text/css">
+    <!--
+    #sidebar {
+        display:none;
+    }
+    #wrap_main, #main, #content {
+        width:auto;
+    }
+    -->
+</style>
+{% endblock %}
+
+{% block content %}
+<p>(<a href="/stats/search">new search</a>) (<a href="/">home</a>)</p>
+{% autoescape off %}
+{{ chart }}
+{{ table }}
+{% endautoescape %}
+{% endblock %}
