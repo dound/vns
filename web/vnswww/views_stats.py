@@ -910,8 +910,8 @@ def stats_search(request):
         if len(group_ids) == 0:
             # no groups => aggregates into just a single value
             val = grouped_data.get_aggregation_value()
-            output = '%s = %s' % (aggr_field_for_view, val)
-            return HttpResponse(output, content_type='text/plain')
+            d = {'single': '%s = %s' % (aggr_field_for_view, val)}
+            return direct_to_template(request, 'vns/search_results.html', d)
 
         table_output = create_table_output(group_field_names_long, aggr_field_for_view, grouped_data, table_div_gindex)
         return direct_to_template(request, 'vns/search_results.html', {'table':table_output})
