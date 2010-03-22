@@ -115,10 +115,10 @@ class SearchDescription():
         self.processed_searchable_fields_for_view = None
 
     def get_aggregatable_fields(self):
-        return [fn for vn, fn in self.aggregatable_items]
+        return [fn for _, fn in self.aggregatable_items]
 
     def get_aggregatable_fields_for_view(self):
-        return [vn for vn, fn in self.aggregatable_items]
+        return [vn for vn, _ in self.aggregatable_items]
 
     def get_groupable_fields(self):
         """Returns all groupable fields on the associated model as a 3-tuple
