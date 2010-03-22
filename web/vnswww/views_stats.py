@@ -436,7 +436,8 @@ class Group():
         """Returns a list of buckets.  Each bucket is a 3-tuple: (min value
         allowed (exclusive except for the first bucket), max value allowed
         (inclusive), list of items in the bucket).  If the min value and max
-        value are the same then only items with that value will be in the bucket."""
+        value are the same then only items with that value will be in the bucket.
+        Buckets may be empty."""
         if self.field_name is None:
             self.prepare_for_use()
 
@@ -560,6 +561,10 @@ class GroupNode():
 
         get_group_field_value = make_getter(field_name)
         vals = (get_group_field_value(r) for r in self.records)
+        # all of the remaining operators require at least one record
+        if len(self.records) == 0:
+            return None
+
         if how == 'min':
             return min(vals)
         elif how == 'max':
@@ -567,10 +572,7 @@ class GroupNode():
         elif how == 'sum':
             return sum(vals)
         elif how == 'average':
-            if len(self.records):
-                return sum(vals) / float(len(self.records))
-            else:
-                return None # undefined
+            return sum(vals) / float(len(self.records))
         elif how == 'median':
             vals_list = [v for v in vals]
             vals_list.sort()
@@ -589,6 +591,16 @@ class GroupNode():
             return self.groups[0]
 
     def get_aggregation_value(self):
+        """Returns the value of the aggregation of this group node.  This value
+        is numerical unless:
+          1) There are no records in this node and the operator requires at
+             least one record (then None is returned), OR
+          2) If the mode operator is used, then the value being extracted will
+             be the type of the value returned, or it will be a string if more
+             than one mode exists, OR
+          3) min or max is the operator and the value being operated on has cmp
+             defined but is not a number.
+        """
         return self.aggregated_value
 
     def get_field_on(self):
@@ -653,7 +665,13 @@ def create_output_dump(group_node, indent_sz=0, group_num=-1, group_range=None):
         txt_indent = ' ' * indent_sz
         recs = group_node.get_records()
         aggr_val = group_node.get_aggregation_value()
-        aggr_txt = 'n/a' if aggr_val is None else '%.2f' % aggr_val
+        if aggr_val is None:
+            aggr_txt = 'n/a'
+        elif type(aggr_val) is float:
+            aggr_txt = '%.2f' % aggr_val
+        else:
+            aggr_txt = str(aggr_val)
+
         if group_range is None:
             range_txt = ''
         else:
