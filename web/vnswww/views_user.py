@@ -96,7 +96,7 @@ class RegistrationForm(forms.Form):
     last_name  = forms.CharField(label='Last Name', max_length=30)
     email      = forms.CharField(label='E-mail Address', max_length=75)
     pw         = forms.CharField(label='Password', min_length=6, widget=forms.PasswordInput(render_value=False))
-    pos        = forms.ChoiceField(label='Position', choices=[(1, u'Student'), (4, u'TA')])
+    pos        = forms.ChoiceField(label='Position', choices=[(1, u'Student'), (4, u'TA'), (5, u'Student (Self-Guided)')])
 
     def clean_username(self):
         un = self.cleaned_data['username']
@@ -105,6 +105,11 @@ class RegistrationForm(forms.Form):
         return un
 
 def user_create(request):
+    # some students are "staff" but don't let them create new users
+    if request.user.get_profile().is_student():
+        messages.error(request, "You are not permitted to create new users.")
+        return HttpResponseRedirect('/')
+
     tn = 'vns/user_create.html'
     if request.method == 'POST':
         form = RegistrationForm(request.POST)

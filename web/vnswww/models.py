@@ -66,6 +66,7 @@ class UserProfile(Model):
         (1, u'Student'),
         (3, u'Instructor'),
         (4, u'TA'),
+        (5, u'Student (Self-Guided)'),
     )
 
     SIM_KEY_SZ = 64 # size in bytes
@@ -121,7 +122,7 @@ class UserProfile(Model):
         return self.pos != 1
 
     def is_student(self):
-        return self.pos == 1
+        return self.pos in (1, 5)
 
     def __unicode__(self):
         return u'%s' % self.user.__unicode__()
