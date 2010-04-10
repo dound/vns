@@ -259,6 +259,7 @@ class VNSSimulator:
         otherwise the first element is the topology."""
         try:
             topo = Topology(tid, self.raw_socket, client_ip, user)
+            topo.interactors = [] # list of TI connections to this topo
         except TopologyCreationException as e:
             return (None, str(e))
         except db.Topology.DoesNotExist:
@@ -314,6 +315,8 @@ class VNSSimulator:
                 topo.get_stats().finalize()
                 if topo.is_temporary():
                     AddressAllocation.free_topology(tid)
+                for ti_conn in topo.interactors:
+                    self.terminate_ti_connection(ti_conn, 'Topology %d has been shutdown' % tid)
 
     def handle_open_msg(self, conn, open_msg):
         # get the topology the client is trying to connect to
