@@ -14,7 +14,7 @@ from os.path import dirname
 import socket
 import sys
 from threading import Condition, Event, Lock
-from time import sleep, time
+from time import time
 
 from pcapy import open_live, PcapError
 from twisted.internet import reactor
