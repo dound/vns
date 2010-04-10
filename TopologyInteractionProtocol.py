@@ -40,6 +40,8 @@ TI_MESSAGES.append(TIOpen)
 class TINodePortHeader(LTMessage):
     def __init__(self, node_name, intf_name):
         LTMessage.__init__(self)
+        assert len(node_name)<=30, 'node_name may only be up to 30 characters'
+        assert len(intf_name)<=5,  'intf_name may only be up to 5 characters'
         self.node_name = node_name
         self.intf_name = intf_name
 
