@@ -54,6 +54,7 @@ class VNSSimulator:
         self.ti_clients = {} # maps active TI conns to the topology ID it is conn to
         self.ti_server = create_ti_server(TI_DEFAULT_PORT,
                                           self.handle_recv_ti_msg,
+                                          self.handle_new_client,
                                           self.handle_ti_client_disconnected)
         if BORDER_DEV_NAME:
             self.__start_raw_socket(BORDER_DEV_NAME)
@@ -477,7 +478,14 @@ class VNSSimulator:
     def handle_recv_ti_msg(self, conn, ti_msg):
         if ti_msg is not None:
             logging.debug('recv VNS TI msg: %s' % ti_msg)
-            if ti_msg.get_type() == TIOpen.get_type():
+            if ti_msg.get_type() == VNSAuthReply.get_type():
+                self.handle_auth_reply(conn, ti_msg, self.terminate_ti_connection)
+                return
+            elif not conn.vns_authorized:
+                logging.warning('received non-auth-reply from unauthenticated TI user %s: terminating the user' % conn)
+                self.terminate_ti_connection(conn, 'simulator expected authentication reply')
+            # user is authenticated => any other messages are ok
+            elif ti_msg.get_type() == TIOpen.get_type():
                 self.handle_ti_open_msg(conn, ti_msg)
             elif ti_msg.get_type() == TIPacket.get_type():
                 self.handle_ti_packet_msg(conn, ti_msg)
