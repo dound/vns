@@ -179,17 +179,18 @@ TI_MESSAGES.append(TIBanner)
 
 TI_PROTOCOL = LTProtocol(TI_MESSAGES, 'H', 'H')
 
-def create_ti_server(port, recv_callback, lost_conn_callback, verbose=True):
+def create_ti_server(port, recv_callback, new_conn_callback, lost_conn_callback, verbose=True):
     """Starts a server which listens for TI clients on the specified port.
 
     @param port  the port to listen on
     @param recv_callback  the function to call with received message content
                          (takes two arguments: transport, msg)
+    @param new_conn_callback   called with one argument (a LTProtocol) when a connection is started
     @param lost_conn_callback  called with one argument (a LTProtocol) when a connection is lost
     @param verbose        whether to print messages when they are sent
 
     @return returns the new LTTwistedServer
     """
-    server = LTTwistedServer(TI_PROTOCOL, recv_callback, None, lost_conn_callback, verbose)
+    server = LTTwistedServer(TI_PROTOCOL, recv_callback, new_conn_callback, lost_conn_callback, verbose)
     server.listen(port)
     return server
