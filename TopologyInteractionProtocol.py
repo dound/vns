@@ -1,5 +1,6 @@
 """Defines the TI protocol and some associated helper functions."""
 
+from socket import gethostbyname, inet_aton, inet_ntoa
 import struct
 
 from ltprotocol.ltprotocol import LTMessage, LTProtocol, LTTwistedServer
@@ -88,6 +89,34 @@ class TIPacket(TINodePortHeader):
     def __str__(self):
         return 'PACKET from %s: %s' % (TINodePortHeader.__str__(self), pktstr(self.ethernet_frame))
 TI_MESSAGES.append(TIPacket)
+
+class TIPingFromRequest(TINodePortHeader):
+    @staticmethod
+    def get_type():
+        return 6
+
+    def __init__(self, node_name, intf_name, dst):
+        TINodePortHeader.__init__(self, node_name, intf_name)
+        if len(dst)==4:
+            self.dst_ip = dst
+        else:
+            self.dst_ip = inet_aton(gethostbyname(dst))
+
+    def length(self):
+        return TINodePortHeader.length(self) + 4
+
+    def pack(self):
+        hdr = TINodePortHeader.pack(self)
+        return hdr + self.dst_ip
+
+    @staticmethod
+    def unpack(body):
+        node_name, port_name, body = TINodePortHeader.unpack_hdr(body)
+        return TIPingFromRequest(node_name, port_name, body)
+
+    def __str__(self):
+        return 'PING request from %s to %s' % (TINodePortHeader.__str__(self), inet_ntoa(self.dst_ip))
+TI_MESSAGES.append(TIPingFromRequest)
 
 class TITap(TINodePortHeader):
     @staticmethod
