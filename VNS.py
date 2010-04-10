@@ -236,7 +236,7 @@ class VNSSimulator:
         if vns_msg is not None:
             logging.debug('recv VNS msg: %s' % vns_msg)
             if vns_msg.get_type() == VNSAuthReply.get_type():
-                self.handle_auth_reply(conn, vns_msg)
+                self.handle_auth_reply(conn, vns_msg, self.terminate_connection)
                 return
             elif not conn.vns_authorized:
                 logging.warning('received non-auth-reply from unauthenticated user %s: terminating the user' % conn)
@@ -402,23 +402,23 @@ class VNSSimulator:
         conn.vns_user_profile = None
         conn.send(VNSAuthRequest(conn.vns_auth_salt))
 
-    def handle_auth_reply(self, conn, ar):
+    def handle_auth_reply(self, conn, ar, terminate_connection):
         if not conn.vns_auth_salt:
             msg = 'unexpectedly received authentication reply from conn_user=%s ar_user=%s at %s'
-            self.terminate_connection(conn, msg % (conn.vns_user_profile, ar.username, conn))
+            terminate_connection(conn, msg % (conn.vns_user_profile, ar.username, conn))
             return
 
         try:
             up = db.UserProfile.objects.get(user__username=ar.username, retired=False)
         except db.UserProfile.DoesNotExist:
             logging.info('unrecognized username tried to login: %s' % ar.username)
-            self.terminate_connection(conn, "authentication failed")
+            terminate_connection(conn, "authentication failed")
             return
 
         expected = hashlib.sha1(conn.vns_auth_salt + str(up.get_sim_auth_key())).digest()
         if ar.ssp != expected:
             logging.info('user %s provided an incorrect password' % ar.username)
-            self.terminate_connection(conn, "authentication failed")
+            terminate_connection(conn, "authentication failed")
         else:
             conn.vns_auth_salt = None # only need one auth reply
             conn.vns_authorized = True
