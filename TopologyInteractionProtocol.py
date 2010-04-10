@@ -177,6 +177,35 @@ class TIBanner(LTMessage):
         return self.msg
 TI_MESSAGES.append(TIBanner)
 
+class TIBadNodeOrPort(TINodePortHeader):
+    """Indicates that the requested node or port was invalid.  If port is
+    omitted, then the node does not exist.  Otherwise the node exists but the
+    port does not."""
+    @staticmethod
+    def get_type():
+        return 7
+
+    def __init__(self, node_name, intf_name):
+        TINodePortHeader.__init__(self, node_name, intf_name)
+
+    def length(self):
+        return TINodePortHeader.length(self)
+
+    def pack(self):
+        return TINodePortHeader.pack(self)
+
+    @staticmethod
+    def unpack(body):
+        node_name, port_name, _ = TINodePortHeader.unpack_hdr(body)
+        return TIBadNodeOrPort(node_name, port_name)
+
+    def __str__(self):
+        if self.intf_name:
+            return 'Invalid interface: %s' % TINodePortHeader.__str__(self)
+        else:
+            return 'Invalid node: %s' % self.node_name
+TI_MESSAGES.append(TIBadNodeOrPort)
+
 TI_PROTOCOL = LTProtocol(TI_MESSAGES, 'H', 'H')
 
 def create_ti_server(port, recv_callback, new_conn_callback, lost_conn_callback, verbose=True):
