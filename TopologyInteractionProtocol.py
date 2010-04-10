@@ -5,10 +5,10 @@ import struct
 from ltprotocol.ltprotocol import LTMessage, LTProtocol, LTTwistedServer
 
 from LoggingHelper import pktstr
-from VNSProtocol import strip_null_chars
+from VNSProtocol import strip_null_chars, VNSAuthRequest, VNSAuthReply, VNSAuthStatus
 
 TI_DEFAULT_PORT = 12346
-TI_MESSAGES = []
+TI_MESSAGES = [VNSAuthRequest, VNSAuthReply, VNSAuthStatus]  # uses same auth messages
 
 class TIOpen(LTMessage):
     @staticmethod
