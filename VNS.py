@@ -317,7 +317,7 @@ class VNSSimulator:
                 if topo.is_temporary():
                     AddressAllocation.free_topology(tid)
                 for ti_conn in topo.interactors:
-                    self.terminate_ti_connection(ti_conn, 'Topology %d has been shutdown' % tid)
+                    self.terminate_ti_connection(ti_conn, 'GOODBYE: Topology %d has been shutdown' % tid)
 
     def handle_open_msg(self, conn, open_msg):
         # get the topology the client is trying to connect to
@@ -483,7 +483,7 @@ class VNSSimulator:
                 return
             elif not conn.vns_authorized:
                 logging.warning('received non-auth-reply from unauthenticated TI user %s: terminating the user' % conn)
-                self.terminate_ti_connection(conn, 'simulator expected authentication reply')
+                self.terminate_ti_connection(conn, 'ERROR: simulator expected authentication reply')
             # user is authenticated => any other messages are ok
             elif ti_msg.get_type() == TIOpen.get_type():
                 self.handle_ti_open_msg(conn, ti_msg)
@@ -495,7 +495,7 @@ class VNSSimulator:
     def handle_ti_open_msg(self, conn, open_msg):
         tid = open_msg.topo_id
         if not self.topologies.has_key(tid):
-            self.terminate_ti_connection(conn, 'Topology %d is not currently active' % tid)
+            self.terminate_ti_connection(conn, 'ERROR: Topology %d is not currently active' % tid)
         else:
             self.ti_clients[conn] = tid
 
@@ -503,13 +503,13 @@ class VNSSimulator:
         try:
             tid = self.ti_clients[conn]
         except KeyError:
-            self.terminate_ti_connection(conn, 'no topology mapping known (forgot to send TIOpen?)')
+            self.terminate_ti_connection(conn, 'ERROR: no topology mapping known (forgot to send TIOpen?)')
             return
 
         try:
             topo = self.topologies[tid]
         except KeyError:
-            self.terminate_ti_connection(conn, 'topology %d is no longer active' % tid)
+            self.terminate_ti_connection(conn, 'GOODBYE: topology %d is no longer active' % tid)
             return
 
         ret = topo.send_packet_from_node(pm.node_name, pm.intf_name, pm.ethernet_frame)
