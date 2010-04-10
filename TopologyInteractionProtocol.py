@@ -174,7 +174,7 @@ class TIBanner(LTMessage):
         return TIBanner(body)
 
     def __str__(self):
-        return 'ERROR: %s' % self.msg
+        return self.msg
 TI_MESSAGES.append(TIBanner)
 
 TI_PROTOCOL = LTProtocol(TI_MESSAGES, 'H', 'H')
