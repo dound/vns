@@ -496,7 +496,7 @@ class Link:
         if self.lossiness==0.0 or random.random()>self.lossiness:
             intf_to = self.get_other(intf_from)
             if intf_to.tap:
-                if intf_to.tap.handle_packet(intf_to.owner.name, intf_to.name, packet):
+                if intf_to.tap.handle_packet(str(intf_to.owner.name), str(intf_to.name), packet):
                     return  # packet was consumed by the tap
             intf_to.owner.handle_packet(intf_to, packet)
 
