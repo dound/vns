@@ -26,7 +26,7 @@ import AddressAllocation
 from LoggingHelper import log_exception, addrstr, pktstr
 import ProtocolHelper
 from Topology import Topology, TopologyCreationException
-from TopologyInteractionProtocol import TI_DEFAULT_PORT, create_ti_server, TIOpen, TIPacket, TIBanner
+from TopologyInteractionProtocol import TI_DEFAULT_PORT, create_ti_server, TIOpen, TIPacket, TIBanner, TIPingFromRequest
 from TopologyResolver import TopologyResolver
 from VNSProtocol import VNS_DEFAULT_PORT, create_vns_server
 from VNSProtocol import VNSOpen, VNSClose, VNSPacket, VNSOpenTemplate, VNSBanner, VNSRtable, VNSAuthRequest, VNSAuthReply, VNSAuthStatus
@@ -489,6 +489,8 @@ class VNSSimulator:
                 self.handle_ti_open_msg(conn, ti_msg)
             elif ti_msg.get_type() == TIPacket.get_type():
                 self.handle_ti_packet_msg(conn, ti_msg)
+            elif ti_msg.get_type() == TIPingFromRequest.get_type():
+                self.handle_ti_pingfrom_msg(conn, ti_msg)
             else:
                 logging.debug('unexpected VNS TI message received: %s' % ti_msg)
 
@@ -519,6 +521,14 @@ class VNSSimulator:
         if not topo:
             return
         ret = topo.send_packet_from_node(pm.node_name, pm.intf_name, pm.ethernet_frame)
+        if ret != True:
+            self.terminate_ti_connection(conn, ret)
+
+    def handle_ti_pingfrom_msg(self, conn, pm):
+        topo = self.ti_conn_to_topo(conn)
+        if not topo:
+            return
+        ret = topo.send_ping_from_node(pm.node_name, pm.intf_name, pm.dst_ip)
         if ret != True:
             self.terminate_ti_connection(conn, ret)
 

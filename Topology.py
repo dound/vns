@@ -331,6 +331,26 @@ class Topology():
             intf.link.send_to_other(intf, ethernet_frame)
             return True
 
+    def send_ping_from_node(self, node_name, intf_name, dst_ip):
+        """Sends a ping from the request node's specified interface.  True is
+        returned on success; otherwise a string describing the error is returned."""
+        ret = self.get_node_and_intf_with_link(node_name, intf_name)
+        if isinstance(ret, basestring):
+            return ret
+        else:
+            _, intf = ret
+            mac_dst = intf.link.get_other(intf).mac
+            mac_src = intf.mac
+            mac_type = '\x08\x00'
+            ethernet_hdr = mac_dst + mac_src + mac_type
+            src_ip = intf.ip
+            ip_hdr = Packet.cksum_ip_hdr('\x45\x00\x00\x54\x00\x00\x40\x00\x40\x01\x00\x00' + src_ip + dst_ip)
+            icmp_hdr = Packet.cksum_icmp_pkt('\x08\x00\x00\x00\x00\x00\x00\x01')
+            icmp_data = '\x00\x01\x02\x03\x04\x05\x06\x07' * 8  # 56 bytes
+            ethernet_frame = ethernet_hdr + ip_hdr + icmp_hdr + icmp_data
+            intf.link.send_to_other(intf, ethernet_frame)
+            return True
+
     def send_packet_to_gateway(self, ethernet_frame):
         """Sends an Ethernet frame to the gateway; the destination MAC address
         is set appropriately."""
