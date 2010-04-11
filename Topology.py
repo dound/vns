@@ -456,8 +456,8 @@ class Link:
             intf_to.owner.handle_packet(intf_to, packet)
 
     def __str__(self):
-        return '%s: %s:%s <--> %s:%s' % (self.intf1.owner.name, self.intf1.name,
-                                         self.intf2.owner.name, self.intf2.name)
+        return '%s:%s <--> %s:%s' % (self.intf1.owner.name, self.intf1.name,
+                                     self.intf2.owner.name, self.intf2.name)
 
     def str_half(self, intf):
         """Returns the name and port of the other side of the link."""
