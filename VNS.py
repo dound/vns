@@ -484,13 +484,20 @@ class VNSSimulator:
             elif not conn.vns_authorized:
                 logging.warning('received non-auth-reply from unauthenticated TI user %s: terminating the user' % conn)
                 self.terminate_ti_connection(conn, 'ERROR: simulator expected authentication reply')
+                return
             # user is authenticated => any other messages are ok
             elif ti_msg.get_type() == TIOpen.get_type():
                 self.handle_ti_open_msg(conn, ti_msg)
-            elif ti_msg.get_type() == TIPacket.get_type():
-                self.handle_ti_packet_msg(conn, ti_msg)
+                return
+
+            # all of the remaining messages require the associated topology
+            topo = self.ti_conn_to_topo(conn)
+            if not topo:
+                return
+            if ti_msg.get_type() == TIPacket.get_type():
+                self.handle_ti_packet_msg(conn, topo, ti_msg)
             elif ti_msg.get_type() == TIPingFromRequest.get_type():
-                self.handle_ti_pingfrom_msg(conn, ti_msg)
+                self.handle_ti_pingfrom_msg(conn, topo, ti_msg)
             else:
                 logging.debug('unexpected VNS TI message received: %s' % ti_msg)
 
@@ -516,21 +523,15 @@ class VNSSimulator:
             self.terminate_ti_connection(conn, 'GOODBYE: topology %d is no longer active' % tid)
             return None
 
-    def handle_ti_packet_msg(self, conn, pm):
-        topo = self.ti_conn_to_topo(conn)
-        if not topo:
-            return
+    def handle_ti_packet_msg(self, conn, topo, pm):
         ret = topo.send_packet_from_node(pm.node_name, pm.intf_name, pm.ethernet_frame)
         if ret != True:
-            self.terminate_ti_connection(conn, ret)
+            conn.send(TIBanner(ret))
 
-    def handle_ti_pingfrom_msg(self, conn, pm):
-        topo = self.ti_conn_to_topo(conn)
-        if not topo:
-            return
+    def handle_ti_pingfrom_msg(self, conn, topo, pm):
         ret = topo.send_ping_from_node(pm.node_name, pm.intf_name, pm.dst_ip)
         if ret != True:
-            self.terminate_ti_connection(conn, ret)
+            conn.send(TIBanner(ret))
 
     def handle_ti_client_disconnected(self, conn):
         self.terminate_ti_connection(conn,
