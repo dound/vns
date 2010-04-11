@@ -55,7 +55,7 @@ class TopologyInteractor(cmd.Cmd):
                 return
             try:
                 ping_req = TIPingFromRequest(name, port, dst)
-            except socket.gaierror, e:
+            except socket.gaierror, e: # thrown if dst cannot be converted to an IP
                 print e
                 return
             reactor.callFromThread(self.conn.send, ping_req)
