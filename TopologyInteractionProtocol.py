@@ -161,31 +161,39 @@ class TIModifyLink(TINodePortHeader):
     def get_type():
         return 4
 
-    def __init__(self, node_name, intf_name, enable):
-        """If enable is True, then the link attached to the specified node's
-        interface will be enabled, otherwise it will be disabled."""
+    def __init__(self, node_name, intf_name, link_state):
+        """If link_state enable is True, then the link will be enabled (no
+        loss).  If False, then the link will be disabled (100% loss). Otherwise,
+        link_state must be a float value in the range [0.0,1.0] specifying how
+        lossy the link is."""
         TINodePortHeader.__init__(self, node_name, intf_name)
-        self.enable = enable
+        if link_state is True:
+            self.lossiness = 0.0
+        elif link_state is False:
+            self.lossiness = 1.0
+        elif link_state<0.0 or link_state>1.0:
+            raise ValueError('link_state must be between 0.0 and 1.0')
+        else:
+            self.lossiness = float(link_state)
 
     def length(self):
         return TINodePortHeader.length(self) + TIModifyLink.SIZE
 
-    FORMAT = '> b'
+    FORMAT = '> f'
     SIZE = struct.calcsize(FORMAT)
 
     def pack(self):
         hdr = TINodePortHeader.pack(self)
-        return hdr + struct.pack(TIModifyLink.FORMAT, self.enable)
+        return hdr + struct.pack(TIModifyLink.FORMAT, self.lossiness)
 
     @staticmethod
     def unpack(body):
         node_name, port_name, body = TINodePortHeader.unpack_hdr(body)
-        enable = struct.unpack(TIModifyLink.FORMAT, body)[0]
-        return TIModifyLink(node_name, port_name, enable)
+        lossiness = struct.unpack(TIModifyLink.FORMAT, body)[0]
+        return TIModifyLink(node_name, port_name, lossiness)
 
     def __str__(self):
-        prefix = 'EN' if self.enable else 'DIS'
-        return '%sABLE link connected to %s' % (prefix, TINodePortHeader.__str__(self))
+        return 'set link lossiness=%.2f%% for link connected to %s' % (self.lossiness, TINodePortHeader.__str__(self))
 TI_MESSAGES.append(TIModifyLink)
 
 class TIBanner(LTMessage):
