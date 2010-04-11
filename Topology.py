@@ -340,7 +340,7 @@ class Topology():
         src_ip = intf.ip
         ip_hdr = Packet.cksum_ip_hdr('\x45\x00\x00\x54\x00\x00\x40\x00\x40\x01\x00\x00' + src_ip + dst_ip)
         icmp_hdr = Packet.cksum_icmp_pkt('\x08\x00\x00\x00\x00\x00\x00\x01')
-        icmp_data = '\x00\x01\x02\x03\x04\x05\x06\x07' * 8  # 56 bytes
+        icmp_data = '\x00\x01\x02\x03\x04\x05\x06\x07' * 7  # 56 bytes
         ethernet_frame = ethernet_hdr + ip_hdr + icmp_hdr + icmp_data
         intf.link.send_to_other(intf, ethernet_frame)
 
@@ -368,7 +368,7 @@ class Topology():
         """Clears all taps associated with the specified TI connection."""
         for n in self.nodes:
             for intf in n.interfaces:
-                if intf.tap and intf.tap.conn==ti_conn:
+                if intf.tap and intf.tap.ti_conn==ti_conn:
                     intf.tap = None
 
     def send_packet_to_gateway(self, ethernet_frame):
