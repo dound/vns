@@ -499,19 +499,25 @@ class VNSSimulator:
         else:
             self.ti_clients[conn] = tid
 
-    def handle_ti_packet_msg(self, conn, pm):
+    def ti_conn_to_topo(self, conn):
+        """Gets the topology associated with the specifeid ti connection.  Returns
+        None on failure (the ti connection will have already been terminated)."""
         try:
             tid = self.ti_clients[conn]
         except KeyError:
             self.terminate_ti_connection(conn, 'ERROR: no topology mapping known (forgot to send TIOpen?)')
-            return
+            return None
 
         try:
-            topo = self.topologies[tid]
+            return self.topologies[tid]
         except KeyError:
             self.terminate_ti_connection(conn, 'GOODBYE: topology %d is no longer active' % tid)
-            return
+            return None
 
+    def handle_ti_packet_msg(self, conn, pm):
+        topo = self.ti_conn_to_topo(conn)
+        if not topo:
+            return
         ret = topo.send_packet_from_node(pm.node_name, pm.intf_name, pm.ethernet_frame)
         if ret != True:
             self.terminate_ti_connection(conn, ret)
