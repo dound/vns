@@ -12,7 +12,8 @@ from ltprotocol.ltprotocol import LTTwistedClient
 from twisted.internet import reactor
 
 from LoggingHelper import pcap_write_header, pcap_write_packet, pktstr
-from TopologyInteractionProtocol import TI_DEFAULT_PORT, TI_PROTOCOL, TIOpen, TIPacket, TIPingFromRequest, TIBadNodeOrPort, TIBanner, TITap
+from TopologyInteractionProtocol import TI_DEFAULT_PORT, TI_PROTOCOL, TIModifyLink, \
+    TIOpen, TIPacket, TIPingFromRequest, TIBadNodeOrPort, TIBanner, TITap
 from VNSProtocol import VNSAuthRequest, VNSAuthReply, VNSAuthStatus
 
 # whether this program is in the process of terminating
@@ -22,6 +23,7 @@ TERMINATE = False
 PING_NODE_COMPLETIONS = ['server1', 'server2']
 NODE_COMPLETIONS = PING_NODE_COMPLETIONS + ['vrhost:eth0', 'vrhost:eth1', 'vrhost:eth2', 'gateway']
 TAP_CMDS = ['off', 'screen']
+LINKMOD_CMDS = ['up', 'down']
 
 def get_node_and_port(x):
     """Returns a (node,port) pair from a string in the format <node>[:<port>]."""
@@ -121,6 +123,37 @@ class TopologyInteractor(cmd.Cmd):
     def __init__(self, ti_conn):
         cmd.Cmd.__init__(self)
         self.conn = ti_conn
+
+    def do_linkmod(self, line):
+        args = line.split()
+        if len(args) != 2:
+            print 'syntax error: linkmod expects this syntax: <node>[:intf] <new_state>'
+            return
+        node, new_state = args
+        try:
+            n, i = get_node_and_port(node)
+            if new_state == 'up':
+                new_state = 0.0
+            elif new_state == 'down':
+                new_state = 1.0
+            else:
+                new_state = float(new_state) / 100.0
+                if new_state < 0.0 or new_state > 1.0:
+                    raise ValueError('Lossiness must be specified in the range [0.0, 100.0]')
+        except ValueError, e:
+            print e
+            return
+        reactor.callFromThread(self.conn.send, TIModifyLink(n, i, new_state))
+
+    def complete_linkmod(self, text, line, begidx, endidx):
+        return self.node_completion_helper(text, line, LINKMOD_CMDS)
+
+    def help_linkmod(self):
+        print '\n'.join(['link <node>[:intf] <new_state>',
+                         '  new_state:',
+                         '    up         enable the link (0% loss)',
+                         '    down       disable the link (100% loss)',
+                         '    <float>    enable the link with lossiness (e.g., 5 => 5% loss)'])
 
     def do_ping(self, line):
         """ping <dst> from <node>[:intf] -- sends a ping FROM node to dst.
