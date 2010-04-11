@@ -304,21 +304,32 @@ class Topology():
                 gw_intf.link.send_to_other(gw_intf, new_pkt)
             self.pending_incoming_packets = [] # clear the list
 
-    def send_packet_from_node(self, node_name, intf_name, ethernet_frame):
-        """Sends a packet from the request node's specified interface.  True is
-        returned on success; otherwise a string describing the error is returned."""
+    def get_node_and_intf_with_link(self, node_name, intf_name):
+        """Returns a 2-tuple containg the named node and interface if they exist
+        and there is a link from it.  Otherwise a string describing the problem
+        is returned."""
         for n in self.nodes:
             if n.name == node_name:
                 for intf in n.interfaces:
                     if intf.name == intf_name:
                         if intf.link:
-                            self.stats.note_pkt_to_topo(len(ethernet_frame))
-                            intf.link.send_to_other(intf, ethernet_frame)
-                            return True
+                            return (n, intf)
                         else:
                             return '%s:%s has no link attached to it' % (node_name, intf_name)
                 return 'there is no interface %s on node %s' % (intf_name, n.str_all())
         return 'there is no node named %s' % node_name
+
+    def send_packet_from_node(self, node_name, intf_name, ethernet_frame):
+        """Sends a packet from the request node's specified interface.  True is
+        returned on success; otherwise a string describing the error is returned."""
+        ret = self.get_node_and_intf_with_link(node_name, intf_name)
+        if isinstance(ret, basestring):
+            return ret
+        else:
+            _, intf = ret
+            self.stats.note_pkt_to_topo(len(ethernet_frame))
+            intf.link.send_to_other(intf, ethernet_frame)
+            return True
 
     def send_packet_to_gateway(self, ethernet_frame):
         """Sends an Ethernet frame to the gateway; the destination MAC address
