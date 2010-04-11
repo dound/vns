@@ -110,8 +110,8 @@ def setup_tap_then_send_ping(conn, ping_req):
         tt = TapHandler(False)
         tt.new_echo_request_sent(ping_req)
         conn.tap_trackers[key] = tt
+        conn.send(TITap(n, i, True, False, True))
 
-    conn.send(TITap(n, i, True, False, True))
     conn.send(ping_req)
 
 class TopologyInteractor(cmd.Cmd):
