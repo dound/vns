@@ -195,20 +195,7 @@ class TopologyInteractor(cmd.Cmd):
             tt.set_file_logging(cmd)
 
     def complete_tap(self, text, line, begidx, endidx):
-        splits = (line+'x').split(' ')
-        if len(splits)==2:
-            if text:
-                completions = [n for n in NODE_COMPLETIONS if n.startswith(text)]
-            else:
-                completions = NODE_COMPLETIONS[:]
-        elif len(splits)==3:
-            if text:
-                completions = [n for n in TAP_CMDS if n.startswith(text)]
-            else:
-                completions = TAP_CMDS[:]
-        else:
-            completions = []
-        return completions
+        return self.node_completion_helper(text, line, TAP_CMDS)
 
     def help_tap(self):
         print '\n'.join(["tap <node>[:intf] <command>",
@@ -230,13 +217,34 @@ class TopologyInteractor(cmd.Cmd):
             print 'Unknown command: %s' % line.split(' ')[0]
 
     def emptyline(self):
+        """Empty lines are no-ops - overrides the default which re-executes the
+        previous command."""
         pass
 
     def onecmd(self, s):
+        """Runs the command unless the program is terminating."""
         if TERMINATE:
             return True
         else:
             return cmd.Cmd.onecmd(self, s)
+
+    @staticmethod
+    def node_completion_helper(text, line, commands):
+        """Completion options for commands of the form: <name> <node>[:intf] <commands>"""
+        splits = (line+'x').split(' ')
+        if len(splits)==2:
+            if text:
+                completions = [n for n in NODE_COMPLETIONS if n.startswith(text)]
+            else:
+                completions = NODE_COMPLETIONS[:]
+        elif len(splits)==3:
+            if text:
+                completions = [n for n in commands if n.startswith(text)]
+            else:
+                completions = commands[:]
+        else:
+            completions = []
+        return completions
 
 def main(argv=sys.argv[1:]):
     """Parses command-line arguments and then runs the TI client."""
@@ -289,7 +297,6 @@ def msg_received(conn, msg):
             sha1_of_salted_pw = hashlib.sha1(msg.salt + conn.auth_key).digest()
             conn.send(VNSAuthReply(conn.username, sha1_of_salted_pw))
         elif msg.get_type() == VNSAuthStatus.get_type():
-            print 'got auth status'
             if msg.auth_ok:
                 print 'Authentication successful.'
                 conn.send(TIOpen(conn.tid))
