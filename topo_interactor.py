@@ -19,23 +19,8 @@ from VNSProtocol import VNSAuthRequest, VNSAuthReply, VNSAuthStatus
 # whether this program is in the process of terminating
 TERMINATE = False
 
-# completions for sr topologies
-PING_NODE_COMPLETIONS = ['server1', 'server2']
-NODE_COMPLETIONS = PING_NODE_COMPLETIONS + ['vrhost:eth0', 'vrhost:eth1', 'vrhost:eth2', 'gateway']
-TAP_CMDS = ['off', 'screen']
-LINKMOD_CMDS = ['up', 'down']
-
-def get_node_and_port(x):
-    """Returns a (node,port) pair from a string in the format <node>[:<port>]."""
-    out = x.split(':')
-    if len(out) == 1:
-        return (x, 'eth0')
-    elif len(out) != 2:
-        raise ValueError("node must be specified in the form <name>[:<port>]")
-    else:
-        return out
-
 class TapHandler(object):
+    """Contains info about and handles a tap on a particular node:port."""
     def __init__(self, permanent):
         """Constructs a new TapTracker.  If permanent is True, then it continues
         until explicitly disabled.  Otherwise, is_done() will return True
@@ -46,7 +31,6 @@ class TapHandler(object):
         self.print_recv_packets = False
         self.log_fp = None
         self.waiting_for_replies_from = {} # maps dst IPs to # replies outstanding
-
 
     def __del__(self):
         if self.log_fp:
@@ -100,29 +84,20 @@ class TapHandler(object):
                 pass # don't care about echo replies we didn't ask for
             return False
 
-def setup_tap_then_send_ping(conn, ping_req):
-    """Starts an IP tap on the node/intf which the ping is requested from and
-    then sings the ping request.  Also sets up a TapTracker to monitor the tap
-    and track replies so we know when we can uninstall the tap."""
-    n, i = ping_req.node_name.lower(), ping_req.intf_name.lower()
-    key = (n, i)
-    try:
-        tt = conn.tap_trackers[key]
-        tt.new_echo_request_sent(ping_req)
-    except KeyError:
-        tt = TapHandler(False)
-        tt.new_echo_request_sent(ping_req)
-        conn.tap_trackers[key] = tt
-        conn.send(TITap(n, i, True, False, True))
-
-    conn.send(ping_req)
-
 class TopologyInteractor(cmd.Cmd):
+    """An interactive command prompt for interacting with a topology."""
     prompt = '>>> '
+    TAP_CMDS = ['off', 'screen']
+    LINKMOD_CMDS = ['up', 'down']
 
-    def __init__(self, ti_conn):
+    # completions for sr topologies
+    PING_NODE_COMPLETIONS = ['server1', 'server2']
+    NODE_COMPLETIONS = PING_NODE_COMPLETIONS + ['vrhost:eth0', 'vrhost:eth1', 'vrhost:eth2', 'gateway']
+
+
+    def __init__(self, ti_client):
         cmd.Cmd.__init__(self)
-        self.conn = ti_conn
+        self.tic = ti_client
 
     def do_linkmod(self, line):
         args = line.split()
@@ -131,7 +106,7 @@ class TopologyInteractor(cmd.Cmd):
             return
         node, new_state = args
         try:
-            n, i = get_node_and_port(node)
+            n, i = self.get_node_and_port(node)
             if new_state == 'up':
                 new_state = 0.0
             elif new_state == 'down':
@@ -143,10 +118,10 @@ class TopologyInteractor(cmd.Cmd):
         except ValueError, e:
             print e
             return
-        reactor.callFromThread(self.conn.send, TIModifyLink(n, i, new_state))
+        reactor.callFromThread(self.tic.conn.send, TIModifyLink(n, i, new_state))
 
     def complete_linkmod(self, text, line, begidx, endidx):
-        return self.node_completion_helper(text, line, LINKMOD_CMDS)
+        return self.node_completion_helper(text, line, self.LINKMOD_CMDS)
 
     def help_linkmod(self):
         print '\n'.join(['link <node>[:intf] <new_state>',
@@ -166,7 +141,7 @@ class TopologyInteractor(cmd.Cmd):
         else:
             dst, _, node = args
             try:
-                name, port = get_node_and_port(node)
+                name, port = self.get_node_and_port(node)
             except ValueError, e:
                 print e
                 return
@@ -175,24 +150,41 @@ class TopologyInteractor(cmd.Cmd):
             except socket.gaierror, e: # thrown if dst cannot be converted to an IP
                 print e
                 return
-            reactor.callFromThread(setup_tap_then_send_ping, self.conn, ping_req)
+            reactor.callFromThread(self.setup_tap_then_send_ping, self.tic, ping_req)
             dst_ip = socket.inet_ntoa(ping_req.dst_ip)
             extra = ''
             if dst_ip != dst:
                 extra = ' (%s)' % dst_ip
             print 'requested that %s send a ping to %s%s' % (node, dst, extra)
 
+    @staticmethod
+    def setup_tap_then_send_ping(tic, ping_req):
+        """Starts an IP tap on the node/intf which the ping is requested from and
+        then sings the ping request.  Also sets up a TapTracker to monitor the tap
+        and track replies so we know when we can uninstall the tap."""
+        n, i = ping_req.node_name.lower(), ping_req.intf_name.lower()
+        key = (n, i)
+        try:
+            tt = tic.tap_trackers[key]
+            tt.new_echo_request_sent(ping_req)
+        except KeyError:
+            tt = TapHandler(False)
+            tt.new_echo_request_sent(ping_req)
+            tic.tap_trackers[key] = tt
+            tic.conn.send(TITap(n, i, True, False, True))
+        tic.conn.send(ping_req)
+
     def complete_ping(self, text, line, begidx, endidx):
         splits = (line+'x').split(' ')
         if len(splits)==3:
-            completions = ['from '+s for s in PING_NODE_COMPLETIONS]
+            completions = ['from '+s for s in self.PING_NODE_COMPLETIONS]
         elif len(splits)<3 or len(splits)>4:
             completions = []
         else:
             if text:
-                completions = [n for n in PING_NODE_COMPLETIONS if n.startswith(text)]
+                completions = [n for n in self.PING_NODE_COMPLETIONS if n.startswith(text)]
             else:
-                completions = PING_NODE_COMPLETIONS[:]
+                completions = self.PING_NODE_COMPLETIONS[:]
         return completions
 
     def do_tap(self, line):
@@ -202,33 +194,33 @@ class TopologyInteractor(cmd.Cmd):
             return
         node, cmd = args
         try:
-            n, i = get_node_and_port(node)
+            n, i = self.get_node_and_port(node)
         except ValueError, e:
             print e
             return
         key = (n, i)
         try:
             if cmd == 'off':
-                del self.conn.tap_trackers[key]
-                reactor.callFromThread(self.conn.send, TITap(n, i, False))
+                del self.tic.tap_trackers[key]
+                reactor.callFromThread(self.tic.conn.send, TITap(n, i, False))
                 return
             else:
-                tt = self.conn.tap_trackers[key]
+                tt = self.tic.tap_trackers[key]
                 tt.permanent = True
         except KeyError:
             if cmd == 'off':
                 print 'There is no tap on %s:%s' % (n, i)
                 return
             tt = TapHandler(permanent=True)
-            reactor.callFromThread(self.conn.send, TITap(n, i, True))
-            self.conn.tap_trackers[key] = tt
+            reactor.callFromThread(self.tic.conn.send, TITap(n, i, True))
+            self.tic.tap_trackers[key] = tt
         if cmd == 'screen':
             tt.toggle_screen_logging()
         else: # cmd is a filename
             tt.set_file_logging(cmd)
 
     def complete_tap(self, text, line, begidx, endidx):
-        return self.node_completion_helper(text, line, TAP_CMDS)
+        return self.node_completion_helper(text, line, self.TAP_CMDS)
 
     def help_tap(self):
         print '\n'.join(["tap <node>[:intf] <command>",
@@ -262,14 +254,25 @@ class TopologyInteractor(cmd.Cmd):
             return cmd.Cmd.onecmd(self, s)
 
     @staticmethod
+    def get_node_and_port(x):
+        """Returns a (node,port) pair from a string in the format <node>[:<port>]."""
+        out = x.split(':')
+        if len(out) == 1:
+            return (x, 'eth0')
+        elif len(out) != 2:
+            raise ValueError("node must be specified in the form <name>[:<port>]")
+        else:
+            return out
+
+    @staticmethod
     def node_completion_helper(text, line, commands):
         """Completion options for commands of the form: <name> <node>[:intf] <commands>"""
         splits = (line+'x').split(' ')
         if len(splits)==2:
             if text:
-                completions = [n for n in NODE_COMPLETIONS if n.startswith(text)]
+                completions = [n for n in TopologyInteractor.NODE_COMPLETIONS if n.startswith(text)]
             else:
-                completions = NODE_COMPLETIONS[:]
+                completions = TopologyInteractor.NODE_COMPLETIONS[:]
         elif len(splits)==3:
             if text:
                 completions = [n for n in commands if n.startswith(text)]
@@ -316,76 +319,83 @@ Connects to the VNS Topology Interaction service."""
 
     # connect to the server and handle messages it sends us
     print 'Connecting to VNS server at %s ...' % options.server
-    gc = lambda c : got_connected(c,options.topo_id, options.username, auth_key)
-    client = LTTwistedClient(TI_PROTOCOL, msg_received, gc, got_disconnected, False)
+    client = TIClient(options.topo_id, options.username, auth_key)
     client.connect(options.server, TI_DEFAULT_PORT)
     reactor.run()
 
-def msg_received(conn, msg):
-    """Handles messages received from the TI server.  Starts the
-    TopologyInteractor command-line interface once authentication is complete."""
-    if msg is not None:
-        if msg.get_type() == VNSAuthRequest.get_type():
-            print 'Authenticating as %s' % conn.username
-            sha1_of_salted_pw = hashlib.sha1(msg.salt + conn.auth_key).digest()
-            conn.send(VNSAuthReply(conn.username, sha1_of_salted_pw))
-        elif msg.get_type() == VNSAuthStatus.get_type():
-            if msg.auth_ok:
-                print 'Authentication successful.'
-                conn.send(TIOpen(conn.tid))
-                reactor.callInThread(TopologyInteractor(conn).cmdloop)
+class TIClient(LTTwistedClient):
+    """Implements methods for handling messages received and events from a
+    Topology Interaction protocol client connection."""
+    def __init__(self, tid, username, auth_key):
+        LTTwistedClient.__init__(self, TI_PROTOCOL, self.msg_received, self.got_connected, self.got_disconnected, False)
+        self.conn = None
+        self.tid = tid
+        self.username = username
+        self.auth_key = auth_key
+        self.prev_bn_msg = None
+        self.tap_trackers = {} # key=(node,intf) => maps to TapTracker
+
+    def msg_received(self, conn, msg):
+        """Handles messages received from the TI server.  Starts the
+        TopologyInteractor command-line interface once authentication is complete."""
+        if msg is not None:
+            if msg.get_type() == VNSAuthRequest.get_type():
+                print 'Authenticating as %s' % self.username
+                sha1_of_salted_pw = hashlib.sha1(msg.salt + self.auth_key).digest()
+                conn.send(VNSAuthReply(self.username, sha1_of_salted_pw))
+            elif msg.get_type() == VNSAuthStatus.get_type():
+                if msg.auth_ok:
+                    print 'Authentication successful.'
+                    conn.send(TIOpen(self.tid))
+                    reactor.callInThread(TopologyInteractor(self).cmdloop)
+                else:
+                    print 'Authentication failed.'
+            elif msg.get_type() ==  TIBadNodeOrPort.get_type():
+                txt = str(msg)
+                if self.prev_bn_msg == txt:
+                    self.prev_bn_msg = None # only stop it once
+                else:
+                    if self.prev_bn_msg != None:
+                        print '***%s!=%s'%(self.prev_bn_msg,txt)
+                    self.prev_bn_msg = txt
+                    print '\n', txt
+            elif msg.get_type() ==  TIBanner.get_type():
+                print '\n', msg.msg
+            elif msg.get_type() ==  TIPacket.get_type():
+                self.got_tapped_packet(msg)
             else:
-                print 'Authentication failed.'
-        elif msg.get_type() ==  TIBadNodeOrPort.get_type():
-            txt = str(msg)
-            if conn.prev_bn_msg == txt:
-                conn.prev_bn_msg = None # only stop it once
-            else:
-                if conn.prev_bn_msg != None:
-                    print '***%s!=%s'%(conn.prev_bn_msg,txt)
-                conn.prev_bn_msg = txt
-                print '\n', txt
-        elif msg.get_type() ==  TIBanner.get_type():
-            print '\n', msg.msg
-        elif msg.get_type() ==  TIPacket.get_type():
-            got_tapped_packet(conn, msg)
-        else:
-            print 'unexpected TI message received: %s' % msg
+                print 'unexpected TI message received: %s' % msg
 
-def got_connected(conn, tid, username, auth_key):
-    print 'Connected!'
-    conn.tid = tid
-    conn.username = username
-    conn.auth_key = auth_key
-    conn.tap_trackers = {} # key=(node,intf) => maps to TapTracker
-    conn.prev_bn_msg = None
+    def got_connected(self, conn):
+        print 'Connected!'
+        self.conn = conn
 
-def got_disconnected(conn):
-    print 'Disconnected!'
-    try:
-        reactor.stop()
-    except:
-        pass
-    global TERMINATE
-    TERMINATE = True
+    def got_disconnected(self, conn):
+        print 'Disconnected!'
+        try:
+            reactor.stop()
+        except:
+            pass
+        global TERMINATE
+        TERMINATE = True
 
-def got_tapped_packet(conn, packet_msg):
-    # check to see if we were waiting for a reply to a ping we sent
-    n, i = (packet_msg.node_name, packet_msg.intf_name)
-    key = (n, i)
-    try:
-        tt = conn.tap_trackers[key]
-    except KeyError:
-        return
+    def got_tapped_packet(self, packet_msg):
+        # check to see if we were waiting for a reply to a ping we sent
+        n, i = (packet_msg.node_name, packet_msg.intf_name)
+        key = (n, i)
+        try:
+            tt = self.tap_trackers[key]
+        except KeyError:
+            return
 
-    if tt.got_packet(packet_msg.ethernet_frame):
-        src_ip = packet_msg.ethernet_frame[26:30]
-        print '%s:%s received ECHO REPLY from %s' % (n, i, socket.inet_ntoa(src_ip))
+        if tt.got_packet(packet_msg.ethernet_frame):
+            src_ip = packet_msg.ethernet_frame[26:30]
+            print '%s:%s received ECHO REPLY from %s' % (n, i, socket.inet_ntoa(src_ip))
 
-        # stop the tap if we aren't listening for any more replies from (n,i)
-        if tt.is_done():
-            del conn.tap_trackers[key]
-            conn.send(TITap(n, i, False))
+            # stop the tap if we aren't listening for any more replies from (n,i)
+            if tt.is_done():
+                del self.tap_trackers[key]
+                self.conn.send(TITap(n, i, False))
 
 if __name__ == "__main__":
     main()
