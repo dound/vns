@@ -14,6 +14,7 @@ from LoggingHelper import log_exception, addrstr, pktstr
 import ProtocolHelper
 from ProtocolHelper import is_http_port, Packet
 from TCPStack import TCPServer
+from TopologyInteractionProtocol import TIPacket
 from VNSProtocol import VNSPacket, VNSInterface, VNSHardwareInfo
 import web.vnswww.models as db
 
@@ -351,6 +352,36 @@ class Topology():
             intf.link.send_to_other(intf, ethernet_frame)
             return True
 
+    def tap_node(self, node_name, intf_name, tap, tap_config):
+        """Sets the state of a tap on a given node.  If there was a tap, then
+        it is replaced if a new one is specified.  A string is returned which
+        describes the action taken."""
+        ret = self.get_node_and_intf_with_link(node_name, intf_name)
+        if isinstance(ret, basestring):
+            return ret
+        else:
+            _, intf = ret
+            if not tap:
+                if intf.tap:
+                    intf.tap = None
+                    return "tap on %s:%s has been disabled" % (node_name, intf_name)
+                else:
+                    return "There was no tap on %s:%s" % (node_name, intf_name)
+            else:
+                if intf.tap:
+                    msg = "tap on %s:%s has been replaced with the new tap" % (node_name, intf_name)
+                else:
+                    msg = "tap on %s:%s has been installed" % (node_name, intf_name)
+                intf.tap = tap_config
+                return msg
+
+    def clear_taps(self, ti_conn):
+        """Clears all taps associated with the specified TI connection."""
+        for n in self.nodes:
+            for intf in n.interfaces:
+                if intf.tap and intf.tap.conn==ti_conn:
+                    intf.tap = None
+
     def send_packet_to_gateway(self, ethernet_frame):
         """Sends an Ethernet frame to the gateway; the destination MAC address
         is set appropriately."""
@@ -415,6 +446,24 @@ class Topology():
         str_nodes = 'Nodes:\n    ' + '\n    '.join([n.str_all() for n in self.nodes])
         return '%s:\n  %s%s\n  %s' % (str_hdr, str_clients, str_psp, str_nodes)
 
+class TapConfig(object):
+    def __init__(self, ti_conn, consume=False, ip_only=False):
+        self.ti_conn = ti_conn
+        self.consume = consume
+        self.ip_only = ip_only
+
+    def handle_packet(self, node, intf, pkt):
+        """Returns True if the packet is consumed and should not be further handled."""
+        if self.ip_only:
+            if len(pkt)>14 and pkt[12:14]=='\x08\x00':
+                self.ti_conn.send(TIPacket(node, intf, pkt))
+                return self.consume
+            else:
+                return False
+        else:
+            self.ti_conn.send(TIPacket(node, intf, pkt))
+            return self.consume
+
 class Link:
     """Information about a connection between two ports.  Tells intf1 and intf2
     about this link too."""
@@ -450,9 +499,16 @@ class Link:
     def send_to_other(self, intf_from, packet):
         """Sends the packet out of the specified interface.  This triggers
         handle_packet() to be called on the owner of the receiving interface.
-        The packet may be randomly discarded if lossiness is greater than zero."""
+        The packet may be randomly discarded if lossiness is greater than zero.
+
+        If the destination interface is tapped, the packet will be handled based
+        on the TapConfig.
+        """
         if self.lossiness==0.0 or random.random()>self.lossiness:
             intf_to = self.get_other(intf_from)
+            if intf_to.tap:
+                if intf_to.tap.handle_packet(intf_to.owner.name, intf_to.name, packet):
+                    return  # packet was consumed by the tap
             intf_to.owner.handle_packet(intf_to, packet)
 
     def __str__(self):
@@ -477,6 +533,7 @@ class Node:
         intf = VNSInterface(name, mac, ip, mask)
         intf.owner = self
         intf.link = None  # will be set by Link.__init__() if connected to another port
+        intf.tap = None   # will be set to a TapConfig if tapped
         self.interfaces.append(intf)
         return intf
 

@@ -25,8 +25,8 @@ from settings import BORDER_DEV_NAME, PCAP_FILTER, MAX_TOPOLOGY_LIFE_SEC, MAX_IN
 import AddressAllocation
 from LoggingHelper import log_exception, addrstr, pktstr
 import ProtocolHelper
-from Topology import Topology, TopologyCreationException
-from TopologyInteractionProtocol import TI_DEFAULT_PORT, create_ti_server, TIOpen, TIPacket, TIBanner, TIPingFromRequest
+from Topology import TapConfig, Topology, TopologyCreationException
+from TopologyInteractionProtocol import TI_DEFAULT_PORT, create_ti_server, TIOpen, TIPacket, TIBanner, TIPingFromRequest, TITap
 from TopologyResolver import TopologyResolver
 from VNSProtocol import VNS_DEFAULT_PORT, create_vns_server
 from VNSProtocol import VNSOpen, VNSClose, VNSPacket, VNSOpenTemplate, VNSBanner, VNSRtable, VNSAuthRequest, VNSAuthReply, VNSAuthStatus
@@ -498,6 +498,8 @@ class VNSSimulator:
                 self.handle_ti_packet_msg(conn, topo, ti_msg)
             elif ti_msg.get_type() == TIPingFromRequest.get_type():
                 self.handle_ti_pingfrom_msg(conn, topo, ti_msg)
+            elif ti_msg.get_type() == TITap.get_type():
+                self.handle_ti_tap_msg(conn, topo, ti_msg)
             else:
                 logging.debug('unexpected VNS TI message received: %s' % ti_msg)
 
@@ -533,6 +535,11 @@ class VNSSimulator:
         if ret != True:
             conn.send(TIBanner(ret))
 
+    def handle_ti_tap_msg(self, conn, topo, tm):
+        conf = TapConfig(conn, tm.consume, tm.ip_only)
+        msg = topo.tap_node(tm.node_name, tm.intf_name, tm.tap, conf)
+        conn.send(TIBanner(msg))
+
     def handle_ti_client_disconnected(self, conn):
         self.terminate_ti_connection(conn,
                                      'client disconnected (%s)' % conn,
@@ -542,6 +549,14 @@ class VNSSimulator:
         """Terminates the TI client connection conn.  This event will be logged
         unless log_it is False.  If notify_client is True, then the client will
         be sent a TIBanner message with an explanation."""
+        # try to clear any taps set by this connection
+        try:
+            tid = self.ti_clients[conn]
+            topo = self.topologies[tid]
+            topo.clear_taps(conn)
+        except KeyError:
+            pass
+
         # terminate the client
         if conn.connected:
             if notify_client:
