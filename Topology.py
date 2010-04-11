@@ -14,7 +14,7 @@ from LoggingHelper import log_exception, addrstr, pktstr
 import ProtocolHelper
 from ProtocolHelper import is_http_port, Packet
 from TCPStack import TCPServer
-from TopologyInteractionProtocol import TIPacket
+from TopologyInteractionProtocol import TIPacket, TIBadNodeOrPort
 from VNSProtocol import VNSPacket, VNSInterface, VNSHardwareInfo
 import web.vnswww.models as db
 
@@ -316,64 +316,51 @@ class Topology():
                         if intf.link:
                             return (n, intf)
                         else:
-                            return '%s:%s has no link attached to it' % (node_name, intf_name)
-                return 'there is no interface %s on node %s' % (intf_name, n.str_all())
-        return 'there is no node named %s' % node_name
+                            raise TIBadNodeOrPort(node_name, intf_name, TIBadNodeOrPort.MISSING_LINK)
+                raise TIBadNodeOrPort(node_name, intf_name, TIBadNodeOrPort.BAD_INTF)
+        raise TIBadNodeOrPort(node_name, intf_name, TIBadNodeOrPort.BAD_NODE)
 
     def send_packet_from_node(self, node_name, intf_name, ethernet_frame):
-        """Sends a packet from the request node's specified interface.  True is
-        returned on success; otherwise a string describing the error is returned."""
-        ret = self.get_node_and_intf_with_link(node_name, intf_name)
-        if isinstance(ret, basestring):
-            return ret
-        else:
-            _, intf = ret
-            self.stats.note_pkt_to_topo(len(ethernet_frame))
-            intf.link.send_to_other(intf, ethernet_frame)
-            return True
+        """Sends a packet from the request node's specified interface.  If the
+        node or port is invalid, TIBadNodeOrPort is raised."""
+        _, intf = self.get_node_and_intf_with_link(node_name, intf_name)
+        self.stats.note_pkt_to_topo(len(ethernet_frame))
+        intf.link.send_to_other(intf, ethernet_frame)
 
     def send_ping_from_node(self, node_name, intf_name, dst_ip):
-        """Sends a ping from the request node's specified interface.  True is
-        returned on success; otherwise a string describing the error is returned."""
-        ret = self.get_node_and_intf_with_link(node_name, intf_name)
-        if isinstance(ret, basestring):
-            return ret
-        else:
-            _, intf = ret
-            mac_dst = intf.link.get_other(intf).mac
-            mac_src = intf.mac
-            mac_type = '\x08\x00'
-            ethernet_hdr = mac_dst + mac_src + mac_type
-            src_ip = intf.ip
-            ip_hdr = Packet.cksum_ip_hdr('\x45\x00\x00\x54\x00\x00\x40\x00\x40\x01\x00\x00' + src_ip + dst_ip)
-            icmp_hdr = Packet.cksum_icmp_pkt('\x08\x00\x00\x00\x00\x00\x00\x01')
-            icmp_data = '\x00\x01\x02\x03\x04\x05\x06\x07' * 8  # 56 bytes
-            ethernet_frame = ethernet_hdr + ip_hdr + icmp_hdr + icmp_data
-            intf.link.send_to_other(intf, ethernet_frame)
-            return True
+        """Sends a ping from the request node's specified interface.  If the
+        node or port is invalid, TIBadNodeOrPort is raised."""
+        _, intf = self.get_node_and_intf_with_link(node_name, intf_name)
+        mac_dst = intf.link.get_other(intf).mac
+        mac_src = intf.mac
+        mac_type = '\x08\x00'
+        ethernet_hdr = mac_dst + mac_src + mac_type
+        src_ip = intf.ip
+        ip_hdr = Packet.cksum_ip_hdr('\x45\x00\x00\x54\x00\x00\x40\x00\x40\x01\x00\x00' + src_ip + dst_ip)
+        icmp_hdr = Packet.cksum_icmp_pkt('\x08\x00\x00\x00\x00\x00\x00\x01')
+        icmp_data = '\x00\x01\x02\x03\x04\x05\x06\x07' * 8  # 56 bytes
+        ethernet_frame = ethernet_hdr + ip_hdr + icmp_hdr + icmp_data
+        intf.link.send_to_other(intf, ethernet_frame)
 
     def tap_node(self, node_name, intf_name, tap, tap_config):
         """Sets the state of a tap on a given node.  If there was a tap, then
         it is replaced if a new one is specified.  A string is returned which
-        describes the action taken."""
-        ret = self.get_node_and_intf_with_link(node_name, intf_name)
-        if isinstance(ret, basestring):
-            return ret
-        else:
-            _, intf = ret
-            if not tap:
-                if intf.tap:
-                    intf.tap = None
-                    return "tap on %s:%s has been disabled" % (node_name, intf_name)
-                else:
-                    return "There was no tap on %s:%s" % (node_name, intf_name)
+        describes the action taken.  TIBadNodeOrPort is raised if node or intf
+        name is invalid."""
+        _, intf = self.get_node_and_intf_with_link(node_name, intf_name)
+        if not tap:
+            if intf.tap:
+                intf.tap = None
+                return "tap on %s:%s has been disabled" % (node_name, intf_name)
             else:
-                if intf.tap:
-                    msg = "tap on %s:%s has been replaced with the new tap" % (node_name, intf_name)
-                else:
-                    msg = "tap on %s:%s has been installed" % (node_name, intf_name)
-                intf.tap = tap_config
-                return msg
+                return "There was no tap on %s:%s" % (node_name, intf_name)
+        else:
+            if intf.tap:
+                msg = "tap on %s:%s has been replaced with the new tap" % (node_name, intf_name)
+            else:
+                msg = "tap on %s:%s has been installed" % (node_name, intf_name)
+            intf.tap = tap_config
+            return msg
 
     def clear_taps(self, ti_conn):
         """Clears all taps associated with the specified TI connection."""

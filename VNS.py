@@ -26,7 +26,7 @@ import AddressAllocation
 from LoggingHelper import log_exception, addrstr, pktstr
 import ProtocolHelper
 from Topology import TapConfig, Topology, TopologyCreationException
-from TopologyInteractionProtocol import TI_DEFAULT_PORT, create_ti_server, TIOpen, TIPacket, TIBanner, TIPingFromRequest, TITap
+from TopologyInteractionProtocol import TI_DEFAULT_PORT, create_ti_server, TIOpen, TIPacket, TIBanner, TIPingFromRequest, TITap, TIBadNodeOrPort
 from TopologyResolver import TopologyResolver
 from VNSProtocol import VNS_DEFAULT_PORT, create_vns_server
 from VNSProtocol import VNSOpen, VNSClose, VNSPacket, VNSOpenTemplate, VNSBanner, VNSRtable, VNSAuthRequest, VNSAuthReply, VNSAuthStatus
@@ -494,14 +494,17 @@ class VNSSimulator:
             topo = self.ti_conn_to_topo(conn)
             if not topo:
                 return
-            if ti_msg.get_type() == TIPacket.get_type():
-                self.handle_ti_packet_msg(conn, topo, ti_msg)
-            elif ti_msg.get_type() == TIPingFromRequest.get_type():
-                self.handle_ti_pingfrom_msg(conn, topo, ti_msg)
-            elif ti_msg.get_type() == TITap.get_type():
-                self.handle_ti_tap_msg(conn, topo, ti_msg)
-            else:
-                logging.debug('unexpected VNS TI message received: %s' % ti_msg)
+            try:
+                if ti_msg.get_type() == TIPacket.get_type():
+                    self.handle_ti_packet_msg(conn, topo, ti_msg)
+                elif ti_msg.get_type() == TIPingFromRequest.get_type():
+                    self.handle_ti_pingfrom_msg(conn, topo, ti_msg)
+                elif ti_msg.get_type() == TITap.get_type():
+                    self.handle_ti_tap_msg(conn, topo, ti_msg)
+                else:
+                    logging.debug('unexpected VNS TI message received: %s' % ti_msg)
+            except TIBadNodeOrPort, e:
+                conn.send(e)
 
     def handle_ti_open_msg(self, conn, open_msg):
         tid = open_msg.topo_id
@@ -526,14 +529,10 @@ class VNSSimulator:
             return None
 
     def handle_ti_packet_msg(self, conn, topo, pm):
-        ret = topo.send_packet_from_node(pm.node_name, pm.intf_name, pm.ethernet_frame)
-        if ret != True:
-            conn.send(TIBanner(ret))
+        topo.send_packet_from_node(pm.node_name, pm.intf_name, pm.ethernet_frame)
 
     def handle_ti_pingfrom_msg(self, conn, topo, pm):
-        ret = topo.send_ping_from_node(pm.node_name, pm.intf_name, pm.dst_ip)
-        if ret != True:
-            conn.send(TIBanner(ret))
+        topo.send_ping_from_node(pm.node_name, pm.intf_name, pm.dst_ip)
 
     def handle_ti_tap_msg(self, conn, topo, tm):
         conf = TapConfig(conn, tm.consume, tm.ip_only)

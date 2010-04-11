@@ -215,29 +215,45 @@ class TIBadNodeOrPort(TINodePortHeader):
     """Indicates that the requested node or port was invalid.  If port is
     omitted, then the node does not exist.  Otherwise the node exists but the
     port does not."""
+    # problem IDs
+    BAD_NODE = 0
+    BAD_INTF = 1
+    MISSING_LINK = 2
+
     @staticmethod
     def get_type():
         return 7
 
-    def __init__(self, node_name, intf_name):
+    def __init__(self, node_name, intf_name, problem_id):
         TINodePortHeader.__init__(self, node_name, intf_name)
+        self.problem_id = int(problem_id)
+
+    FORMAT = '> I'
+    SIZE = struct.calcsize(FORMAT)
 
     def length(self):
-        return TINodePortHeader.length(self)
+        return TINodePortHeader.length(self) + TIBadNodeOrPort.SIZE
 
     def pack(self):
-        return TINodePortHeader.pack(self)
+        hdr = TINodePortHeader.pack(self)
+        return hdr + struct.pack(TIBadNodeOrPort.FORMAT, self.problem_id)
 
     @staticmethod
     def unpack(body):
-        node_name, port_name, _ = TINodePortHeader.unpack_hdr(body)
-        return TIBadNodeOrPort(node_name, port_name)
+        node_name, port_name, body = TINodePortHeader.unpack_hdr(body)
+        problem_id = struct.unpack(TIBadNodeOrPort.FORMAT, body)[0]
+        return TIBadNodeOrPort(node_name, port_name, problem_id)
 
     def __str__(self):
-        if self.intf_name:
-            return 'Invalid interface: %s' % TINodePortHeader.__str__(self)
-        else:
+        if self.problem_id == TIBadNodeOrPort.BAD_NODE:
             return 'Invalid node: %s' % self.node_name
+        what = TINodePortHeader.__str__(self)
+        if self.problem_id == TIBadNodeOrPort.BAD_INTF:
+            return 'Invalid interface: %s' % what
+        elif self.problem_id == TIBadNodeOrPort.MISSING_LINK:
+            return 'There is no link connected to %s' % what
+        else:
+            return 'Unknown problem (code %d) with %s' % (self.problem_id, what)
 TI_MESSAGES.append(TIBadNodeOrPort)
 
 TI_PROTOCOL = LTProtocol(TI_MESSAGES, 'H', 'H')
