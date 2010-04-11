@@ -245,8 +245,7 @@ class TopologyInteractor(cmd.Cmd):
                          '    <float>    enable the link with lossiness (e.g., 5 => 5% loss)'])
 
     def do_ping(self, line):
-        """ping <dst> from <node>[:intf] -- sends a ping FROM node to dst.
-        """
+        """ping <dst> from <node>[:intf] -- sends a ping FROM node to dst."""
         args = line.split()
         if len(args) != 3:
             print 'syntax error: ping expects this syntax: <dst> from <node>'
@@ -348,6 +347,9 @@ class TopologyInteractor(cmd.Cmd):
         print
         reactor.callFromThread(reactor.stop)
         return True
+
+    def help_help(self):
+        print "Displays a list of available commands."
 
     def default(self, line):
         """Ignore lines beginning with '#'.  Print a message about an unknown
