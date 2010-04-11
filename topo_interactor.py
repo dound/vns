@@ -199,9 +199,16 @@ def msg_received(conn, msg):
             else:
                 print 'Authentication failed.'
         elif msg.get_type() ==  TIBadNodeOrPort.get_type():
-            print '\n', msg
+            txt = str(msg)
+            if conn.prev_bn_msg == txt:
+                conn.prev_bn_msg = None # only stop it once
+            else:
+                if conn.prev_bn_msg != None:
+                    print '***%s!=%s'%(conn.prev_bn_msg,txt)
+                conn.prev_bn_msg = txt
+                print '\n', txt
         elif msg.get_type() ==  TIBanner.get_type():
-            print '\n', msg
+            print '\n', msg.msg
         elif msg.get_type() ==  TIPacket.get_type():
             got_tapped_packet(conn, msg)
         else:
@@ -213,6 +220,7 @@ def got_connected(conn, tid, username, auth_key):
     conn.username = username
     conn.auth_key = auth_key
     conn.tap_trackers = {} # key=(node,intf) => maps to TapTracker
+    conn.prev_bn_msg = None
 
 def got_disconnected(conn):
     print 'Disconnected!'
