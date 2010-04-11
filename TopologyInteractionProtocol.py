@@ -123,33 +123,36 @@ class TITap(TINodePortHeader):
     def get_type():
         return 3
 
-    def __init__(self, node_name, intf_name, tap, consume):
+    def __init__(self, node_name, intf_name, tap, consume=False, ip_only=False):
         """If tap is True, then packets arriving at the specified node on the
         specified interface will be forwarded to this connection.  If consume is
-        True, then any tapped packets will not be sent to the topology too."""
+        True, then any tapped packets will not be sent to the topology too.  If
+        ip_only is True, then only packets with an IP header will be tapped."""
         TINodePortHeader.__init__(self, node_name, intf_name)
         self.tap = tap
         self.consume = consume
+        self.ip_only = ip_only
 
     def length(self):
         return TINodePortHeader.length(self) + TITap.SIZE
 
-    FORMAT = '> 2b'
+    FORMAT = '> 3b'
     SIZE = struct.calcsize(FORMAT)
 
     def pack(self):
         hdr = TINodePortHeader.pack(self)
-        return hdr + struct.pack(TITap.FORMAT, self.tap, self.consume)
+        return hdr + struct.pack(TITap.FORMAT, self.tap, self.consume, self.ip_only)
 
     @staticmethod
     def unpack(body):
         node_name, port_name, body = TINodePortHeader.unpack_hdr(body)
-        tap, consume = struct.unpack(TITap.FORMAT, body)
-        return TITap(node_name, port_name, tap, consume)
+        tap, consume, ip_only = struct.unpack(TITap.FORMAT, body)
+        return TITap(node_name, port_name, tap, consume, ip_only)
 
     def __str__(self):
         prefix = 'TAP' if self.tap else 'UNTAP'
         suffix = ' [CONSUME]' if self.tap and self.consume else ''
+        suffix += ' [IP ONLY]' if self.tap and self.ip_only else ''
         return '%s %s%s' % (prefix, TINodePortHeader.__str__(self), suffix)
 TI_MESSAGES.append(TITap)
 
