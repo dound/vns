@@ -306,13 +306,15 @@ class Topology():
             self.pending_incoming_packets = [] # clear the list
 
     def get_node_and_intf_with_link(self, node_name, intf_name):
-        """Returns a 2-tuple containg the named node and interface if they exist
-        and there is a link from it.  Otherwise a string describing the problem
-        is returned."""
+        """Returns a 2-tuple containing the named node and interface if they
+        exist and there is a link from it.  Case-insensitive.  Otherwise
+        TIBadNodeOrPort is raised."""
+        node_name = node_name.lower()
+        intf_name = intf_name.lower()
         for n in self.nodes:
-            if n.name == node_name:
+            if n.name.lower() == node_name:
                 for intf in n.interfaces:
-                    if intf.name == intf_name:
+                    if intf.name.lower() == intf_name:
                         if intf.link:
                             return (n, intf)
                         else:
