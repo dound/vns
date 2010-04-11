@@ -12,12 +12,126 @@ from ltprotocol.ltprotocol import LTTwistedClient
 from twisted.internet import reactor
 
 from LoggingHelper import pcap_write_header, pcap_write_packet, pktstr
-from TopologyInteractionProtocol import TI_DEFAULT_PORT, TI_PROTOCOL, TIModifyLink, \
-    TIOpen, TIPacket, TIPingFromRequest, TIBadNodeOrPort, TIBanner, TITap
+from TopologyInteractionProtocol import *
 from VNSProtocol import VNSAuthRequest, VNSAuthReply, VNSAuthStatus
 
 # whether this program is in the process of terminating
 TERMINATE = False
+
+def main(argv=sys.argv[1:]):
+    """Parses command-line arguments and then runs the TI client."""
+    usage = """usage: %prog [options] -t <TOPO_ID>
+Connects to the VNS Topology Interaction service."""
+    parser = OptionParser(usage)
+    parser.add_option("-s", "--server",
+                      default='vns-2.stanford.edu',
+                      help="VNS server IP address or hostname [default:%default]")
+    parser.add_option("-t", "--topo_id", # specified as an option for consistency with sr args
+                      default=-1, type="int",
+                      help="Topology ID to interact with")
+    parser.add_option("-u", "--username",
+                      default=os.getlogin(),
+                      help="VNS username [default:%default]")
+    parser.add_option("-a", "--auth_key_file",
+                      default='auth_key',
+                      help="File containing your auth key [default:%default]")
+
+    (options, args) = parser.parse_args(argv)
+    if len(args) > 0:
+        parser.error("too many arguments")
+
+    if options.topo_id == -1:
+        parser.error("-t (topology id to interact with) must be specified")
+
+    # get the auth key
+    try:
+        fp = open(options.auth_key_file, 'r')
+        auth_key = fp.read()
+        auth_key = auth_key[:len(auth_key)-1] # remove trailing \n
+        fp.close()
+    except IOError, e:
+        print 'Unable to load authentication key from %s: %s' % (options.auth_key_file, e)
+        return
+
+    # connect to the server and handle messages it sends us
+    print 'Connecting to VNS server at %s ...' % options.server
+    client = TIClient(options.topo_id, options.username, auth_key)
+    client.connect(options.server, TI_DEFAULT_PORT)
+    reactor.run()
+
+class TIClient(LTTwistedClient):
+    """Implements methods for handling messages received and events from a
+    Topology Interaction protocol client connection."""
+    def __init__(self, tid, username, auth_key):
+        LTTwistedClient.__init__(self, TI_PROTOCOL, self.msg_received, self.got_connected, self.got_disconnected, False)
+        self.conn = None
+        self.tid = tid
+        self.username = username
+        self.auth_key = auth_key
+        self.prev_bn_msg = None
+        self.tap_trackers = {} # key=(node,intf) => maps to TapTracker
+
+    def msg_received(self, conn, msg):
+        """Handles messages received from the TI server.  Starts the
+        TopologyInteractor command-line interface once authentication is complete."""
+        if msg is not None:
+            if msg.get_type() == VNSAuthRequest.get_type():
+                print 'Authenticating as %s' % self.username
+                sha1_of_salted_pw = hashlib.sha1(msg.salt + self.auth_key).digest()
+                conn.send(VNSAuthReply(self.username, sha1_of_salted_pw))
+            elif msg.get_type() == VNSAuthStatus.get_type():
+                if msg.auth_ok:
+                    print 'Authentication successful.'
+                    conn.send(TIOpen(self.tid))
+                    reactor.callInThread(TopologyInteractor(self).cmdloop)
+                else:
+                    print 'Authentication failed.'
+            elif msg.get_type() ==  TIBadNodeOrPort.get_type():
+                txt = str(msg)
+                if self.prev_bn_msg == txt:
+                    self.prev_bn_msg = None # only stop it once
+                else:
+                    if self.prev_bn_msg != None:
+                        print '***%s!=%s'%(self.prev_bn_msg,txt)
+                    self.prev_bn_msg = txt
+                    print '\n', txt
+            elif msg.get_type() ==  TIBanner.get_type():
+                print '\n', msg.msg
+            elif msg.get_type() ==  TIPacket.get_type():
+                self.got_tapped_packet(msg)
+            else:
+                print 'unexpected TI message received: %s' % msg
+
+    def got_connected(self, conn):
+        print 'Connected!'
+        self.conn = conn
+
+    def got_disconnected(self, conn):
+        print 'Disconnected!'
+        try:
+            reactor.stop()
+        except:
+            pass
+        global TERMINATE
+        TERMINATE = True
+
+    def got_tapped_packet(self, packet_msg):
+        # check to see if we were waiting for a reply to a ping we sent
+        n, i = (packet_msg.node_name, packet_msg.intf_name)
+        key = (n, i)
+        try:
+            tt = self.tap_trackers[key]
+        except KeyError:
+            return
+
+        if tt.got_packet(packet_msg.ethernet_frame):
+            src_ip = packet_msg.ethernet_frame[26:30]
+            print '%s:%s received ECHO REPLY from %s' % (n, i, socket.inet_ntoa(src_ip))
+
+            # stop the tap if we aren't listening for any more replies from (n,i)
+            if tt.is_done():
+                del self.tap_trackers[key]
+                self.conn.send(TITap(n, i, False))
 
 class TapHandler(object):
     """Contains info about and handles a tap on a particular node:port."""
@@ -281,121 +395,6 @@ class TopologyInteractor(cmd.Cmd):
         else:
             completions = []
         return completions
-
-def main(argv=sys.argv[1:]):
-    """Parses command-line arguments and then runs the TI client."""
-    usage = """usage: %prog [options] -t <TOPO_ID>
-Connects to the VNS Topology Interaction service."""
-    parser = OptionParser(usage)
-    parser.add_option("-s", "--server",
-                      default='vns-2.stanford.edu',
-                      help="VNS server IP address or hostname [default:%default]")
-    parser.add_option("-t", "--topo_id", # specified as an option for consistency with sr args
-                      default=-1, type="int",
-                      help="Topology ID to interact with")
-    parser.add_option("-u", "--username",
-                      default=os.getlogin(),
-                      help="VNS username [default:%default]")
-    parser.add_option("-a", "--auth_key_file",
-                      default='auth_key',
-                      help="File containing your auth key [default:%default]")
-
-    (options, args) = parser.parse_args(argv)
-    if len(args) > 0:
-        parser.error("too many arguments")
-
-    if options.topo_id == -1:
-        parser.error("-t (topology id to interact with) must be specified")
-
-    # get the auth key
-    try:
-        fp = open(options.auth_key_file, 'r')
-        auth_key = fp.read()
-        auth_key = auth_key[:len(auth_key)-1] # remove trailing \n
-        fp.close()
-    except IOError, e:
-        print 'Unable to load authentication key from %s: %s' % (options.auth_key_file, e)
-        return
-
-    # connect to the server and handle messages it sends us
-    print 'Connecting to VNS server at %s ...' % options.server
-    client = TIClient(options.topo_id, options.username, auth_key)
-    client.connect(options.server, TI_DEFAULT_PORT)
-    reactor.run()
-
-class TIClient(LTTwistedClient):
-    """Implements methods for handling messages received and events from a
-    Topology Interaction protocol client connection."""
-    def __init__(self, tid, username, auth_key):
-        LTTwistedClient.__init__(self, TI_PROTOCOL, self.msg_received, self.got_connected, self.got_disconnected, False)
-        self.conn = None
-        self.tid = tid
-        self.username = username
-        self.auth_key = auth_key
-        self.prev_bn_msg = None
-        self.tap_trackers = {} # key=(node,intf) => maps to TapTracker
-
-    def msg_received(self, conn, msg):
-        """Handles messages received from the TI server.  Starts the
-        TopologyInteractor command-line interface once authentication is complete."""
-        if msg is not None:
-            if msg.get_type() == VNSAuthRequest.get_type():
-                print 'Authenticating as %s' % self.username
-                sha1_of_salted_pw = hashlib.sha1(msg.salt + self.auth_key).digest()
-                conn.send(VNSAuthReply(self.username, sha1_of_salted_pw))
-            elif msg.get_type() == VNSAuthStatus.get_type():
-                if msg.auth_ok:
-                    print 'Authentication successful.'
-                    conn.send(TIOpen(self.tid))
-                    reactor.callInThread(TopologyInteractor(self).cmdloop)
-                else:
-                    print 'Authentication failed.'
-            elif msg.get_type() ==  TIBadNodeOrPort.get_type():
-                txt = str(msg)
-                if self.prev_bn_msg == txt:
-                    self.prev_bn_msg = None # only stop it once
-                else:
-                    if self.prev_bn_msg != None:
-                        print '***%s!=%s'%(self.prev_bn_msg,txt)
-                    self.prev_bn_msg = txt
-                    print '\n', txt
-            elif msg.get_type() ==  TIBanner.get_type():
-                print '\n', msg.msg
-            elif msg.get_type() ==  TIPacket.get_type():
-                self.got_tapped_packet(msg)
-            else:
-                print 'unexpected TI message received: %s' % msg
-
-    def got_connected(self, conn):
-        print 'Connected!'
-        self.conn = conn
-
-    def got_disconnected(self, conn):
-        print 'Disconnected!'
-        try:
-            reactor.stop()
-        except:
-            pass
-        global TERMINATE
-        TERMINATE = True
-
-    def got_tapped_packet(self, packet_msg):
-        # check to see if we were waiting for a reply to a ping we sent
-        n, i = (packet_msg.node_name, packet_msg.intf_name)
-        key = (n, i)
-        try:
-            tt = self.tap_trackers[key]
-        except KeyError:
-            return
-
-        if tt.got_packet(packet_msg.ethernet_frame):
-            src_ip = packet_msg.ethernet_frame[26:30]
-            print '%s:%s received ECHO REPLY from %s' % (n, i, socket.inet_ntoa(src_ip))
-
-            # stop the tap if we aren't listening for any more replies from (n,i)
-            if tt.is_done():
-                del self.tap_trackers[key]
-                self.conn.send(TITap(n, i, False))
 
 if __name__ == "__main__":
     main()
