@@ -508,10 +508,13 @@ class VNSSimulator:
 
     def handle_ti_open_msg(self, conn, open_msg):
         tid = open_msg.topo_id
-        if not self.topologies.has_key(tid):
+        try:
+            topo = self.topologies[tid]
+        except KeyError:
             self.terminate_ti_connection(conn, 'ERROR: Topology %d is not currently active' % tid)
-        else:
-            self.ti_clients[conn] = tid
+            return
+        self.ti_clients[conn] = tid
+        topo.interactors.append(conn)
 
     def ti_conn_to_topo(self, conn):
         """Gets the topology associated with the specifeid ti connection.  Returns
