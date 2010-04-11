@@ -11,6 +11,7 @@ import sys
 from ltprotocol.ltprotocol import LTTwistedClient
 from twisted.internet import reactor
 
+from LoggingHelper import pcap_write_header, pcap_write_packet, pktstr
 from TopologyInteractionProtocol import TI_DEFAULT_PORT, TI_PROTOCOL, TIOpen, TIPacket, TIPingFromRequest, TIBadNodeOrPort, TIBanner, TITap
 from VNSProtocol import VNSAuthRequest, VNSAuthReply, VNSAuthStatus
 
@@ -31,38 +32,70 @@ def get_node_and_port(x):
     else:
         return out
 
-class TapTracker(object):
-    def __init__(self, ping_req):
-        """Constructs a new TapTracker to wait for a reply for ping_req."""
-        self.node_name = ping_req.node_name
-        self.intf_name = ping_req.intf_name
+class TapHandler(object):
+    def __init__(self, permanent):
+        """Constructs a new TapTracker.  If permanent is True, then it continues
+        until explicitly disabled.  Otherwise, is_done() will return True
+        whenever an echo reply has been received for each new_echo_request_sent()
+        call."""
         self.num_replies_outstanding = 0
+        self.permanent = permanent
+        self.print_recv_packets = False
+        self.log_fp = None
+        self.waiting_for_replies_from = {} # maps dst IPs to # replies outstanding
 
-        # maps destination IPs to # replies outstanding
-        self.waiting_for_replies_from = {}
-        self.new_echo_request_sent(ping_req)
+
+    def __del__(self):
+        if self.log_fp:
+            self.log_fp.close()
+
+    def toggle_screen_logging(self):
+        self.print_recv_packets = not self.print_recv_packets
+
+    def set_file_logging(self, filename):
+        if not filename:
+            self.log_fp = None
+        else:
+            self.log_fp = open(filename, 'w')
+            pcap_write_header(self.log_fp)
 
     def is_done(self):
-        """Returns True if no more replies are expected."""
-        return self.num_replies_outstanding == 0
+        """Returns True if no more replies are expected and this is not a
+        permanent tap."""
+        return self.num_replies_outstanding==0 and not self.permanent
 
     def new_echo_request_sent(self, ping_req):
         """Adds an additional echo request to wait for a response for."""
         v = self.waiting_for_replies_from.get(ping_req.dst_ip, 0)
         self.waiting_for_replies_from[ping_req.dst_ip] = v + 1
+        self.num_replies_outstanding += 1
 
-    def note_reply(self, from_ip):
-        """Indicates that an echo reply has been received from the specified IP.
-        Returns True if this TapTracker was expecting this reply."""
-        try:
-            n = self.waiting_for_replies_from[from_ip]
-            if n > 0:
-                self.waiting_for_replies_from[from_ip] = n - 1
-                self.num_replies_outstanding -= 1
-                return True
-        except KeyError:
-            pass # don't care about echo replies we didn't ask for
+    def got_packet(self, pkt):
+        """Handles packets received as a result of this tap.  If the packet is
+        an echo reply to an echo request we sent, then True is returned."""
+        # log the packet if requested
+        if self.print_recv_packets:
+            print pktstr(pkt, noop=False)
+        if self.log_fp:
+            pcap_write_packet(self.log_fp, pkt)
+
+        # see if this was an echo reply we were waiting for
+        if self.num_replies_outstanding > 0:
+            return self.__check_for_echo_reply(pkt)
         return False
+
+    def __check_for_echo_reply(self, pkt):
+        if len(pkt)>=14+20+8 and pkt[12:14]=='\x08\x00' and pkt[23]=='\x01' and pkt[34]=='\x00':
+            src_ip = pkt[26:30]
+            try:
+                n = self.waiting_for_replies_from[src_ip]
+                if n > 0:
+                    self.waiting_for_replies_from[src_ip] = n - 1
+                    self.num_replies_outstanding -= 1
+                    return True
+            except KeyError:
+                pass # don't care about echo replies we didn't ask for
+            return False
 
 def setup_tap_then_send_ping(conn, ping_req):
     """Starts an IP tap on the node/intf which the ping is requested from and
@@ -74,7 +107,9 @@ def setup_tap_then_send_ping(conn, ping_req):
         tt = conn.tap_trackers[key]
         tt.new_echo_request_sent(ping_req)
     except KeyError:
-        conn.tap_trackers[key] = TapTracker(ping_req)
+        tt = TapHandler(False)
+        tt.new_echo_request_sent(ping_req)
+        conn.tap_trackers[key] = tt
 
     conn.send(TITap(n, i, True, False, True))
     conn.send(ping_req)
@@ -232,19 +267,17 @@ def got_disconnected(conn):
     TERMINATE = True
 
 def got_tapped_packet(conn, packet_msg):
-    # check to see if the tap got an ICMP Echo Reply
-    pkt = packet_msg.ethernet_frame
-    if len(pkt)>=14+20+8 and pkt[12:14]=='\x08\x00' and pkt[23]=='\x01' and pkt[34]=='\x00':
-        # check to see if we were waiting for a reply to a ping we sent
-        n, i = (packet_msg.node_name, packet_msg.intf_name)
-        key = (n, i)
-        try:
-            tt = conn.tap_trackers[key]
-        except KeyError:
-            return
-        src_ip = pkt[26:30]
-        if tt.note_reply(src_ip):
-            print '%s:%s received ECHO REPLY from %s' % (n, i, socket.inet_ntoa(src_ip))
+    # check to see if we were waiting for a reply to a ping we sent
+    n, i = (packet_msg.node_name, packet_msg.intf_name)
+    key = (n, i)
+    try:
+        tt = conn.tap_trackers[key]
+    except KeyError:
+        return
+
+    if tt.got_packet(packet_msg.ethernet_frame):
+        src_ip = packet_msg.ethernet_frame[26:30]
+        print '%s:%s received ECHO REPLY from %s' % (n, i, socket.inet_ntoa(src_ip))
 
         # stop the tap if we aren't listening for any more replies from (n,i)
         if tt.is_done():
