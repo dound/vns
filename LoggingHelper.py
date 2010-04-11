@@ -1,12 +1,15 @@
 """Defines some simple helper methods for logging."""
 
 import logging
-import struct
-import traceback
 from socket import inet_ntoa
+import struct
+import time
+import traceback
 
 from impacket.ImpactDecoder import EthDecoder
 from impacket.ImpactPacket import ImpactPacketException
+
+PCAP_SNAPLEN = 1514
 
 def log_exception(lvl, msg):
     """Like logging.exception(msg) except you may choose what level to log to."""
@@ -53,3 +56,24 @@ def pktstr(pkt, noop=True):
         return ret.replace('\n', '\n    ')
     except ImpactPacketException as e:
         return 'packet=%s (decoding failed: %s)' % (hexstr(pkt), str(e))
+
+def pcap_write_header(fp):
+    magic = 0xa1b2c3d4
+    version_major = 2
+    version_minor = 4
+    this_zone = 0
+    sigfigs = 0
+    snaplen = PCAP_SNAPLEN
+    linktype = 1  # ethernet
+    hdr = struct.pack('>I 2H 4I', magic, version_major, version_minor, this_zone, sigfigs, snaplen, linktype)
+    fp.write(hdr)
+
+def pcap_write_packet(fp, pkt):
+    now = time.time()
+    sec = int(now)
+    microsec = int(1000000 * (now - sec))
+    sz_actual = len(pkt)
+    sz_written = min(PCAP_SNAPLEN, sz_actual)
+    hdr = struct.pack('> 4I', sec, microsec, sz_written, sz_actual)
+    fp.write(hdr)
+    fp.write(pkt[:sz_written])
