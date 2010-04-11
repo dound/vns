@@ -20,7 +20,8 @@ TERMINATE = False
 
 # completions for sr topologies
 PING_NODE_COMPLETIONS = ['server1', 'server2']
-NODE_COMPLETIONS = PING_NODE_COMPLETIONS + ['vrhost:eth0', 'vrhost:eth1', 'vrhost:eth2']
+NODE_COMPLETIONS = PING_NODE_COMPLETIONS + ['vrhost:eth0', 'vrhost:eth1', 'vrhost:eth2', 'gateway']
+TAP_CMDS = ['off', 'screen']
 
 def get_node_and_port(x):
     """Returns a (node,port) pair from a string in the format <node>[:<port>]."""
@@ -122,7 +123,7 @@ class TopologyInteractor(cmd.Cmd):
         self.conn = ti_conn
 
     def do_ping(self, line):
-        """ping <dst> from <node>: Sends a ping FROM node to dst.
+        """ping <dst> from <node>[:intf] -- sends a ping FROM node to dst.
         """
         args = line.split()
         if len(args) != 3:
@@ -154,11 +155,67 @@ class TopologyInteractor(cmd.Cmd):
             completions = ['from '+s for s in PING_NODE_COMPLETIONS]
         elif len(splits)<3 or len(splits)>4:
             completions = []
-        elif not text:
-            completions = PING_NODE_COMPLETIONS[:]
         else:
-            completions = [n for n in PING_NODE_COMPLETIONS if n.startswith(text)]
+            if text:
+                completions = [n for n in PING_NODE_COMPLETIONS if n.startswith(text)]
+            else:
+                completions = PING_NODE_COMPLETIONS[:]
         return completions
+
+    def do_tap(self, line):
+        args = line.split()
+        if len(args) != 2:
+            print 'syntax error: tap expects this syntax: <node>[:intf] <command>'
+            return
+        node, cmd = args
+        try:
+            n, i = get_node_and_port(node)
+        except ValueError, e:
+            print e
+            return
+        key = (n, i)
+        try:
+            if cmd == 'off':
+                del self.conn.tap_trackers[key]
+                reactor.callFromThread(self.conn.send, TITap(n, i, False))
+                return
+            else:
+                tt = self.conn.tap_trackers[key]
+                tt.permanent = True
+        except KeyError:
+            if cmd == 'off':
+                print 'There is no tap on %s:%s' % (n, i)
+                return
+            tt = TapHandler(permanent=True)
+            reactor.callFromThread(self.conn.send, TITap(n, i, True))
+            self.conn.tap_trackers[key] = tt
+        if cmd == 'screen':
+            tt.toggle_screen_logging()
+        else: # cmd is a filename
+            tt.set_file_logging(cmd)
+
+    def complete_tap(self, text, line, begidx, endidx):
+        splits = (line+'x').split(' ')
+        if len(splits)==2:
+            if text:
+                completions = [n for n in NODE_COMPLETIONS if n.startswith(text)]
+            else:
+                completions = NODE_COMPLETIONS[:]
+        elif len(splits)==3:
+            if text:
+                completions = [n for n in TAP_CMDS if n.startswith(text)]
+            else:
+                completions = TAP_CMDS[:]
+        else:
+            completions = []
+        return completions
+
+    def help_tap(self):
+        print '\n'.join(["tap <node>[:intf] <command>",
+                         "  commands:",
+                         "     off           deletes the tap",
+                         "     screen        toggles the printing of packets the tap receives",
+                         "     <filename>    dumps packets the tap receives to a pcap file"])
 
     def do_EOF(self, line):
         """Terminates this session."""
