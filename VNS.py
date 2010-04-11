@@ -26,7 +26,8 @@ import AddressAllocation
 from LoggingHelper import log_exception, addrstr, pktstr
 import ProtocolHelper
 from Topology import TapConfig, Topology, TopologyCreationException
-from TopologyInteractionProtocol import TI_DEFAULT_PORT, create_ti_server, TIOpen, TIPacket, TIBanner, TIPingFromRequest, TITap, TIBadNodeOrPort
+from TopologyInteractionProtocol import TI_DEFAULT_PORT, create_ti_server, TIOpen, TIPacket, TIBanner, TIPingFromRequest, TITap, TIBadNodeOrPort,\
+    TIModifyLink
 from TopologyResolver import TopologyResolver
 from VNSProtocol import VNS_DEFAULT_PORT, create_vns_server
 from VNSProtocol import VNSOpen, VNSClose, VNSPacket, VNSOpenTemplate, VNSBanner, VNSRtable, VNSAuthRequest, VNSAuthReply, VNSAuthStatus
@@ -501,6 +502,8 @@ class VNSSimulator:
                     self.handle_ti_pingfrom_msg(conn, topo, ti_msg)
                 elif ti_msg.get_type() == TITap.get_type():
                     self.handle_ti_tap_msg(conn, topo, ti_msg)
+                elif ti_msg.get_type() == TIModifyLink.get_type():
+                    self.handle_ti_modifylink_msg(conn, topo, ti_msg)
                 else:
                     logging.debug('unexpected VNS TI message received: %s' % ti_msg)
             except TIBadNodeOrPort, e:
@@ -540,6 +543,10 @@ class VNSSimulator:
     def handle_ti_tap_msg(self, conn, topo, tm):
         conf = TapConfig(conn, tm.consume, tm.ip_only)
         msg = topo.tap_node(tm.node_name, tm.intf_name, tm.tap, conf)
+        conn.send(TIBanner(msg))
+
+    def handle_ti_modifylink_msg(self, conn, topo, mlm):
+        msg = topo.modify_link(mlm.node_name, mlm.intf_name, mlm.lossiness)
         conn.send(TIBanner(msg))
 
     def handle_ti_client_disconnected(self, conn):

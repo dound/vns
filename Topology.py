@@ -345,6 +345,21 @@ class Topology():
         ethernet_frame = ethernet_hdr + ip_hdr + icmp
         intf.link.send_to_other(intf, ethernet_frame)
 
+    def modify_link(self, node_name, intf_name, new_lossiness):
+        """Sets the link attached to the specified port to the new lossiness
+        value.  Returns a string describing what happened.  TIBadNodeOrPort is
+        raised the node or interface specified is invalid."""
+        if new_lossiness<0.0 or new_lossiness>1.0:
+            return "Error: lossiness requested is not in [0,1]"
+        _, i = self.get_node_and_intf_with_link(node_name, intf_name)
+        old_lossiness_txt = i.link.str_lossiness()
+        i.link.lossiness = new_lossiness
+        new_lossiness_txt = i.link.str_lossiness()
+        if old_lossiness_txt == new_lossiness_txt:
+            return 'No link modification required (was already %s)' % old_lossiness_txt
+        else:
+            return 'Link modified from "%s" to "%s"' % (old_lossiness_txt, new_lossiness_txt)
+
     def tap_node(self, node_name, intf_name, tap, tap_config):
         """Sets the state of a tap on a given node.  If there was a tap, then
         it is replaced if a new one is specified.  A string is returned which
@@ -494,7 +509,7 @@ class Link:
         If the destination interface is tapped, the packet will be handled based
         on the TapConfig.
         """
-        if self.lossiness==0.0 or random.random()>self.lossiness:
+        if self.lossiness==0.0 or (not self.lossiness>=1.0 and random.random()>self.lossiness):
             intf_to = self.get_other(intf_from)
             if intf_to.tap:
                 if intf_to.tap.handle_packet(str(intf_to.owner.name), str(intf_to.name), packet):
@@ -509,6 +524,14 @@ class Link:
         """Returns the name and port of the other side of the link."""
         other_intf = self.get_other(intf)
         return '-> %s:%s' % (other_intf.owner.name, other_intf.name)
+
+    def str_lossiness(self):
+        if self.lossiness == 0.0:
+            return 'enabled'
+        elif self.lossiness >= 1.0:
+            return 'disabled'
+        else:
+            return 'enabled but lossy (loses %.2f%% of packets)' % (100.0*self.lossiness,)
 
 class Node:
     """A node in a topology"""
