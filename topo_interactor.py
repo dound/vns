@@ -223,6 +223,12 @@ class TopologyInteractor(cmd.Cmd):
         reactor.callFromThread(reactor.stop)
         return True
 
+    def default(self, line):
+        """Ignore lines beginning with '#'.  Print a message about an unknown
+        command otherwise."""
+        if line.lstrip()[0] != '#':  # line is non-empty
+            print 'Unknown command: %s' % line.split(' ')[0]
+
     def emptyline(self):
         pass
 
