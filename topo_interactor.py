@@ -116,7 +116,7 @@ class TopologyInteractor(cmd.Cmd):
     def complete_ping(self, text, line, begidx, endidx):
         splits = (line+'x').split(' ')
         if len(splits)==3:
-            completions = ['from']
+            completions = ['from '+s for s in PING_NODE_COMPLETIONS]
         elif len(splits)<3 or len(splits)>4:
             completions = []
         elif not text:
