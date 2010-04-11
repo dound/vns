@@ -68,7 +68,7 @@ def setup_tap_then_send_ping(conn, ping_req):
     """Starts an IP tap on the node/intf which the ping is requested from and
     then sings the ping request.  Also sets up a TapTracker to monitor the tap
     and track replies so we know when we can uninstall the tap."""
-    n, i = ping_req.node_name, ping_req.intf_name
+    n, i = ping_req.node_name.lower(), ping_req.intf_name.lower()
     key = (n, i)
     try:
         tt = conn.tap_trackers[key]

@@ -43,11 +43,11 @@ class TINodePortHeader(LTMessage):
         LTMessage.__init__(self)
         assert len(node_name)<=30, 'node_name may only be up to 30 characters'
         assert len(intf_name)<=5,  'intf_name may only be up to 5 characters'
-        self.node_name = node_name
-        self.intf_name = intf_name
+        self.node_name = node_name.lower()
+        self.intf_name = intf_name.lower()
 
     def length(self):
-        return TIInjectPacket.HEADER_SIZE
+        return TINodePortHeader.HEADER_SIZE
 
     HEADER_FORMAT = '> 30s 5s'
     HEADER_SIZE = struct.calcsize(HEADER_FORMAT)
