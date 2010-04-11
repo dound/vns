@@ -11,7 +11,7 @@ import sys
 from ltprotocol.ltprotocol import LTTwistedClient
 from twisted.internet import reactor
 
-from TopologyInteractionProtocol import TI_DEFAULT_PORT, TI_PROTOCOL, TIOpen, TIPingFromRequest, TIBadNodeOrPort, TIBanner
+from TopologyInteractionProtocol import TI_DEFAULT_PORT, TI_PROTOCOL, TIOpen, TIPacket, TIPingFromRequest, TIBadNodeOrPort, TIBanner, TITap
 from VNSProtocol import VNSAuthRequest, VNSAuthReply, VNSAuthStatus
 
 # whether this program is in the process of terminating
@@ -30,6 +30,54 @@ def get_node_and_port(x):
         raise ValueError("node must be specified in the form <name>[:<port>]")
     else:
         return out
+
+class TapTracker(object):
+    def __init__(self, ping_req):
+        """Constructs a new TapTracker to wait for a reply for ping_req."""
+        self.node_name = ping_req.node_name
+        self.intf_name = ping_req.intf_name
+        self.num_replies_outstanding = 0
+
+        # maps destination IPs to # replies outstanding
+        self.waiting_for_replies_from = {}
+        self.new_echo_request_sent(ping_req)
+
+    def is_done(self):
+        """Returns True if no more replies are expected."""
+        return self.num_replies_outstanding == 0
+
+    def new_echo_request_sent(self, ping_req):
+        """Adds an additional echo request to wait for a response for."""
+        v = self.waiting_for_replies_from.get(ping_req.dst_ip, 0)
+        self.waiting_for_replies_from[ping_req.dst_ip] = v + 1
+
+    def note_reply(self, from_ip):
+        """Indicates that an echo reply has been received from the specified IP.
+        Returns True if this TapTracker was expecting this reply."""
+        try:
+            n = self.waiting_for_replies_from[from_ip]
+            if n > 0:
+                self.waiting_for_replies_from[from_ip] = n - 1
+                self.num_replies_outstanding -= 1
+                return True
+        except KeyError:
+            pass # don't care about echo replies we didn't ask for
+        return False
+
+def setup_tap_then_send_ping(conn, ping_req):
+    """Starts an IP tap on the node/intf which the ping is requested from and
+    then sings the ping request.  Also sets up a TapTracker to monitor the tap
+    and track replies so we know when we can uninstall the tap."""
+    n, i = ping_req.node_name, ping_req.intf_name
+    key = (n, i)
+    try:
+        tt = conn.tap_trackers[key]
+        tt.new_echo_request_sent(ping_req)
+    except KeyError:
+        conn.tap_trackers[key] = TapTracker(ping_req)
+
+    conn.send(TITap(n, i, True, False, True))
+    conn.send(ping_req)
 
 class TopologyInteractor(cmd.Cmd):
     prompt = '>>> '
@@ -58,7 +106,7 @@ class TopologyInteractor(cmd.Cmd):
             except socket.gaierror, e: # thrown if dst cannot be converted to an IP
                 print e
                 return
-            reactor.callFromThread(self.conn.send, ping_req)
+            reactor.callFromThread(setup_tap_then_send_ping, self.conn, ping_req)
             dst_ip = socket.inet_ntoa(ping_req.dst_ip)
             extra = ''
             if dst_ip != dst:
@@ -152,6 +200,8 @@ def msg_received(conn, msg):
             print '\n', msg
         elif msg.get_type() ==  TIBanner.get_type():
             print '\n', msg
+        elif msg.get_type() ==  TIPacket.get_type():
+            got_tapped_packet(conn, msg)
         else:
             print 'unexpected TI message received: %s' % msg
 
@@ -160,6 +210,7 @@ def got_connected(conn, tid, username, auth_key):
     conn.tid = tid
     conn.username = username
     conn.auth_key = auth_key
+    conn.tap_trackers = {} # key=(node,intf) => maps to TapTracker
 
 def got_disconnected(conn):
     print 'Disconnected!'
@@ -169,6 +220,26 @@ def got_disconnected(conn):
         pass
     global TERMINATE
     TERMINATE = True
+
+def got_tapped_packet(conn, packet_msg):
+    # check to see if the tap got an ICMP Echo Reply
+    pkt = packet_msg.ethernet_frame
+    if len(pkt)>=14+20+8 and pkt[12:14]=='\x08\x00' and pkt[23]=='\x01' and pkt[34]=='\x00':
+        # check to see if we were waiting for a reply to a ping we sent
+        n, i = (packet_msg.node_name, packet_msg.intf_name)
+        key = (n, i)
+        try:
+            tt = conn.tap_trackers[key]
+        except KeyError:
+            return
+        src_ip = pkt[26:30]
+        if tt.note_reply(src_ip):
+            print '%s:%s received ECHO REPLY from %s' % (n, i, socket.inet_ntoa(src_ip))
+
+        # stop the tap if we aren't listening for any more replies from (n,i)
+        if tt.is_done():
+            del conn.tap_trackers[key]
+            conn.send(TITap(n, i, False))
 
 if __name__ == "__main__":
     main()
