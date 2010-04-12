@@ -244,7 +244,7 @@ class TopologyInteractor(cmd.Cmd):
         return self.node_completion_helper(text, line, self.LINKMOD_CMDS)
 
     def help_linkmod(self):
-        print '\n'.join(['link <node>[:intf] <new_state>',
+        print '\n'.join(['linkmod <node>[:intf] <new_state>',
                          '  new_state:',
                          '    up         enable the link (0% loss)',
                          '    down       disable the link (100% loss)',
