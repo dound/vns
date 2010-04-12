@@ -79,7 +79,10 @@ class HTTPServer(TCPServer):
                 f.close()
 
                 ext_and_trailer = match.group(1)
-                is_html = HTTPServer.RE_HTML.search(ext_and_trailer)
+                if len(body) < 2**16:
+                    is_html = HTTPServer.RE_HTML.search(ext_and_trailer)
+                else:
+                    is_html = False  # too big, don't waste time on the RE
                 header = HTTPServer.__make_response_header(True, is_html)
                 return header + body
             except IOError as e:
