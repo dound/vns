@@ -213,6 +213,12 @@ class TopologyInteractor(cmd.Cmd):
         cmd.Cmd.__init__(self)
         self.tic = ti_client
 
+    def do_exit(self, line):
+        self.do_EOF(line)
+
+    def help_exit(self):
+        self.help_EOF()
+
     def do_linkmod(self, line):
         args = line.split()
         if len(args) != 2:
@@ -343,10 +349,12 @@ class TopologyInteractor(cmd.Cmd):
                          "     <filename>    dumps packets the tap receives to a pcap file"])
 
     def do_EOF(self, line):
-        """Terminates this session."""
         print
         reactor.callFromThread(reactor.stop)
         return True
+
+    def help_EOF(self):
+        print 'Terminates this session'
 
     def help_help(self):
         print "Displays a list of available commands."
