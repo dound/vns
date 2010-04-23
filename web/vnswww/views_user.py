@@ -77,7 +77,7 @@ def user_access_check(request, callee, requester_is_staff_req, requester_in_same
         msg = 'Only %s or staff in his/her organization may do that.' % un
         if requester.is_superuser:
             messages.info(request, msg + "  However, so can you since you're a superuser.")
-        elif not requester.get_profile().is_staff() or not requester.org==up.org:
+        elif not requester.get_profile().is_staff() or not requester.get_profile().org==up.org:
             messages.error(request, msg)
             return HttpResponseRedirect('/')
 
