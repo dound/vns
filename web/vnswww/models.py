@@ -330,15 +330,15 @@ class Port(Model):
                              "this port's IP.  If -1, then this port will not "  + \
                              "be assigned any IP.")
 
-    def get_tree(self):
+    def get_tree(self, error_if_nontree=False):
         """Returns the topology tree (from a depth-first search) rooted at this
         port excluding any ports attached to nodes in the completed_nodes
         dictionary.  In particular, the root node is returned.  Each node is a
         PortTreeNode consisting of the Port the node represents and a list of
         nodes (its subtrees)."""
-        return self.__get_tree({})
+        return self.__get_tree({}, error_if_nontree)
 
-    def __get_tree(self, completed_nodes):
+    def __get_tree(self, completed_nodes, error_if_nontree=False):
         # the node this port is attached to is now on the completed list
         assert not completed_nodes.has_key(self.node), 'loop due to node re-exploration'
         completed_nodes[self.node] = True
@@ -356,9 +356,11 @@ class Port(Model):
                 conn_port = link.get_other(port)
                 if completed_nodes.has_key(conn_port.node):
                     # already explored the link from this port, so it has no new subtree to add
+                    if error_if_nontree:
+                        raise NonTreeException()
                     subtree.append(PortTreeNode(port))
                 else:
-                    subtree.append(PortTreeNode(port, [conn_port.__get_tree(completed_nodes)]))
+                    subtree.append(PortTreeNode(port, [conn_port.__get_tree(completed_nodes, error_if_nontree)]))
             except Link.DoesNotExist:
                 # no link from the other port, so it has no subtree
                 subtree.append(PortTreeNode(port))
@@ -367,6 +369,10 @@ class Port(Model):
 
     def __unicode__(self):
         return u'%s: %s: %s' % (self.node.template.name, self.node.name, self.name)
+
+class NonTreeException(Exception):
+    def __init__(self):
+        Exception.__init__(self, "non-tree")
 
 class Link(Model):
     """A link connecting two nodes in a topology template."""

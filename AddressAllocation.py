@@ -41,8 +41,14 @@ def instantiate_template(owner, template, ip_block_from, src_filters, temporary,
     root = template.get_root_port()
     if not root:
         return ("template '%s' has no ports" % template.name,)
-    tree = root.get_tree()
-    num_addrs = tree.compute_subnet_size()
+    try:
+        tree = root.get_tree(True)
+        num_addrs = tree.compute_subnet_size()
+    except:
+        # topology graph has cycles - just make each link its own /31
+        tree = None
+        links = db.Link.objects.filter(port1__node__template=template)
+        num_addrs = len(links) * 2
 
     # try to give the user the allocation they most recently had
     alloc = __realloc_if_available(owner, template, ip_block_from) if use_recent_alloc_logic else None
@@ -55,7 +61,14 @@ def instantiate_template(owner, template, ip_block_from, src_filters, temporary,
 
     # create the topology and assign IP addresses
     start_addr = struct.unpack('>I', inet_aton(alloc.start_addr))[0]
-    assignments = tree.assign_addr(start_addr, alloc.size())
+    if tree:
+        assignments = tree.assign_addr(start_addr, alloc.size())
+    else:
+        assignments = []
+        for i,link in enumerate(links):
+            assignments.append((link.port1, start_addr+2*i,   31))
+            assignments.append((link.port2, start_addr+2*i+1, 31))
+
     t = db.Topology()
     t.owner = owner
     t.template = template
