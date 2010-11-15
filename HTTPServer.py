@@ -4,6 +4,8 @@ import re
 import socket
 import sys
 
+from LoggingHelper import addrstr
+from LoggingHelper import portstr
 from twisted.internet import reactor
 
 from TCPStack import TCPServer
@@ -44,7 +46,7 @@ class HTTPServer(TCPServer):
         url_requested = self.extract_http_get_request(conn)
         if url_requested:
             logging.debug('A URL has been requested: ' + url_requested)
-            conn.add_data_to_send(self.__make_response(url_requested))
+            conn.add_data_to_send(self.__make_response(url_requested, pkt))
             logging.debug('The requested URL has been sent; closing the connection')
             conn.close()
         return conn
@@ -61,10 +63,20 @@ class HTTPServer(TCPServer):
             header += '<html><body><h1>404: Page Not Found</h1></body></html>'
         return header
 
+    @staticmethod
+    def __make_response_dynamic_body(body, pkt):
+        """Replaces tags in a given response body with the proper values from
+        the request packet. This is used in order to see what request ip and
+        port the HTTPServer sees (useful for testing NAT)."""
+
+        body = body.replace('%SRC_PORT%', portstr(pkt.tcp_src_port))
+        body = body.replace('%SRC_IP%', addrstr(pkt.ip_src))
+        return body
+
     ALLOWED_CHARS = r'[-A-Za-z0-9_/]*'
     RE_OK_URL = re.compile(r'^%s([.]%s)?$' % (ALLOWED_CHARS, ALLOWED_CHARS))
     RE_HTML = re.compile('^[.]html?([?].*)?$')
-    def __make_response(self, url):
+    def __make_response(self, url, pkt):
         """Verifies that the URL requested is legitimate (alphanumeric, dash,
         underscore, and forward slash characters are permitted only).  A single
         period is also permitted (to separate a file name from an extension)."""
@@ -77,6 +89,9 @@ class HTTPServer(TCPServer):
                 f = open(self.serve_from + '/' + url, 'rb')
                 body = f.read()
                 f.close()
+
+                if url.endswith('.dyn'):
+                    body = HTTPServer.__make_response_dynamic_body(body, pkt)
 
                 ext_and_trailer = match.group(1)
                 if len(body) < 2**16:

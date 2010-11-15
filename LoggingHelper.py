@@ -26,6 +26,10 @@ def addrstr(addr):
         logging.warning('unexpected address length: %d' % sz)
         return hexstr(addr)
 
+def portstr(nbo_port):
+  """Returns a host byte order string for the given network byte order port."""
+  return str(struct.unpack('>H', nbo_port)[0])
+
 def split_then_join(s, chunk_sz, join_str):
     """Splits s into chunk_sz chunks and then joins those chunks using join_str."""
     return join_str.join([s[i*chunk_sz:(i+1)*chunk_sz] for i in range((len(s)-1)/chunk_sz+1)])
