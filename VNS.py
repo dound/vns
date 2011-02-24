@@ -373,10 +373,14 @@ class VNSSimulator:
             return
         ip_block_from = blocks[0]
 
+        if ot.get_src_filters() == VNSOpenTemplate.NO_SRC_FILTERS:
+            src_filters = []
+        else:
+            src_filters = ot.get_src_filters()
         err_msg, topo, alloc, tree = AddressAllocation.instantiate_template(conn.vns_user_profile.user,
                                                                             template,
                                                                             ip_block_from,
-                                                                            ot.get_src_filters(),
+                                                                            src_filters,
                                                                             True, True)
         if err_msg:
             self.terminate_connection(conn, err_msg)
