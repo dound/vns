@@ -144,11 +144,14 @@ class TopologyTemplate(Model):
                      help_text='The organization this template belongs to.')
     visibility = IntegerField(choices=VISIBILITY_CHOICES,
                               help_text='Who may see and use this template.')
-    readme = TextField(help_text='Template of the readme which will explain ' + \
-                       'the topology to the user.  Template tags start with $ ' + \
-                       'and include the following: $topo.id, $sim.gatewayip, ' + \
-                       "and $node.port.ip where node is a node's name and " + \
-                       "port is a port's name (e.g., $Server1.eth0.ip).")
+    readme = TextField(help_text='''Template of the readme which will explain \
+the topology to the user.  Template tags start with $: \
+$topo.id, $topo.gatewayip[15], and $node.port.ip[15[R]|_SameSzXY] where node is \
+a node's name and port is a port's name and X is one of L (left) or R (right) \
+and Y is one of D (dash) or S (space) (e.g., $Server1.eth0.ip or \
+$Server1.eth0.ip_SameSzLD [the latter will be replaced with the IP plus one \
+space and enough dashes on the left so that the replacement is the same size \
+as the source text]).''')
     rtable = TextField(help_text='Template of the rtable for the topology, if any.')
 
     def get_root_port(self):
@@ -169,7 +172,7 @@ class TopologyTemplate(Model):
             except IndexError:
                 return None # no ports in this topology
 
-    TEMPLATE_TEXT_REGEXP = re.compile(r'[$][a-zA-Z0-9.]+')
+    TEMPLATE_TEXT_REGEXP = re.compile(r'[$][a-zA-Z0-9._]+')
     def render_template_text(self, sim, topo, txt):
         # build the dictionary of all valid substitutions
         values = {}
@@ -177,8 +180,22 @@ class TopologyTemplate(Model):
         values['$topo.gatewayip15'] = ('%-15s' % sim.gatewayIP)
         values['$topo.id'] = topo.id
         for ipa in IPAssignment.objects.filter(port__node__template=self, topology=topo):
-            values['$%s.%s.ip' % (ipa.port.node.name, ipa.port.name)] = ipa.ip
-            values['$%s.%s.ip15' % (ipa.port.node.name, ipa.port.name)] = ('%-15s' % ipa.ip)
+            t = (ipa.port.node.name, ipa.port.name)
+            values['$%s.%s.ip' % t] = ipa.ip
+            values['$%s.%s.ip15' % t] = ('%-15s' % ipa.ip)
+            values['$%s.%s.ip15R' % t] = ('%15s' % ipa.ip)
+
+            more_pad_len = 0
+            space_pad = ''
+            src_len = len('$%s.%s.ip_SameSzXY' % t)  # min size is 16 even if %s are both 1 char ... intentional: matches min size of an IPv4 addr + 1
+            ip_len = len(str(ipa.ip))
+            if ip_len < src_len:
+                space_pad = ' '
+                more_pad_len = max(src_len - ip_len - 1, 0)
+            values['$%s.%s.ip_SameSzLS' % t] = '%s%s%s' % (' ' * more_pad_len, space_pad, ipa.ip)
+            values['$%s.%s.ip_SameSzLD' % t] = '%s%s%s' % ('-' * more_pad_len, space_pad, ipa.ip)
+            values['$%s.%s.ip_SameSzRS' % t] = '%s%s%s' % (ipa.ip, space_pad, ' ' * more_pad_len)
+            values['$%s.%s.ip_SameSzRD' % t] = '%s%s%s' % (ipa.ip, space_pad, '-' * more_pad_len)
 
         # define a function for substituting the appropriate value for an exp
         def repl(m):
